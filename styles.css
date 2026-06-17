@@ -1,0 +1,1155 @@
+:root {
+  --bg: #f6f7f8;
+  --panel: #ffffff;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --line: #dfe3e8;
+  --soft: #eef2f6;
+  --dark: #020617;
+  --accent: #0f766e;
+  --danger: #b91c1c;
+  --warning: #b45309;
+  --ok: #047857;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  min-height: 68px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.94);
+  padding: 12px clamp(16px, 3vw, 32px);
+  backdrop-filter: blur(14px);
+}
+
+.brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--dark);
+  color: white;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.brand strong,
+.brand span {
+  display: block;
+}
+
+.brand span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.topbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.primary-button,
+.ghost-button,
+.tool,
+.modality-tabs button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary-button {
+  background: var(--dark);
+  color: white;
+}
+
+.ghost-button,
+.tool,
+.modality-tabs button {
+  background: var(--soft);
+  color: var(--ink);
+}
+
+.tool.is-active,
+.modality-tabs button.is-active {
+  background: white;
+  color: var(--dark);
+}
+
+.shell {
+  display: grid;
+  max-width: 1520px;
+  grid-template-columns: 390px minmax(0, 1fr);
+  gap: 16px;
+  margin: 0 auto;
+  padding: 16px clamp(12px, 3vw, 32px) 32px;
+}
+
+.worklist,
+.workspace,
+.details {
+  min-width: 0;
+}
+
+.metrics {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.metrics article,
+.panel,
+.study-header {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.metrics article {
+  padding: 16px;
+}
+
+.metrics span,
+.study-meta span,
+.eyebrow {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.metrics strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 26px;
+}
+
+.metrics small {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+}
+
+.searchbar {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.searchbar input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  outline: 0;
+}
+
+.searchbar input:focus {
+  border-color: #94a3b8;
+  box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.22);
+}
+
+.modality-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.modality-tabs button.is-active {
+  background: var(--dark);
+  color: white;
+}
+
+.study-list {
+  max-height: 610px;
+  overflow-y: auto;
+}
+
+.study-row {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: white;
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.study-row:hover,
+.study-row.is-selected {
+  background: #f1f5f9;
+}
+
+.modality-badge {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--dark);
+  color: white;
+  font-weight: 900;
+}
+
+.study-row h3,
+.study-row p {
+  margin: 0;
+}
+
+.study-row h3 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+}
+
+.study-row p {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.study-row footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.priority {
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.priority.acil {
+  background: #fee2e2;
+  color: var(--danger);
+}
+
+.priority.rutin {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.priority.kontrol {
+  background: #d1fae5;
+  color: var(--ok);
+}
+
+.study-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+  padding: 18px;
+}
+
+h1,
+h2 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+.study-header h1 {
+  margin-top: 3px;
+  font-size: clamp(26px, 4vw, 42px);
+}
+
+.study-header p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.study-meta {
+  display: grid;
+  min-width: 380px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  text-align: right;
+}
+
+.study-meta strong {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.viewer-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 16px;
+}
+
+.viewer-panel {
+  overflow: hidden;
+  border: 1px solid #111827;
+  border-radius: 10px;
+  background: var(--dark);
+}
+
+.viewer-toolbar {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 10px;
+}
+
+.tool {
+  flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+}
+
+.viewport-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: #1e293b;
+}
+
+.viewport {
+  position: relative;
+  min-height: 330px;
+  overflow: hidden;
+  background: black;
+}
+
+.scan {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    radial-gradient(circle at center, #334155 0, #111827 55%, #020617 100%);
+  background-size: 24px 24px, 24px 24px, auto;
+}
+
+.scan::before {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.03) 0 1px,
+      transparent 1px 5px
+    );
+  content: "";
+  mix-blend-mode: screen;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.scan-alt {
+  filter: contrast(1.08) brightness(0.9);
+}
+
+.dicom-object,
+.dicom-object i {
+  position: absolute;
+  display: block;
+}
+
+.dicom-object {
+  inset: 11% 12%;
+  filter: drop-shadow(0 0 28px rgba(203, 213, 225, 0.24));
+}
+
+.scan-small .dicom-object {
+  inset: 18% 20%;
+}
+
+.brain {
+  inset: 12% 23%;
+  border-radius: 48%;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(226, 232, 240, 0.48), transparent 24%),
+    radial-gradient(circle at 37% 44%, rgba(203, 213, 225, 0.5), transparent 28%),
+    radial-gradient(circle at 62% 44%, rgba(203, 213, 225, 0.5), transparent 28%),
+    radial-gradient(circle, rgba(148, 163, 184, 0.48) 0 42%, rgba(15, 23, 42, 0.86) 64%);
+  box-shadow: inset 0 0 0 12px rgba(226, 232, 240, 0.2);
+}
+
+.brain.ct {
+  box-shadow:
+    inset 0 0 0 14px rgba(241, 245, 249, 0.48),
+    inset 0 0 0 24px rgba(148, 163, 184, 0.18);
+}
+
+.brain-rim,
+.skull {
+  inset: 2%;
+  border: 2px solid rgba(226, 232, 240, 0.42);
+  border-radius: 48%;
+}
+
+.brain-lobe.left,
+.brain-lobe.right {
+  top: 24%;
+  width: 32%;
+  height: 42%;
+  border-radius: 50%;
+  background: rgba(226, 232, 240, 0.1);
+}
+
+.brain-lobe.left {
+  left: 18%;
+}
+
+.brain-lobe.right {
+  right: 18%;
+}
+
+.ventricle {
+  top: 40%;
+  width: 11%;
+  height: 20%;
+  border-radius: 50%;
+  background: rgba(2, 6, 23, 0.58);
+}
+
+.ventricle.left {
+  left: 39%;
+}
+
+.ventricle.right {
+  right: 39%;
+}
+
+.midline {
+  left: 50%;
+  top: 16%;
+  width: 2px;
+  height: 70%;
+  background: rgba(226, 232, 240, 0.18);
+}
+
+.chest,
+.xchest {
+  inset: 10% 18%;
+}
+
+.ribcage,
+.body-ring,
+.face {
+  inset: 4% 8%;
+  border: 2px solid rgba(226, 232, 240, 0.32);
+  border-radius: 42%;
+}
+
+.lung {
+  top: 18%;
+  width: 31%;
+  height: 56%;
+  border-radius: 48% 48% 34% 34%;
+  background:
+    radial-gradient(circle at center, rgba(2, 6, 23, 0.72), rgba(30, 41, 59, 0.18) 70%);
+  border: 1px solid rgba(226, 232, 240, 0.16);
+}
+
+.lung.left {
+  left: 17%;
+}
+
+.lung.right {
+  right: 17%;
+}
+
+.heart {
+  left: 45%;
+  top: 44%;
+  width: 17%;
+  height: 24%;
+  border-radius: 50% 45% 55% 45%;
+  background: rgba(226, 232, 240, 0.22);
+  transform: rotate(-18deg);
+}
+
+.spine-dot {
+  left: 47%;
+  top: 70%;
+  width: 8%;
+  height: 9%;
+  border-radius: 50%;
+  background: rgba(241, 245, 249, 0.4);
+}
+
+.xchest {
+  background: radial-gradient(ellipse at center, rgba(226, 232, 240, 0.18), transparent 66%);
+}
+
+.clavicle {
+  top: 16%;
+  width: 34%;
+  height: 2px;
+  background: rgba(241, 245, 249, 0.48);
+}
+
+.clavicle.left {
+  left: 15%;
+  transform: rotate(10deg);
+}
+
+.clavicle.right {
+  right: 15%;
+  transform: rotate(-10deg);
+}
+
+.diaphragm {
+  left: 18%;
+  right: 18%;
+  bottom: 18%;
+  height: 11%;
+  border-top: 3px solid rgba(226, 232, 240, 0.32);
+  border-radius: 50%;
+}
+
+.abdomen {
+  inset: 10% 18%;
+  border-radius: 42%;
+  background: radial-gradient(circle, rgba(148, 163, 184, 0.16), transparent 60%);
+}
+
+.liver {
+  left: 18%;
+  top: 24%;
+  width: 33%;
+  height: 24%;
+  border-radius: 48% 30% 45% 35%;
+  background: rgba(226, 232, 240, 0.28);
+}
+
+.spleen {
+  right: 23%;
+  top: 31%;
+  width: 15%;
+  height: 25%;
+  border-radius: 50%;
+  background: rgba(226, 232, 240, 0.2);
+}
+
+.kidney {
+  top: 58%;
+  width: 13%;
+  height: 20%;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.66);
+  border: 1px solid rgba(226, 232, 240, 0.25);
+}
+
+.kidney.left {
+  left: 31%;
+}
+
+.kidney.right {
+  right: 31%;
+}
+
+.sinus {
+  inset: 12% 24%;
+}
+
+.face {
+  border-radius: 38% 38% 48% 48%;
+}
+
+.orbit {
+  top: 23%;
+  width: 20%;
+  height: 18%;
+  border-radius: 50%;
+  background: rgba(2, 6, 23, 0.72);
+}
+
+.orbit.left {
+  left: 24%;
+}
+
+.orbit.right {
+  right: 24%;
+}
+
+.sinus-cavity {
+  top: 48%;
+  width: 19%;
+  height: 19%;
+  border-radius: 50%;
+  background: rgba(2, 6, 23, 0.58);
+}
+
+.sinus-cavity.left {
+  left: 29%;
+}
+
+.sinus-cavity.right {
+  right: 29%;
+}
+
+.septum {
+  left: 50%;
+  top: 43%;
+  width: 2px;
+  height: 32%;
+  background: rgba(226, 232, 240, 0.28);
+}
+
+.spine {
+  inset: 8% 36%;
+}
+
+.canal {
+  left: 46%;
+  top: 4%;
+  width: 8%;
+  height: 88%;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.3);
+}
+
+.disc,
+.vertebra {
+  left: 26%;
+  width: 48%;
+  border-radius: 8px;
+}
+
+.disc {
+  height: 9%;
+  background: rgba(2, 6, 23, 0.74);
+  border: 1px solid rgba(226, 232, 240, 0.2);
+}
+
+.disc.d1 { top: 16%; }
+.disc.d2 { top: 32%; }
+.disc.d3 { top: 48%; }
+.disc.d4 { top: 64%; }
+
+.vertebra {
+  height: 10%;
+  background: rgba(226, 232, 240, 0.28);
+}
+
+.vertebra.v1 { top: 23%; }
+.vertebra.v2 { top: 55%; }
+
+.knee {
+  inset: 12% 25%;
+}
+
+.femur,
+.tibia {
+  left: 28%;
+  width: 44%;
+  height: 29%;
+  border-radius: 42%;
+  background: rgba(226, 232, 240, 0.26);
+}
+
+.femur {
+  top: 12%;
+}
+
+.tibia {
+  bottom: 10%;
+}
+
+.meniscus {
+  top: 46%;
+  width: 18%;
+  height: 9%;
+  border-radius: 50%;
+  background: rgba(2, 6, 23, 0.78);
+}
+
+.meniscus.left { left: 29%; }
+.meniscus.right { right: 29%; }
+
+.patella {
+  right: 15%;
+  top: 38%;
+  width: 13%;
+  height: 20%;
+  border-radius: 50%;
+  background: rgba(226, 232, 240, 0.22);
+}
+
+.shoulder {
+  inset: 15% 23%;
+}
+
+.humerus {
+  left: 48%;
+  top: 48%;
+  width: 18%;
+  height: 38%;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.28);
+  transform: rotate(-12deg);
+}
+
+.glenoid {
+  left: 32%;
+  top: 34%;
+  width: 29%;
+  height: 28%;
+  border-radius: 50%;
+  background: rgba(226, 232, 240, 0.2);
+}
+
+.acromion {
+  left: 26%;
+  top: 22%;
+  width: 42%;
+  height: 11%;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.23);
+}
+
+.cuff {
+  left: 42%;
+  top: 35%;
+  width: 31%;
+  height: 6%;
+  border-radius: 999px;
+  border-top: 3px solid rgba(241, 245, 249, 0.42);
+}
+
+.mammo {
+  inset: 8% 18%;
+}
+
+.breast {
+  top: 14%;
+  width: 62%;
+  height: 72%;
+  border-radius: 55% 36% 48% 54%;
+  background:
+    radial-gradient(circle at 55% 44%, rgba(255, 255, 255, 0.42), transparent 4%),
+    radial-gradient(circle at 38% 52%, rgba(226, 232, 240, 0.38), transparent 34%),
+    radial-gradient(ellipse, rgba(148, 163, 184, 0.3), rgba(15, 23, 42, 0.78));
+  box-shadow: inset 0 0 0 2px rgba(241, 245, 249, 0.28);
+}
+
+.breast.right { right: 8%; }
+.breast.left { left: 8%; transform: scaleX(-1); }
+
+.pectoralis {
+  left: 12%;
+  top: 10%;
+  width: 26%;
+  height: 58%;
+  background: rgba(241, 245, 249, 0.2);
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+
+.marker {
+  right: 12%;
+  top: 10%;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(241, 245, 249, 0.8);
+  border-radius: 50%;
+}
+
+.speck {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.speck.s1 { left: 58%; top: 44%; }
+.speck.s2 { left: 66%; top: 57%; }
+
+.ankle {
+  inset: 9% 28%;
+}
+
+.ankle .tibia,
+.ankle .fibula {
+  top: 8%;
+  height: 58%;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.3);
+}
+
+.ankle .tibia {
+  left: 34%;
+  width: 18%;
+}
+
+.ankle .fibula {
+  right: 28%;
+  width: 11%;
+}
+
+.talus {
+  left: 30%;
+  top: 62%;
+  width: 36%;
+  height: 16%;
+  border-radius: 50%;
+  background: rgba(226, 232, 240, 0.24);
+}
+
+.calcaneus {
+  left: 22%;
+  top: 76%;
+  width: 49%;
+  height: 14%;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.2);
+}
+
+.cervical {
+  inset: 8% 34%;
+}
+
+.spine-line {
+  left: 46%;
+  top: 18%;
+  width: 13%;
+  height: 66%;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.26);
+}
+
+.cdisc {
+  left: 33%;
+  width: 42%;
+  height: 7%;
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.7);
+}
+
+.cdisc.c1 { top: 35%; }
+.cdisc.c2 { top: 48%; }
+.cdisc.c3 { top: 61%; }
+
+.jaw {
+  left: 20%;
+  top: 7%;
+  width: 60%;
+  height: 16%;
+  border-radius: 40%;
+  background: rgba(226, 232, 240, 0.2);
+}
+
+.ultrasound {
+  inset: 5% 12%;
+  background:
+    repeating-radial-gradient(circle at 50% 0%, rgba(255,255,255,0.18) 0 1px, transparent 2px 8px);
+  clip-path: polygon(50% 0, 100% 96%, 0 96%);
+}
+
+.sector {
+  inset: 0;
+  background: radial-gradient(circle at 50% 18%, rgba(226, 232, 240, 0.36), rgba(15, 23, 42, 0.78) 65%);
+}
+
+.ultrasound .organ {
+  left: 27%;
+  top: 48%;
+  width: 48%;
+  height: 22%;
+  border-radius: 50%;
+  background: rgba(226, 232, 240, 0.25);
+}
+
+.shadow {
+  left: 50%;
+  top: 40%;
+  width: 12%;
+  height: 45%;
+  background: rgba(2, 6, 23, 0.45);
+  transform: translateX(-50%);
+}
+
+.measure {
+  left: 35%;
+  top: 45%;
+  width: 34%;
+  height: 1px;
+  background: rgba(167, 243, 208, 0.72);
+}
+
+.thyroid .lobe {
+  top: 42%;
+  width: 22%;
+  height: 29%;
+  border-radius: 50%;
+  background: rgba(226, 232, 240, 0.26);
+}
+
+.thyroid .lobe.left { left: 28%; }
+.thyroid .lobe.right { right: 28%; }
+
+.nodule {
+  right: 36%;
+  top: 52%;
+  width: 8%;
+  height: 8%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.gest-sac {
+  left: 31%;
+  top: 38%;
+  width: 42%;
+  height: 35%;
+  border-radius: 50%;
+  border: 2px solid rgba(226, 232, 240, 0.36);
+  background: rgba(2, 6, 23, 0.32);
+}
+
+.fetal-head {
+  left: 48%;
+  top: 48%;
+  width: 11%;
+  height: 11%;
+  border-radius: 50%;
+  background: rgba(226, 232, 240, 0.32);
+}
+
+.fetal-body {
+  left: 40%;
+  top: 57%;
+  width: 22%;
+  height: 10%;
+  border-radius: 50%;
+  background: rgba(226, 232, 240, 0.25);
+  transform: rotate(-20deg);
+}
+
+.angio {
+  inset: 8% 18%;
+  filter: drop-shadow(0 0 16px rgba(255,255,255,0.32));
+}
+
+.vessel {
+  background: rgba(241, 245, 249, 0.78);
+  border-radius: 999px;
+  transform-origin: left center;
+}
+
+.vessel.main {
+  left: 27%;
+  top: 20%;
+  width: 9%;
+  height: 64%;
+  transform: rotate(16deg);
+}
+
+.vessel.branch {
+  left: 43%;
+  height: 4%;
+}
+
+.branch.b1 {
+  top: 28%;
+  width: 37%;
+  transform: rotate(-24deg);
+}
+
+.branch.b2 {
+  top: 45%;
+  width: 34%;
+  transform: rotate(10deg);
+}
+
+.branch.b3 {
+  top: 61%;
+  width: 28%;
+  transform: rotate(32deg);
+}
+
+.stenosis {
+  left: 58%;
+  top: 43%;
+  width: 9%;
+  height: 6%;
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.7);
+  box-shadow: 0 0 0 2px rgba(241, 245, 249, 0.38);
+}
+
+.generic {
+  inset: 12% 24%;
+  border-radius: 45%;
+  background: radial-gradient(circle, rgba(148, 163, 184, 0.42), rgba(15, 23, 42, 0.88));
+}
+
+.overlay {
+  position: absolute;
+  margin: 0;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #a7f3d0;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.55;
+  padding: 7px 8px;
+  white-space: pre-wrap;
+}
+
+.overlay.left {
+  left: 12px;
+  top: 12px;
+}
+
+.overlay.right {
+  right: 12px;
+  top: 12px;
+  text-align: right;
+}
+
+.details {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.detail-panel {
+  padding: 16px;
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.panel-title h2 {
+  font-size: 17px;
+}
+
+.panel-title span {
+  border-radius: 999px;
+  background: var(--soft);
+  padding: 4px 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.series-list,
+.findings-list {
+  display: grid;
+  gap: 8px;
+}
+
+.series-card,
+.finding {
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.series-card strong {
+  display: block;
+}
+
+.series-card span,
+.finding {
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.full {
+  width: 100%;
+  margin-top: 14px;
+}
+
+@media (max-width: 1180px) {
+  .shell,
+  .viewer-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .study-list {
+    max-height: 380px;
+  }
+}
+
+@media (max-width: 760px) {
+  .topbar,
+  .study-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .topbar-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .metrics,
+  .study-meta,
+  .viewport-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .study-meta {
+    min-width: 0;
+    text-align: left;
+  }
+
+  .viewport {
+    min-height: 270px;
+  }
+}

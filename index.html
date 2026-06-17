@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RAI PACS</title>
+    <meta
+      name="description"
+      content="Buluttan çalışan, hızlı ve mobil uyumlu PACS MVP arayüzü."
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">RAI</div>
+        <div>
+          <strong>RAI PACS</strong>
+          <span>Bulut görüntüleme iş istasyonu</span>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="ghost-button" type="button">Audit</button>
+        <button class="primary-button" type="button">Güvenli paylaş</button>
+      </div>
+    </header>
+
+    <main class="shell">
+      <section class="worklist">
+        <div class="metrics">
+          <article>
+            <span>Bugün gelen</span>
+            <strong>42</strong>
+            <small>11 acil çalışma</small>
+          </article>
+          <article>
+            <span>Ortalama açılış</span>
+            <strong>1.8 sn</strong>
+            <small>Önizleme cache aktif</small>
+          </article>
+          <article>
+            <span>Rapor bekleyen</span>
+            <strong>18</strong>
+            <small>6 BT, 9 MR, 3 US</small>
+          </article>
+        </div>
+
+        <div class="panel">
+          <div class="searchbar">
+            <input
+              id="study-search"
+              type="search"
+              placeholder="Hasta, protokol veya hekim ara"
+              autocomplete="off"
+            />
+          </div>
+          <div class="modality-tabs" id="modality-tabs"></div>
+          <div class="study-list" id="study-list"></div>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <div class="study-header">
+          <div>
+            <div class="eyebrow">Seçili çalışma</div>
+            <h1 id="patient-name">-</h1>
+            <p id="study-summary">-</p>
+          </div>
+          <div class="study-meta">
+            <div>
+              <span>Tarih</span>
+              <strong id="study-date">-</strong>
+            </div>
+            <div>
+              <span>Modalite</span>
+              <strong id="study-modality">-</strong>
+            </div>
+            <div>
+              <span>Seri</span>
+              <strong id="study-series-count">-</strong>
+            </div>
+            <div>
+              <span>Durum</span>
+              <strong id="study-status">-</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="viewer-layout">
+          <section class="viewer-panel">
+            <div class="viewer-toolbar">
+              <button type="button" class="tool is-active">Pencere</button>
+              <button type="button" class="tool">Zoom</button>
+              <button type="button" class="tool">Pan</button>
+              <button type="button" class="tool">Ölçüm</button>
+              <button type="button" class="tool">Layout</button>
+            </div>
+            <div class="viewport-grid">
+              <div class="viewport">
+                <div class="scan scan-main"></div>
+                <pre class="overlay left" id="overlay-left-a"></pre>
+                <pre class="overlay right" id="overlay-right-a"></pre>
+              </div>
+              <div class="viewport">
+                <div class="scan scan-secondary"></div>
+                <pre class="overlay left" id="overlay-left-b"></pre>
+                <pre class="overlay right" id="overlay-right-b"></pre>
+              </div>
+              <div class="viewport">
+                <div class="scan scan-secondary scan-small"></div>
+                <pre class="overlay left" id="overlay-left-c"></pre>
+                <pre class="overlay right" id="overlay-right-c"></pre>
+              </div>
+              <div class="viewport">
+                <div class="scan scan-main scan-small"></div>
+                <pre class="overlay left" id="overlay-left-d"></pre>
+                <pre class="overlay right" id="overlay-right-d"></pre>
+              </div>
+            </div>
+          </section>
+
+          <aside class="details">
+            <section class="panel detail-panel">
+              <div class="panel-title">
+                <h2>Seriler</h2>
+                <span id="series-total">0</span>
+              </div>
+              <div id="series-list" class="series-list"></div>
+            </section>
+
+            <section class="panel detail-panel">
+              <div class="panel-title">
+                <h2>Ön rapor</h2>
+                <span>AI draft</span>
+              </div>
+              <div id="findings-list" class="findings-list"></div>
+              <button class="primary-button full" type="button">Raporu aç</button>
+            </section>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
