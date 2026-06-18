@@ -1,0 +1,75 @@
+import { redirect } from "next/navigation"
+
+import { isSupabaseConfigured } from "@/lib/config"
+import { createClient } from "@/lib/supabase/server"
+import type { AppRole } from "@/lib/types"
+
+export type CurrentUser = {
+  id: string
+  email: string
+  fullName: string
+  role: AppRole
+  organizationId: string
+  organizationName: string
+  demo: boolean
+}
+
+const demoUser: CurrentUser = {
+  id: "demo-admin",
+  email: "admin@raipacs.com",
+  fullName: "RAI PACS Admin",
+  role: "admin",
+  organizationId: "demo-organization",
+  organizationName: "RAI Klinik Goruntuleme",
+  demo: true,
+}
+
+export async function getCurrentUser(): Promise<CurrentUser | null> {
+  if (!isSupabaseConfigured) return demoUser
+
+  const supabase = await createClient()
+  const { data } = await supabase.auth.getClaims()
+  const userId = data?.claims?.sub
+  if (!userId) return null
+
+  const { data: membership } = await supabase
+    .from("organization_members")
+    .select(
+      "role, organization_id, profiles(full_name), organizations(name)"
+    )
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .limit(1)
+    .maybeSingle()
+
+  if (!membership) return null
+
+  const profile = Array.isArray(membership.profiles)
+    ? membership.profiles[0]
+    : membership.profiles
+  const organization = Array.isArray(membership.organizations)
+    ? membership.organizations[0]
+    : membership.organizations
+
+  return {
+    id: userId,
+    email: String(data.claims.email ?? ""),
+    fullName: profile?.full_name ?? String(data.claims.email ?? "Kullanici"),
+    role: membership.role as AppRole,
+    organizationId: membership.organization_id,
+    organizationName: organization?.name ?? "RAI PACS",
+    demo: false,
+  }
+}
+
+export async function requireUser() {
+  const user = await getCurrentUser()
+  if (!user) redirect("/login")
+  return user
+}
+
+export async function requireAdmin() {
+  const user = await requireUser()
+  if (user.role !== "admin") redirect("/worklist")
+  return user
+}

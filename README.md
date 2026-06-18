@@ -1,6 +1,6 @@
 # RAI PACS MVP
 
-Bu klasor ana Next.js projesinden bagimsiz statik PACS MVP sitesidir.
+Bulut tabanli PACS ve radyoloji is istasyonu.
 
 Canli site:
 
@@ -8,17 +8,34 @@ Canli site:
 https://app.raipacs.com
 ```
 
-Calistirmak icin:
+## Gelistirme
 
 ```bash
-cd pacs-site
-python3 -m http.server 4173 --bind 127.0.0.1
+npm install
+cp .env.example .env.local
+npm run dev
 ```
 
-Adres:
+Next.js gelistirme adresi:
+
+```bash
+http://127.0.0.1:4174
+```
+
+Supabase env degiskenleri bosken uygulama demo modunda calisir.
+
+## Veritabani
+
+Ilk migration:
 
 ```text
-http://127.0.0.1:4173
+supabase/migrations/202606180001_initial_pacs_schema.sql
 ```
 
-`localhost:3000` kullanmaz.
+Mimari notlari: `docs/architecture.md`.
+
+## Mevcut statik prototip
+
+GitHub Pages yayini kesilmemesi icin `index.html`, `app.js` ve `styles.css`
+dosyalari gecici olarak repoda tutulur. Next.js uygulamasi Vercel'e alindiginda
+alan adi yeni deploymente tasinabilir.
