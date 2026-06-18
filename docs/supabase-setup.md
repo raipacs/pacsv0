@@ -54,5 +54,11 @@ start with the organization UUID:
 {organization_id}/{study_uid}/{series_uid}/{sop_uid}.dcm
 ```
 
-Uploads should be performed by a trusted ingestion service after validating
-DICOM UIDs, object size and SHA-256 checksum.
+The MVP app uploads original DICOM objects directly from the browser to
+Supabase Storage. Next/Vercel prepares the storage key and writes metadata
+after the upload succeeds, so large DICOM files do not pass through the
+application server.
+
+PostgreSQL stores only study, series and instance metadata, including the
+DICOM UIDs, object size, SHA-256 checksum, bucket name and immutable storage
+key. The DICOM file bytes stay in Supabase Storage.

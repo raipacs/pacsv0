@@ -32,7 +32,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -172,7 +173,9 @@ p {
 }
 
 .login-form input,
-.table-tools input {
+.table-tools input,
+.upload-form input,
+.upload-form select {
   width: 100%;
   min-height: 44px;
   border: 1px solid var(--border);
@@ -184,7 +187,9 @@ p {
 }
 
 .login-form input:focus,
-.table-tools input:focus {
+.table-tools input:focus,
+.upload-form input:focus,
+.upload-form select:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
 }
@@ -360,6 +365,75 @@ p {
 
 .data-panel {
   overflow: hidden;
+}
+
+.upload-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 0.75fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.upload-panel {
+  overflow: visible;
+}
+
+.upload-form {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+
+.upload-form fieldset {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.upload-form label {
+  display: grid;
+  gap: 8px;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.upload-form label.wide {
+  grid-column: 1 / -1;
+}
+
+.upload-form input[type="file"] {
+  padding: 9px 12px;
+}
+
+.form-status {
+  margin: 0;
+  border-radius: var(--radius);
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.form-status.idle {
+  color: #344054;
+  background: #f2f4f7;
+}
+
+.form-status.success {
+  color: var(--success);
+  background: #d1fadf;
+}
+
+.form-status.error {
+  color: var(--danger);
+  background: #fee4e2;
 }
 
 .table-tools {
@@ -585,6 +659,8 @@ td span {
 
   .metric-row,
   .detail-grid,
+  .upload-layout,
+  .form-grid,
   .info-panel dl {
     grid-template-columns: 1fr;
   }

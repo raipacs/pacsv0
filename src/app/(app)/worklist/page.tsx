@@ -1,3 +1,5 @@
+import Link from "next/link"
+
 import { WorklistTable } from "@/components/worklist-table"
 import { requireUser } from "@/lib/auth"
 import { getWorklist } from "@/lib/data"
@@ -20,9 +22,9 @@ export default async function WorklistPage() {
           <h1>Worklist</h1>
           <p>Atanmis ve bekleyen tetkikleri tek ekrandan yonetin.</p>
         </div>
-        <button className="button primary" type="button">
+        <Link className="button primary" href="/worklist/upload">
           DICOM yukle
-        </button>
+        </Link>
       </header>
       <section className="metric-row">
         <article>
