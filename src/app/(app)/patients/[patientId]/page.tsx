@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation"
 
+import { DicomInstanceActions } from "@/components/dicom-instance-actions"
 import { requireUser } from "@/lib/auth"
-import { getPatient, getWorklist } from "@/lib/data"
+import { getPatient, getPatientStudies } from "@/lib/data"
 
 export const metadata = { title: "Hasta detayi" }
 
@@ -15,9 +16,7 @@ export default async function PatientDetailPage({
   const patient = await getPatient(user.organizationId, patientId)
   if (!patient) notFound()
 
-  const studies = (await getWorklist(user.organizationId)).filter(
-    (study) => study.patientNumber === patient.patientNumber
-  )
+  const studies = await getPatientStudies(user.organizationId, patient.id)
 
   return (
     <>
@@ -73,6 +72,7 @@ export default async function PatientDetailPage({
                   <th>Aciklama</th>
                   <th>Modalite</th>
                   <th>Tarih</th>
+                  <th>DICOM</th>
                   <th>Durum</th>
                 </tr>
               </thead>
@@ -82,6 +82,10 @@ export default async function PatientDetailPage({
                     <td>{study.description}</td>
                     <td>{study.modality}</td>
                     <td>{study.date}</td>
+                    <td>
+                      <strong>{study.instanceCount}</strong>
+                      <span>instance</span>
+                    </td>
                     <td>{study.status}</td>
                   </tr>
                 ))}
@@ -92,6 +96,53 @@ export default async function PatientDetailPage({
           <p className="empty-state">Bu hasta icin demo tetkik bulunmuyor.</p>
         )}
       </section>
+      <section className="data-panel storage-panel">
+        <div className="panel-heading">
+          <h2>Storage instance referanslari</h2>
+        </div>
+        {studies.some((study) => study.instances.length > 0) ? (
+          <div className="responsive-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Accession</th>
+                  <th>SOP Instance UID</th>
+                  <th>Boyut</th>
+                  <th>Storage key</th>
+                  <th>Erisim</th>
+                </tr>
+              </thead>
+              <tbody>
+                {studies.flatMap((study) =>
+                  study.instances.map((instance) => (
+                    <tr key={instance.id}>
+                      <td>{study.accessionNumber}</td>
+                      <td>{instance.sopInstanceUid}</td>
+                      <td>{formatBytes(instance.sizeBytes)}</td>
+                      <td>
+                        <code>{instance.storageKey}</code>
+                      </td>
+                      <td>
+                        <DicomInstanceActions instanceId={instance.id} />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="empty-state">
+            Bu hasta icin Storage kayitli DICOM instance henuz yok.
+          </p>
+        )}
+      </section>
     </>
   )
+}
+
+function formatBytes(value: number) {
+  if (value < 1024) return `${value} B`
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
+  return `${(value / 1024 / 1024).toFixed(1)} MB`
 }

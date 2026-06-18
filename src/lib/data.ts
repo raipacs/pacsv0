@@ -1,7 +1,7 @@
 import { isSupabaseConfigured } from "@/lib/config"
 import { demoPatients, demoStudies } from "@/lib/demo-data"
 import { createClient } from "@/lib/supabase/server"
-import type { Patient, WorklistStudy } from "@/lib/types"
+import type { Patient, PatientStudy, WorklistStudy } from "@/lib/types"
 
 export async function getPatients(organizationId: string): Promise<Patient[]> {
   if (!isSupabaseConfigured) return demoPatients
@@ -90,6 +90,89 @@ export async function getWorklist(
         : "-",
       priority: mapPriority(study.priority),
       status: mapStatus(study.status),
+    }
+  })
+}
+
+export async function getPatientStudies(
+  organizationId: string,
+  patientId: string
+): Promise<PatientStudy[]> {
+  if (!isSupabaseConfigured) {
+    const patient = demoPatients.find((item) => item.id === patientId)
+    if (!patient) return []
+
+    return demoStudies
+      .filter((study) => study.patientNumber === patient.patientNumber)
+      .map((study) => ({
+        id: study.id,
+        accessionNumber: study.accessionNumber,
+        modality: study.modality,
+        description: study.description,
+        date: study.date,
+        status: study.status,
+        instanceCount: 0,
+        instances: [],
+      }))
+  }
+
+  const supabase = await createClient()
+  const { data: studies, error } = await supabase
+    .from("studies")
+    .select("id, accession_number, modality, description, study_at, status")
+    .eq("organization_id", organizationId)
+    .eq("patient_id", patientId)
+    .order("study_at", { ascending: false })
+
+  if (error) throw new Error(`Tetkikler alinamadi: ${error.message}`)
+  if (!studies?.length) return []
+
+  const studyIds = studies.map((study) => study.id)
+  const [{ data: series }, { data: instances }] = await Promise.all([
+    supabase
+      .from("series")
+      .select("id, study_id, instance_count")
+      .in("study_id", studyIds),
+    supabase
+      .from("instances")
+      .select(
+        "id, study_id, sop_instance_uid, instance_number, storage_bucket, storage_key, size_bytes, sha256, created_at"
+      )
+      .in("study_id", studyIds)
+      .order("instance_number", { ascending: true }),
+  ])
+
+  return studies.map((study) => {
+    const studyInstances = (instances ?? []).filter(
+      (instance) => instance.study_id === study.id
+    )
+    const seriesInstanceCount = (series ?? [])
+      .filter((item) => item.study_id === study.id)
+      .reduce((total, item) => total + (item.instance_count ?? 0), 0)
+
+    return {
+      id: study.id,
+      accessionNumber: study.accession_number,
+      modality: study.modality,
+      description: study.description ?? "Aciklama yok",
+      date: study.study_at
+        ? new Intl.DateTimeFormat("tr-TR", {
+            dateStyle: "short",
+            timeStyle: "short",
+          }).format(new Date(study.study_at))
+        : "-",
+      status: mapStatus(study.status),
+      instanceCount: Math.max(seriesInstanceCount, studyInstances.length),
+      instances: studyInstances.map((instance) => ({
+        id: instance.id,
+        sopInstanceUid: instance.sop_instance_uid,
+        instanceNumber: instance.instance_number,
+        storageBucket: instance.storage_bucket,
+        storageKey: instance.storage_key,
+        sizeBytes: instance.size_bytes,
+        sha256: instance.sha256,
+        createdAt: instance.created_at,
+      })),
     }
   })
 }

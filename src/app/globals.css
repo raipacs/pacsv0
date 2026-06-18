@@ -79,6 +79,12 @@ p {
   background: var(--surface);
 }
 
+.button.small {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
 .eyebrow {
   margin-bottom: 6px;
   color: var(--primary);
@@ -606,6 +612,30 @@ td span {
   margin: 0;
   padding: 32px;
   color: var(--muted);
+}
+
+.storage-panel {
+  margin-top: 16px;
+}
+
+.storage-panel code {
+  overflow-wrap: anywhere;
+  color: #344054;
+  font-size: 12px;
+}
+
+.inline-actions {
+  display: inline-flex;
+  max-width: 240px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline-error {
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 @media (max-width: 900px) {

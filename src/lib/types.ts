@@ -25,3 +25,25 @@ export type WorklistStudy = {
   priority: "Acil" | "Rutin" | "Kontrol"
   status: "Okunacak" | "Raporlanıyor" | "Tamamlandı"
 }
+
+export type DicomInstance = {
+  id: string
+  sopInstanceUid: string
+  instanceNumber: number | null
+  storageBucket: string
+  storageKey: string
+  sizeBytes: number
+  sha256: string
+  createdAt: string
+}
+
+export type PatientStudy = {
+  id: string
+  accessionNumber: string
+  modality: string
+  description: string
+  date: string
+  status: WorklistStudy["status"]
+  instanceCount: number
+  instances: DicomInstance[]
+}
