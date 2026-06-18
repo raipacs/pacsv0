@@ -2,6 +2,12 @@
 
 Bu klasor ana Next.js projesinden bagimsiz statik PACS MVP sitesidir.
 
+Canli site:
+
+```text
+https://app.raipacs.com
+```
+
 Calistirmak icin:
 
 ```bash
