@@ -34,7 +34,7 @@ export function LoginForm({ demoMode }: { demoMode: boolean }) {
       </label>
       {state.error ? <p className="form-error">{state.error}</p> : null}
       <button type="submit" className="button primary" disabled={pending}>
-        {pending ? "Giris yapiliyor..." : demoMode ? "Demo panele gir" : "Giris yap"}
+        {pending ? "Giriş yapılıyor..." : demoMode ? "Demo panele gir" : "Giriş yap"}
       </button>
     </form>
   )

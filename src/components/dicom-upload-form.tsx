@@ -51,13 +51,13 @@ export function DicomUploadForm({
     if (!supabaseConfigured) {
       setStatus({
         type: "error",
-        message: "Supabase env degiskenleri tanimlanmadan DICOM yuklenemez.",
+        message: "Supabase ortam değişkenleri tanımlanmadan DICOM yüklenemez.",
       })
       return
     }
 
     if (!(file instanceof File) || file.size === 0) {
-      setStatus({ type: "error", message: "Bir DICOM dosyasi secin." })
+      setStatus({ type: "error", message: "Bir DICOM dosyası seçin." })
       return
     }
 
@@ -65,7 +65,7 @@ export function DicomUploadForm({
       setStatus({
         type: "error",
         message:
-          "Bu MVP formu tek dosyada 512 MB ile sinirlidir. Daha buyuk DICOM aktarimi icin Storage ingestion servisi kullanilacak.",
+          "Bu MVP formu tek dosyada 512 MB ile sınırlıdır. Daha büyük DICOM aktarımı için Storage ingestion servisi kullanılacak.",
       })
       return
     }
@@ -73,13 +73,13 @@ export function DicomUploadForm({
     if (!(await hasDicomPreamble(file))) {
       setStatus({
         type: "error",
-        message: "Secilen dosyada DICOM preamble imzasi bulunamadi.",
+        message: "Seçilen dosyada DICOM preamble imzası bulunamadı.",
       })
       return
     }
 
     const input = formInput(formData)
-    setStatus({ type: "idle", message: "Dosya ozeti hesaplaniyor..." })
+    setStatus({ type: "idle", message: "Dosya özeti hesaplanıyor..." })
 
     startTransition(async () => {
       const prepared = await prepareDicomStorageUpload(input)
@@ -89,7 +89,7 @@ export function DicomUploadForm({
       }
 
       const sha256 = await digestSha256(file)
-      setStatus({ type: "idle", message: "DICOM Storage bucket'a yukleniyor..." })
+      setStatus({ type: "idle", message: "DICOM Storage bucket'a yükleniyor..." })
 
       const supabase = createClient()
       const { error: uploadError } = await supabase.storage
@@ -121,7 +121,7 @@ export function DicomUploadForm({
       form.reset()
       setStatus({
         type: "success",
-        message: "DICOM Storage'a yuklendi ve metadata kaydedildi.",
+        message: "DICOM Storage'a yüklendi ve metadata kaydedildi.",
       })
     })
   }
@@ -134,7 +134,7 @@ export function DicomUploadForm({
             Hasta
             <select name="patientId" required defaultValue="">
               <option value="" disabled>
-                Hasta secin
+                Hasta seçin
               </option>
               {patients.map((patient) => (
                 <option key={patient.id} value={patient.id}>
@@ -144,7 +144,7 @@ export function DicomUploadForm({
             </select>
           </label>
           <label>
-            DICOM dosyasi
+            DICOM dosyası
             <input
               name="dicomFile"
               type="file"
@@ -168,7 +168,7 @@ export function DicomUploadForm({
             </select>
           </label>
           <label>
-            Vucut bolgesi
+            Vücut bölgesi
             <input name="bodyPart" placeholder="Beyin, toraks, abdomen" />
           </label>
           <label>
@@ -176,11 +176,11 @@ export function DicomUploadForm({
             <input name="studyAt" type="datetime-local" defaultValue={defaultStudyAt} />
           </label>
           <label className="wide">
-            Aciklama
+            Açıklama
             <input name="description" placeholder="MR Beyin kontrastli" />
           </label>
           <label>
-            Oncelik
+            Öncelik
             <select name="priority" defaultValue="routine">
               <option value="routine">Rutin</option>
               <option value="urgent">Acil</option>
@@ -223,8 +223,8 @@ export function DicomUploadForm({
       ) : null}
       {!supabaseConfigured ? (
         <p className="form-status error">
-          Demo modda dosya yuklenmez. Vercel env degiskenleri ve Supabase
-          projesi baglaninca Storage aktif olur.
+          Demo modda dosya yüklenmez. Vercel ortam değişkenleri ve Supabase
+          projesi bağlanınca Storage aktif olur.
         </p>
       ) : null}
       <button
@@ -232,7 +232,7 @@ export function DicomUploadForm({
         type="submit"
         disabled={isPending || !supabaseConfigured}
       >
-        {isPending ? "Yukleniyor..." : "Storage'a yukle"}
+        {isPending ? "Yükleniyor..." : "Storage'a yükle"}
       </button>
     </form>
   )

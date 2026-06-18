@@ -6,13 +6,13 @@ import type { WorklistStudy } from "@/lib/types"
 
 export function WorklistTable({ studies }: { studies: WorklistStudy[] }) {
   const [query, setQuery] = useState("")
-  const [modality, setModality] = useState("Tumu")
+  const [modality, setModality] = useState("Tümü")
 
-  const modalities = ["Tumu", ...new Set(studies.map((study) => study.modality))]
+  const modalities = ["Tümü", ...new Set(studies.map((study) => study.modality))]
   const visible = useMemo(() => {
     const normalized = query.toLocaleLowerCase("tr-TR")
     return studies.filter((study) => {
-      const matchesModality = modality === "Tumu" || study.modality === modality
+      const matchesModality = modality === "Tümü" || study.modality === modality
       const searchable = [
         study.patientName,
         study.patientNumber,
@@ -55,7 +55,7 @@ export function WorklistTable({ studies }: { studies: WorklistStudy[] }) {
               <th>Tetkik</th>
               <th>Modalite</th>
               <th>Tarih</th>
-              <th>Oncelik</th>
+              <th>Öncelik</th>
               <th>Durum</th>
             </tr>
           </thead>

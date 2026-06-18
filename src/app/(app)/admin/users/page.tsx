@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/auth"
 
-export const metadata = { title: "Kullanicilar" }
+export const metadata = { title: "Kullanıcılar" }
 
 const users = [
   {
@@ -16,10 +16,10 @@ const users = [
     status: "Aktif",
   },
   {
-    name: "Dr. Murat Onal",
+    name: "Dr. Murat Önal",
     email: "murat.onal@raipacs.com",
     role: "Doktor",
-    status: "Davet gonderildi",
+    status: "Davet gönderildi",
   },
 ]
 
@@ -31,11 +31,11 @@ export default async function UsersPage() {
       <header className="page-header">
         <div>
           <p className="eyebrow">Admin</p>
-          <h1>Kullanicilar</h1>
-          <p>Doktor ve yonetici hesaplarini kurum bazinda yonetin.</p>
+          <h1>Kullanıcılar</h1>
+          <p>Doktor ve yönetici hesaplarını kurum bazında yönetin.</p>
         </div>
         <button className="button primary" type="button">
-          Kullanici davet et
+          Kullanıcı davet et
         </button>
       </header>
       <section className="data-panel">
@@ -43,10 +43,10 @@ export default async function UsersPage() {
           <table>
             <thead>
               <tr>
-                <th>Kullanici</th>
+                <th>Kullanıcı</th>
                 <th>Rol</th>
                 <th>Durum</th>
-                <th>Islem</th>
+                <th>İşlem</th>
               </tr>
             </thead>
             <tbody>
@@ -60,7 +60,7 @@ export default async function UsersPage() {
                   <td>{user.status}</td>
                   <td>
                     <button className="button subtle" type="button">
-                      Yonet
+                      Yönet
                     </button>
                   </td>
                 </tr>

@@ -20,7 +20,7 @@ const demoUser: CurrentUser = {
   fullName: "RAI PACS Admin",
   role: "admin",
   organizationId: "demo-organization",
-  organizationName: "RAI Klinik Goruntuleme",
+  organizationName: "RAI Klinik Görüntüleme",
   demo: true,
 }
 
@@ -54,7 +54,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   return {
     id: userId,
     email: String(data.claims.email ?? ""),
-    fullName: profile?.full_name ?? String(data.claims.email ?? "Kullanici"),
+    fullName: profile?.full_name ?? String(data.claims.email ?? "Kullanıcı"),
     role: membership.role as AppRole,
     organizationId: membership.organization_id,
     organizationName: organization?.name ?? "RAI PACS",

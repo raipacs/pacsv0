@@ -4,7 +4,7 @@ export const demoPatients: Patient[] = [
   {
     id: "pat-1",
     patientNumber: "PAT-48291",
-    firstName: "Ayse",
+    firstName: "Ayşe",
     lastName: "Demir",
     birthDate: "1972-04-12",
     sex: "K",
@@ -29,7 +29,7 @@ export const demoPatients: Patient[] = [
     id: "pat-3",
     patientNumber: "PAT-77120",
     firstName: "Zeynep",
-    lastName: "Celik",
+    lastName: "Çelik",
     birthDate: "1988-01-26",
     sex: "K",
     phone: "+90 535 555 08 10",
@@ -40,8 +40,8 @@ export const demoPatients: Patient[] = [
   {
     id: "pat-4",
     patientNumber: "PAT-90417",
-    firstName: "Omer",
-    lastName: "Sahin",
+    firstName: "Ömer",
+    lastName: "Şahin",
     birthDate: "1954-11-19",
     sex: "E",
     phone: null,
@@ -52,7 +52,7 @@ export const demoPatients: Patient[] = [
   {
     id: "pat-5",
     patientNumber: "PAT-31876",
-    firstName: "Nazli",
+    firstName: "Nazlı",
     lastName: "Korkmaz",
     birthDate: "1977-08-08",
     sex: "K",
@@ -66,7 +66,7 @@ export const demoPatients: Patient[] = [
 export const demoStudies: WorklistStudy[] = [
   {
     id: "study-1",
-    patientName: "Ayse Demir",
+    patientName: "Ayşe Demir",
     patientNumber: "PAT-48291",
     accessionNumber: "ACC-2026-0617-018",
     modality: "MR",
@@ -90,19 +90,19 @@ export const demoStudies: WorklistStudy[] = [
   },
   {
     id: "study-3",
-    patientName: "Zeynep Celik",
+    patientName: "Zeynep Çelik",
     patientNumber: "PAT-77120",
     accessionNumber: "ACC-2026-0617-031",
     modality: "US",
     bodyPart: "Abdomen",
-    description: "USG Tum abdomen",
+    description: "USG Tüm abdomen",
     date: "17.06.2026 11:05",
     priority: "Kontrol",
     status: "Tamamlandı",
   },
   {
     id: "study-4",
-    patientName: "Omer Sahin",
+    patientName: "Ömer Şahin",
     patientNumber: "PAT-90417",
     accessionNumber: "ACC-2026-0617-052",
     modality: "BT",
@@ -114,7 +114,7 @@ export const demoStudies: WorklistStudy[] = [
   },
   {
     id: "study-5",
-    patientName: "Nazli Korkmaz",
+    patientName: "Nazlı Korkmaz",
     patientNumber: "PAT-31876",
     accessionNumber: "ACC-2026-0617-058",
     modality: "MG",

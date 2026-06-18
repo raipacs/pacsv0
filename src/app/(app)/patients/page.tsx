@@ -13,9 +13,9 @@ export default async function PatientsPage() {
     <>
       <header className="page-header">
         <div>
-          <p className="eyebrow">Hasta yonetimi</p>
+          <p className="eyebrow">Hasta yönetimi</p>
           <h1>Hastalar</h1>
-          <p>Demografik bilgiler ve tetkik gecmisine kontrollu erisim.</p>
+          <p>Demografik bilgiler ve tetkik geçmişine kontrollü erişim.</p>
         </div>
         <button className="button primary" type="button">
           Yeni hasta
@@ -27,9 +27,9 @@ export default async function PatientsPage() {
             <thead>
               <tr>
                 <th>Hasta</th>
-                <th>Dogum tarihi</th>
+                <th>Doğum tarihi</th>
                 <th>Cinsiyet</th>
-                <th>Iletisim</th>
+                <th>İletişim</th>
                 <th>Tetkik</th>
                 <th>Son tetkik</th>
               </tr>

@@ -17,7 +17,7 @@ export function AppShell({
 }) {
   const links =
     user.role === "admin"
-      ? [...mainLinks, { href: "/admin/users", label: "Kullanicilar" }]
+      ? [...mainLinks, { href: "/admin/users", label: "Kullanıcılar" }]
       : mainLinks
 
   return (
@@ -44,15 +44,15 @@ export function AppShell({
           </div>
           <form action={signOut}>
             <button className="button subtle" type="submit">
-              Cikis
+              Çıkış
             </button>
           </form>
         </div>
       </header>
       {user.demo ? (
         <div className="demo-banner">
-          Demo modu: Supabase env degiskenleri tanimlandiginda gercek oturum ve
-          veritabani devreye girer.
+          Demo modu: Supabase ortam değişkenleri tanımlandığında gerçek oturum
+          ve veritabanı devreye girer.
         </div>
       ) : null}
       <main className="app-content">{children}</main>

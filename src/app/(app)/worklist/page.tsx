@@ -20,15 +20,15 @@ export default async function WorklistPage() {
         <div>
           <p className="eyebrow">Radyoloji operasyonu</p>
           <h1>Worklist</h1>
-          <p>Atanmis ve bekleyen tetkikleri tek ekrandan yonetin.</p>
+          <p>Atanmış ve bekleyen tetkikleri tek ekrandan yönetin.</p>
         </div>
         <Link className="button primary" href="/worklist/upload">
-          DICOM yukle
+          DICOM yükle
         </Link>
       </header>
       <section className="metric-row">
         <article>
-          <span>Bugun gelen</span>
+          <span>Bugün gelen</span>
           <strong>{studies.length}</strong>
         </article>
         <article>
@@ -36,11 +36,11 @@ export default async function WorklistPage() {
           <strong>{urgent}</strong>
         </article>
         <article>
-          <span>Raporlaniyor</span>
+          <span>Raporlanıyor</span>
           <strong>{reporting}</strong>
         </article>
         <article>
-          <span>Ort. acilis</span>
+          <span>Ort. açılış</span>
           <strong>1.8 sn</strong>
         </article>
       </section>

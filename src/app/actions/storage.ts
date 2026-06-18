@@ -10,7 +10,7 @@ export async function createDicomSignedUrl(instanceId: string) {
   if (!isSupabaseConfigured) {
     return {
       ok: false as const,
-      error: "Demo modda signed URL uretilemez.",
+      error: "Demo modda signed URL üretilemez.",
     }
   }
 
@@ -24,7 +24,7 @@ export async function createDicomSignedUrl(instanceId: string) {
 
   if (error) return { ok: false as const, error: error.message }
   if (!instance) {
-    return { ok: false as const, error: "DICOM instance bulunamadi." }
+    return { ok: false as const, error: "DICOM instance bulunamadı." }
   }
 
   const { data, error: signedUrlError } = await supabase.storage

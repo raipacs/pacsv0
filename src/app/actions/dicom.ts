@@ -43,7 +43,7 @@ export async function prepareDicomStorageUpload(
   if (!isSupabaseConfigured) {
     return {
       ok: false,
-      error: "Supabase baglantisi olmadan DICOM yuklenemez.",
+      error: "Supabase bağlantısı olmadan DICOM yüklenemez.",
     }
   }
 
@@ -74,7 +74,7 @@ export async function completeDicomStorageUpload(
   if (!isSupabaseConfigured) {
     return {
       ok: false,
-      error: "Supabase baglantisi olmadan DICOM metadata kaydedilemez.",
+      error: "Supabase bağlantısı olmadan DICOM metadata kaydedilemez.",
     }
   }
 
@@ -82,15 +82,15 @@ export async function completeDicomStorageUpload(
   if (validationError) return { ok: false, error: validationError }
 
   if (!input.storageKey.startsWith(`${user.organizationId}/`)) {
-    return { ok: false, error: "Storage anahtari kurum alani disinda." }
+    return { ok: false, error: "Storage anahtarı kurum alanı dışında." }
   }
 
   if (!Number.isSafeInteger(input.sizeBytes) || input.sizeBytes <= 0) {
-    return { ok: false, error: "Dosya boyutu gecersiz." }
+    return { ok: false, error: "Dosya boyutu geçersiz." }
   }
 
   if (!/^[a-f0-9]{64}$/.test(input.sha256)) {
-    return { ok: false, error: "SHA-256 degeri gecersiz." }
+    return { ok: false, error: "SHA-256 değeri geçersiz." }
   }
 
   const supabase = await createClient()
@@ -196,8 +196,8 @@ export async function completeDicomStorageUpload(
 }
 
 function validateDicomInput(input: DicomUploadInput) {
-  if (!input.patientId) return "Hasta secimi gerekli."
-  if (!input.accessionNumber.trim()) return "Accession numarasi gerekli."
+  if (!input.patientId) return "Hasta seçimi gerekli."
+  if (!input.accessionNumber.trim()) return "Accession numarası gerekli."
   if (!input.modality.trim()) return "Modalite gerekli."
   if (!input.studyInstanceUid.trim()) return "Study Instance UID gerekli."
   if (!input.seriesInstanceUid.trim()) return "Series Instance UID gerekli."

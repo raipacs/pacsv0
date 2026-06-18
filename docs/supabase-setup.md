@@ -8,10 +8,11 @@ backup and residency requirements are reviewed.
 
 ## 2. Apply the migration
 
-Run:
+Run both migrations in order:
 
 ```text
 supabase/migrations/202606180001_initial_pacs_schema.sql
+supabase/migrations/202606180002_turkish_text_support.sql
 ```
 
 ## 3. Configure the application
@@ -34,7 +35,7 @@ Then run the following in the SQL editor, replacing both placeholders:
 
 ```sql
 insert into public.organizations (name, slug)
-values ('RAI Klinik Goruntuleme', 'rai-klinik')
+values ('RAI Klinik Görüntüleme', 'rai-klinik')
 returning id;
 
 insert into public.organization_members (organization_id, user_id, role)
@@ -69,3 +70,11 @@ same `dicom-originals` bucket and metadata tables.
 PostgreSQL stores only study, series and instance metadata, including the
 DICOM UIDs, object size, SHA-256 checksum, bucket name and immutable storage
 key. The DICOM file bytes stay in Supabase Storage.
+
+## 6. Turkish text
+
+PostgreSQL `text` columns store Turkish characters as UTF-8. The second
+migration adds `public.tr_search_normalize(text)` plus generated `search_text`
+columns on patients and studies. This keeps names such as `Ayşe`, `Çelik`,
+`Ömer` and `Şahin` intact while enabling accent-insensitive lookup such as
+`Celik` matching `Çelik`.

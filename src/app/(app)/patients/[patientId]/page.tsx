@@ -4,7 +4,7 @@ import { DicomInstanceActions } from "@/components/dicom-instance-actions"
 import { requireUser } from "@/lib/auth"
 import { getPatient, getPatientStudies } from "@/lib/data"
 
-export const metadata = { title: "Hasta detayi" }
+export const metadata = { title: "Hasta detayı" }
 
 export default async function PatientDetailPage({
   params,
@@ -26,10 +26,10 @@ export default async function PatientDetailPage({
           <h1>
             {patient.firstName} {patient.lastName}
           </h1>
-          <p>Hasta bilgileri ve goruntuleme gecmisi.</p>
+          <p>Hasta bilgileri ve görüntüleme geçmişi.</p>
         </div>
         <button className="button primary" type="button">
-          Bilgileri duzenle
+          Bilgileri düzenle
         </button>
       </header>
       <section className="detail-grid">
@@ -37,7 +37,7 @@ export default async function PatientDetailPage({
           <h2>Demografik bilgiler</h2>
           <dl>
             <div>
-              <dt>Dogum tarihi</dt>
+              <dt>Doğum tarihi</dt>
               <dd>{new Intl.DateTimeFormat("tr-TR").format(new Date(patient.birthDate))}</dd>
             </div>
             <div>
@@ -55,9 +55,9 @@ export default async function PatientDetailPage({
           </dl>
         </article>
         <article className="info-panel">
-          <h2>Tetkik ozeti</h2>
+          <h2>Tetkik özeti</h2>
           <p className="big-number">{patient.studyCount}</p>
-          <p className="muted">Toplam kayitli tetkik</p>
+          <p className="muted">Toplam kayıtlı tetkik</p>
         </article>
       </section>
       <section className="data-panel">
@@ -69,7 +69,7 @@ export default async function PatientDetailPage({
             <table>
               <thead>
                 <tr>
-                  <th>Aciklama</th>
+                  <th>Açıklama</th>
                   <th>Modalite</th>
                   <th>Tarih</th>
                   <th>DICOM</th>
@@ -93,7 +93,7 @@ export default async function PatientDetailPage({
             </table>
           </div>
         ) : (
-          <p className="empty-state">Bu hasta icin demo tetkik bulunmuyor.</p>
+          <p className="empty-state">Bu hasta için demo tetkik bulunmuyor.</p>
         )}
       </section>
       <section className="data-panel storage-panel">
@@ -109,7 +109,7 @@ export default async function PatientDetailPage({
                   <th>SOP Instance UID</th>
                   <th>Boyut</th>
                   <th>Storage key</th>
-                  <th>Erisim</th>
+                  <th>Erişim</th>
                 </tr>
               </thead>
               <tbody>
@@ -133,7 +133,7 @@ export default async function PatientDetailPage({
           </div>
         ) : (
           <p className="empty-state">
-            Bu hasta icin Storage kayitli DICOM instance henuz yok.
+            Bu hasta için Storage kayıtlı DICOM instance henüz yok.
           </p>
         )}
       </section>

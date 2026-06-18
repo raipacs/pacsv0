@@ -23,7 +23,7 @@ export async function getPatients(organizationId: string): Promise<Patient[]> {
       .order("study_at", { ascending: false }),
   ])
 
-  if (error) throw new Error(`Hasta listesi alinamadi: ${error.message}`)
+  if (error) throw new Error(`Hasta listesi alınamadı: ${error.message}`)
 
   return (patients ?? []).map((patient) => {
     const patientStudies = (studies ?? []).filter(
@@ -66,7 +66,7 @@ export async function getWorklist(
     .eq("organization_id", organizationId)
     .order("study_at", { ascending: false })
 
-  if (error) throw new Error(`Worklist alinamadi: ${error.message}`)
+  if (error) throw new Error(`Worklist alınamadı: ${error.message}`)
 
   return (data ?? []).map((study) => {
     const patient = Array.isArray(study.patients)
@@ -81,7 +81,7 @@ export async function getWorklist(
       accessionNumber: study.accession_number,
       modality: study.modality,
       bodyPart: study.body_part ?? "-",
-      description: study.description ?? "Aciklama yok",
+      description: study.description ?? "Açıklama yok",
       date: study.study_at
         ? new Intl.DateTimeFormat("tr-TR", {
             dateStyle: "short",
@@ -124,7 +124,7 @@ export async function getPatientStudies(
     .eq("patient_id", patientId)
     .order("study_at", { ascending: false })
 
-  if (error) throw new Error(`Tetkikler alinamadi: ${error.message}`)
+  if (error) throw new Error(`Tetkikler alınamadı: ${error.message}`)
   if (!studies?.length) return []
 
   const studyIds = studies.map((study) => study.id)
@@ -154,7 +154,7 @@ export async function getPatientStudies(
       id: study.id,
       accessionNumber: study.accession_number,
       modality: study.modality,
-      description: study.description ?? "Aciklama yok",
+      description: study.description ?? "Açıklama yok",
       date: study.study_at
         ? new Intl.DateTimeFormat("tr-TR", {
             dateStyle: "short",
