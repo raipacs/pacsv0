@@ -59,6 +59,13 @@ Supabase Storage. Next/Vercel prepares the storage key and writes metadata
 after the upload succeeds, so large DICOM files do not pass through the
 application server.
 
+The browser MVP flow validates the DICOM preamble, stores objects in the
+private bucket and removes the uploaded object if metadata persistence fails.
+Browser uploads are limited to 512 MB per object because client-side SHA-256
+calculation requires reading the selected file. Higher-volume hospital
+ingestion should use a dedicated DIMSE/DICOMweb service that writes to the
+same `dicom-originals` bucket and metadata tables.
+
 PostgreSQL stores only study, series and instance metadata, including the
 DICOM UIDs, object size, SHA-256 checksum, bucket name and immutable storage
 key. The DICOM file bytes stay in Supabase Storage.

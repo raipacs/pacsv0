@@ -7,7 +7,10 @@ import {
   prepareDicomStorageUpload,
   type DicomUploadInput,
 } from "@/app/actions/dicom"
-import { DICOM_STORAGE_BUCKET } from "@/lib/dicom-storage"
+import {
+  DICOM_STORAGE_BUCKET,
+  MAX_BROWSER_DICOM_UPLOAD_BYTES,
+} from "@/lib/dicom-storage"
 import { createClient } from "@/lib/supabase/client"
 
 type PatientOption = {
@@ -58,6 +61,23 @@ export function DicomUploadForm({
       return
     }
 
+    if (file.size > MAX_BROWSER_DICOM_UPLOAD_BYTES) {
+      setStatus({
+        type: "error",
+        message:
+          "Bu MVP formu tek dosyada 512 MB ile sinirlidir. Daha buyuk DICOM aktarimi icin Storage ingestion servisi kullanilacak.",
+      })
+      return
+    }
+
+    if (!(await hasDicomPreamble(file))) {
+      setStatus({
+        type: "error",
+        message: "Secilen dosyada DICOM preamble imzasi bulunamadi.",
+      })
+      return
+    }
+
     const input = formInput(formData)
     setStatus({ type: "idle", message: "Dosya ozeti hesaplaniyor..." })
 
@@ -93,6 +113,7 @@ export function DicomUploadForm({
       })
 
       if (!completed.ok) {
+        await supabase.storage.from(prepared.bucket).remove([prepared.storageKey])
         setStatus({ type: "error", message: completed.error })
         return
       }
@@ -242,4 +263,15 @@ async function digestSha256(file: File) {
   return Array.from(new Uint8Array(hashBuffer))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("")
+}
+
+async function hasDicomPreamble(file: File) {
+  if (file.size < 132) return false
+  const bytes = new Uint8Array(await file.slice(128, 132).arrayBuffer())
+  return (
+    bytes[0] === 0x44 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x43 &&
+    bytes[3] === 0x4d
+  )
 }

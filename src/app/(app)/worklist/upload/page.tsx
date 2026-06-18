@@ -4,6 +4,7 @@ import { DicomUploadForm } from "@/components/dicom-upload-form"
 import { requireAdmin } from "@/lib/auth"
 import { isSupabaseConfigured } from "@/lib/config"
 import { getPatients } from "@/lib/data"
+import { MAX_BROWSER_DICOM_UPLOAD_BYTES } from "@/lib/dicom-storage"
 
 export const metadata = { title: "DICOM Yukle" }
 
@@ -61,6 +62,10 @@ export default async function DicomUploadPage() {
             <div>
               <dt>Okuma</dt>
               <dd>Kurum uyeleri</dd>
+            </div>
+            <div>
+              <dt>MVP limit</dt>
+              <dd>{MAX_BROWSER_DICOM_UPLOAD_BYTES / 1024 / 1024} MB</dd>
             </div>
           </dl>
         </aside>
