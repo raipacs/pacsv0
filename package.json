@@ -6,6 +6,7 @@
     "dev": "next dev -p 4174",
     "build": "next build --webpack",
     "start": "next start -p 4174",
+    "import:dicom-folder": "node scripts/import-dicom-folder.mjs",
     "lint": "eslint"
   },
   "dependencies": {

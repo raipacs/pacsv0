@@ -34,6 +34,12 @@ supabase/migrations/202606180001_initial_pacs_schema.sql
 
 Mimari notlari: `docs/architecture.md`.
 
+DICOM klasor import operasyon notu:
+
+```text
+docs/dicom-folder-import-runbook.md
+```
+
 ## Mevcut statik prototip
 
 GitHub Pages yayini kesilmemesi icin `index.html`, `app.js` ve `styles.css`
