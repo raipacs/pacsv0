@@ -24,6 +24,13 @@ export type DicomUploadInput = {
   transferSyntaxUid: string
 }
 
+export type DicomImportInput = Omit<DicomUploadInput, "patientId"> & {
+  patientName: string
+  patientDicomId: string
+  patientBirthDate: string
+  patientSex: string
+}
+
 export type PreparedDicomUpload = {
   ok: true
   bucket: string
@@ -48,6 +55,33 @@ export async function prepareDicomStorageUpload(
   }
 
   const validationError = validateDicomInput(input)
+  if (validationError) return { ok: false, error: validationError }
+
+  return {
+    ok: true,
+    bucket: DICOM_STORAGE_BUCKET,
+    storageKey: [
+      user.organizationId,
+      normalizeStorageSegment(input.studyInstanceUid),
+      normalizeStorageSegment(input.seriesInstanceUid),
+      `${normalizeStorageSegment(input.sopInstanceUid)}.dcm`,
+    ].join("/"),
+  }
+}
+
+export async function prepareDicomImportStorageUpload(
+  input: DicomImportInput
+): Promise<PreparedDicomUpload | DicomActionError> {
+  const user = await requireTableManager("instances", "insert")
+
+  if (!isSupabaseConfigured) {
+    return {
+      ok: false,
+      error: "Supabase bağlantısı olmadan DICOM yüklenemez.",
+    }
+  }
+
+  const validationError = validateDicomImportInput(input)
   if (validationError) return { ok: false, error: validationError }
 
   return {
@@ -195,9 +229,123 @@ export async function completeDicomStorageUpload(
   return { ok: true, studyId: study.id }
 }
 
+export async function completeDicomImportStorageUpload(
+  input: DicomImportInput & {
+    storageKey: string
+    sizeBytes: number
+    sha256: string
+  }
+): Promise<{ ok: true; patientId: string; studyId: string } | DicomActionError> {
+  const user = await requireTableManager("instances", "insert")
+
+  if (!isSupabaseConfigured) {
+    return {
+      ok: false,
+      error: "Supabase bağlantısı olmadan DICOM metadata kaydedilemez.",
+    }
+  }
+
+  const validationError = validateDicomImportInput(input)
+  if (validationError) return { ok: false, error: validationError }
+
+  if (!input.storageKey.startsWith(`${user.organizationId}/`)) {
+    return { ok: false, error: "Storage anahtarı kurum alanı dışında." }
+  }
+
+  if (!Number.isSafeInteger(input.sizeBytes) || input.sizeBytes <= 0) {
+    return { ok: false, error: "Dosya boyutu geçersiz." }
+  }
+
+  if (!/^[a-f0-9]{64}$/.test(input.sha256)) {
+    return { ok: false, error: "SHA-256 değeri geçersiz." }
+  }
+
+  const supabase = await createClient()
+  const patientName = splitDicomPatientName(input.patientName)
+  const patientNumber =
+    input.patientDicomId.trim() || `DICOM-${shortUid(input.studyInstanceUid)}`
+
+  const { data: patient, error: patientError } = await supabase
+    .from("patients")
+    .upsert(
+      {
+        organization_id: user.organizationId,
+        patient_number: patientNumber,
+        first_name: patientName.firstName,
+        last_name: patientName.lastName,
+        birth_date: normalizeDicomDate(input.patientBirthDate),
+        sex: normalizePatientSex(input.patientSex),
+        created_by: user.id,
+      },
+      { onConflict: "organization_id,patient_number" }
+    )
+    .select("id")
+    .single()
+
+  if (patientError) {
+    return { ok: false, error: `Hasta kaydedilemedi: ${patientError.message}` }
+  }
+
+  const accessionNumber = await resolveAccessionNumber(
+    supabase,
+    user.organizationId,
+    input.accessionNumber,
+    input.studyInstanceUid
+  )
+
+  const completed = await completeDicomStorageUpload({
+    patientId: patient.id,
+    accessionNumber,
+    modality: input.modality,
+    bodyPart: input.bodyPart,
+    description: input.description,
+    studyAt: input.studyAt,
+    priority: input.priority,
+    studyInstanceUid: input.studyInstanceUid,
+    seriesInstanceUid: input.seriesInstanceUid,
+    sopInstanceUid: input.sopInstanceUid,
+    seriesNumber: input.seriesNumber,
+    instanceNumber: input.instanceNumber,
+    sopClassUid: input.sopClassUid,
+    transferSyntaxUid: input.transferSyntaxUid,
+    storageKey: input.storageKey,
+    sizeBytes: input.sizeBytes,
+    sha256: input.sha256,
+  })
+
+  if (!completed.ok) return completed
+
+  await supabase.from("audit_logs").insert({
+    organization_id: user.organizationId,
+    actor_id: user.id,
+    action: "dicom.imported",
+    resource_type: "instance",
+    resource_id: input.sopInstanceUid.trim(),
+    metadata: {
+      patientNumber,
+      bucket: DICOM_STORAGE_BUCKET,
+      storageKey: input.storageKey,
+      sizeBytes: input.sizeBytes,
+      sha256: input.sha256,
+    },
+  })
+
+  revalidatePath("/patients")
+
+  return { ok: true, patientId: patient.id, studyId: completed.studyId }
+}
+
 function validateDicomInput(input: DicomUploadInput) {
   if (!input.patientId) return "Hasta seçimi gerekli."
   if (!input.accessionNumber.trim()) return "Accession numarası gerekli."
+  if (!input.modality.trim()) return "Modalite gerekli."
+  if (!input.studyInstanceUid.trim()) return "Study Instance UID gerekli."
+  if (!input.seriesInstanceUid.trim()) return "Series Instance UID gerekli."
+  if (!input.sopInstanceUid.trim()) return "SOP Instance UID gerekli."
+  return null
+}
+
+function validateDicomImportInput(input: DicomImportInput) {
   if (!input.modality.trim()) return "Modalite gerekli."
   if (!input.studyInstanceUid.trim()) return "Study Instance UID gerekli."
   if (!input.seriesInstanceUid.trim()) return "Series Instance UID gerekli."
@@ -220,4 +368,68 @@ function toNullableInteger(value: string) {
   if (!value.trim()) return null
   const parsed = Number.parseInt(value, 10)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+function splitDicomPatientName(value: string) {
+  const cleaned = value.trim()
+  if (!cleaned) return { firstName: "DICOM", lastName: "Hasta" }
+
+  if (cleaned.includes("^")) {
+    const [family, given, middle] = cleaned.split("^")
+    return {
+      firstName: [given, middle].filter(Boolean).join(" ").trim() || "DICOM",
+      lastName: family.trim() || "Hasta",
+    }
+  }
+
+  const parts = cleaned.split(/\s+/)
+  if (parts.length === 1) {
+    return { firstName: "DICOM", lastName: parts[0] }
+  }
+
+  return {
+    firstName: parts.slice(0, -1).join(" "),
+    lastName: parts.at(-1) ?? "Hasta",
+  }
+}
+
+function normalizeDicomDate(value: string) {
+  const trimmed = value.trim()
+  if (!/^\d{8}$/.test(trimmed)) return null
+  return `${trimmed.slice(0, 4)}-${trimmed.slice(4, 6)}-${trimmed.slice(6, 8)}`
+}
+
+function normalizePatientSex(value: string) {
+  const normalized = value.trim().toUpperCase()
+  if (normalized === "M") return "M"
+  if (normalized === "F") return "F"
+  if (normalized === "O") return "O"
+  return "U"
+}
+
+function shortUid(value: string) {
+  return value.trim().replace(/[^A-Za-z0-9]/g, "").slice(-12) || "UNKNOWN"
+}
+
+async function resolveAccessionNumber(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  accessionNumber: string,
+  studyInstanceUid: string
+) {
+  const base =
+    accessionNumber.trim() || `DCM-${shortUid(studyInstanceUid)}`
+
+  const { data } = await supabase
+    .from("studies")
+    .select("study_instance_uid")
+    .eq("organization_id", organizationId)
+    .eq("accession_number", base)
+    .maybeSingle()
+
+  if (!data || data.study_instance_uid === studyInstanceUid.trim()) {
+    return base
+  }
+
+  return `${base}-${shortUid(studyInstanceUid)}`
 }

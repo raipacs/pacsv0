@@ -381,7 +381,13 @@ p {
 }
 
 .upload-panel {
+  grid-column: 1;
   overflow: visible;
+}
+
+.upload-layout .info-panel {
+  grid-column: 2;
+  grid-row: 1 / span 2;
 }
 
 .upload-form {
@@ -693,5 +699,11 @@ td span {
   .form-grid,
   .info-panel dl {
     grid-template-columns: 1fr;
+  }
+
+  .upload-panel,
+  .upload-layout .info-panel {
+    grid-column: auto;
+    grid-row: auto;
   }
 }

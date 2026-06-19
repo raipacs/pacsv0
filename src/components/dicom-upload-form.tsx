@@ -4,13 +4,21 @@ import { useMemo, useState, useTransition } from "react"
 
 import {
   completeDicomStorageUpload,
+  completeDicomImportStorageUpload,
   prepareDicomStorageUpload,
+  prepareDicomImportStorageUpload,
   type DicomUploadInput,
+  type DicomImportInput,
 } from "@/app/actions/dicom"
 import {
   DICOM_STORAGE_BUCKET,
   MAX_BROWSER_DICOM_UPLOAD_BYTES,
 } from "@/lib/dicom-storage"
+import {
+  isDicomInstanceMetadata,
+  parseDicomMetadata,
+  type ParsedDicomMetadata,
+} from "@/lib/dicom-client-parser"
 import { createClient } from "@/lib/supabase/client"
 
 type PatientOption = {
@@ -21,6 +29,12 @@ type PatientOption = {
 type UploadStatus = {
   type: "idle" | "error" | "success"
   message: string
+}
+
+type ImportResult = {
+  uploaded: number
+  skipped: number
+  failed: number
 }
 
 export function DicomUploadForm({
@@ -238,6 +252,147 @@ export function DicomUploadForm({
   )
 }
 
+export function DicomExportImportForm({
+  supabaseConfigured,
+}: {
+  supabaseConfigured: boolean
+}) {
+  const [status, setStatus] = useState<UploadStatus>({
+    type: "idle",
+    message: "",
+  })
+  const [isPending, startTransition] = useTransition()
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = event.currentTarget
+    const formData = new FormData(form)
+    const files = formData
+      .getAll("dicomExportFiles")
+      .filter((file): file is File => file instanceof File && file.size > 0)
+
+    if (!supabaseConfigured) {
+      setStatus({
+        type: "error",
+        message: "Supabase ortam değişkenleri tanımlanmadan DICOM yüklenemez.",
+      })
+      return
+    }
+
+    if (!files.length) {
+      setStatus({ type: "error", message: "DICOM export klasörü veya dosyaları seçin." })
+      return
+    }
+
+    startTransition(async () => {
+      const result: ImportResult = { uploaded: 0, skipped: 0, failed: 0 }
+      const supabase = createClient()
+
+      for (const file of files) {
+        setStatus({
+          type: "idle",
+          message: `${file.name} okunuyor... (${result.uploaded} yüklendi)`,
+        })
+
+        if (file.size > MAX_BROWSER_DICOM_UPLOAD_BYTES) {
+          result.failed += 1
+          continue
+        }
+
+        let metadata: ParsedDicomMetadata
+        try {
+          metadata = await parseDicomMetadata(file)
+        } catch {
+          result.skipped += 1
+          continue
+        }
+
+        if (!isDicomInstanceMetadata(metadata)) {
+          result.skipped += 1
+          continue
+        }
+
+        const input = importInput(metadata)
+        const prepared = await prepareDicomImportStorageUpload(input)
+        if (!prepared.ok) {
+          result.failed += 1
+          continue
+        }
+
+        const sha256 = await digestSha256(file)
+        const { error: uploadError } = await supabase.storage
+          .from(DICOM_STORAGE_BUCKET)
+          .upload(prepared.storageKey, file, {
+            cacheControl: "31536000",
+            contentType: file.type || "application/dicom",
+            upsert: false,
+          })
+
+        if (uploadError) {
+          result.failed += 1
+          continue
+        }
+
+        const completed = await completeDicomImportStorageUpload({
+          ...input,
+          storageKey: prepared.storageKey,
+          sizeBytes: file.size,
+          sha256,
+        })
+
+        if (!completed.ok) {
+          await supabase.storage.from(prepared.bucket).remove([prepared.storageKey])
+          result.failed += 1
+          continue
+        }
+
+        result.uploaded += 1
+      }
+
+      form.reset()
+      const type = result.failed ? "error" : "success"
+      setStatus({
+        type,
+        message: `${result.uploaded} DICOM Storage'a yüklendi. ${result.skipped} dosya atlandı, ${result.failed} dosya başarısız.`,
+      })
+    })
+  }
+
+  return (
+    <form className="upload-form" onSubmit={onSubmit}>
+      <fieldset disabled={isPending || !supabaseConfigured}>
+        <div className="form-grid">
+          <label className="wide">
+            DICOM export klasörü veya dosyaları
+            <input
+              name="dicomExportFiles"
+              type="file"
+              multiple
+              {...{ webkitdirectory: "" }}
+            />
+          </label>
+        </div>
+      </fieldset>
+      {status.message ? (
+        <p className={`form-status ${status.type}`}>{status.message}</p>
+      ) : null}
+      {!supabaseConfigured ? (
+        <p className="form-status error">
+          Demo modda dosya yüklenmez. Vercel ortam değişkenleri ve Supabase
+          projesi bağlanınca Storage aktif olur.
+        </p>
+      ) : null}
+      <button
+        className="button primary"
+        type="submit"
+        disabled={isPending || !supabaseConfigured}
+      >
+        {isPending ? "Import ediliyor..." : "Export'u Storage'a import et"}
+      </button>
+    </form>
+  )
+}
+
 function formInput(formData: FormData): DicomUploadInput {
   return {
     patientId: String(formData.get("patientId") ?? ""),
@@ -254,6 +409,28 @@ function formInput(formData: FormData): DicomUploadInput {
     instanceNumber: String(formData.get("instanceNumber") ?? ""),
     sopClassUid: String(formData.get("sopClassUid") ?? ""),
     transferSyntaxUid: String(formData.get("transferSyntaxUid") ?? ""),
+  }
+}
+
+function importInput(metadata: ParsedDicomMetadata): DicomImportInput {
+  return {
+    patientName: metadata.patientName,
+    patientDicomId: metadata.patientDicomId,
+    patientBirthDate: metadata.patientBirthDate,
+    patientSex: metadata.patientSex,
+    accessionNumber: metadata.accessionNumber,
+    modality: metadata.modality,
+    bodyPart: metadata.bodyPart,
+    description: metadata.description,
+    studyAt: metadata.studyAt,
+    priority: "routine",
+    studyInstanceUid: metadata.studyInstanceUid,
+    seriesInstanceUid: metadata.seriesInstanceUid,
+    sopInstanceUid: metadata.sopInstanceUid,
+    seriesNumber: metadata.seriesNumber,
+    instanceNumber: metadata.instanceNumber,
+    sopClassUid: metadata.sopClassUid,
+    transferSyntaxUid: metadata.transferSyntaxUid,
   }
 }
 

@@ -1,6 +1,9 @@
 import Link from "next/link"
 
-import { DicomUploadForm } from "@/components/dicom-upload-form"
+import {
+  DicomExportImportForm,
+  DicomUploadForm,
+} from "@/components/dicom-upload-form"
 import { requireTableManager } from "@/lib/auth"
 import { isSupabaseConfigured } from "@/lib/config"
 import { getPatients } from "@/lib/data"
@@ -39,6 +42,12 @@ export default async function DicomUploadPage() {
             }))}
             supabaseConfigured={isSupabaseConfigured}
           />
+        </div>
+        <div className="data-panel upload-panel">
+          <div className="panel-heading">
+            <h2>DICOM export import</h2>
+          </div>
+          <DicomExportImportForm supabaseConfigured={isSupabaseConfigured} />
         </div>
         <aside className="info-panel">
           <h2>Saklama kuralı</h2>
