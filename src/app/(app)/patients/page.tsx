@@ -1,6 +1,6 @@
 import Link from "next/link"
 
-import { requireUser } from "@/lib/auth"
+import { canManagePatients, requireUser } from "@/lib/auth"
 import { getPatients } from "@/lib/data"
 
 export const metadata = { title: "Hastalar" }
@@ -8,6 +8,7 @@ export const metadata = { title: "Hastalar" }
 export default async function PatientsPage() {
   const user = await requireUser()
   const patients = await getPatients(user.organizationId)
+  const canCreatePatient = await canManagePatients(user, "insert")
 
   return (
     <>
@@ -17,7 +18,7 @@ export default async function PatientsPage() {
           <h1>Hastalar</h1>
           <p>Demografik bilgiler ve tetkik geçmişine kontrollü erişim.</p>
         </div>
-        {user.role === "admin" ? (
+        {canCreatePatient ? (
           <Link className="button primary" href="/patients/new">
             Yeni hasta
           </Link>

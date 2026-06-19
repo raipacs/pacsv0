@@ -73,3 +73,28 @@ export async function requireAdmin() {
   if (user.role !== "admin") redirect("/worklist")
   return user
 }
+
+export async function canManagePatients(
+  user: CurrentUser,
+  action: "insert" | "update" | "delete" = "insert"
+) {
+  if (user.role === "admin") return true
+  if (!isSupabaseConfigured) return false
+
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc("has_group_table_permission", {
+    requested_action: action,
+    target_organization_id: user.organizationId,
+    target_table_name: "patients",
+  })
+
+  if (error) return false
+  return data === true
+}
+
+export async function requirePatientManager() {
+  const user = await requireUser()
+  const allowed = await canManagePatients(user, "insert")
+  if (!allowed) redirect("/worklist")
+  return user
+}

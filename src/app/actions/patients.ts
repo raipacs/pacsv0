@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { z } from "zod"
 
-import { requireAdmin } from "@/lib/auth"
+import { requirePatientManager } from "@/lib/auth"
 import { isSupabaseConfigured } from "@/lib/config"
 import { createClient } from "@/lib/supabase/server"
 
@@ -32,7 +32,7 @@ export async function createPatient(
   _state: PatientFormState,
   formData: FormData
 ): Promise<PatientFormState> {
-  const user = await requireAdmin()
+  const user = await requirePatientManager()
 
   if (!isSupabaseConfigured) {
     return { error: "Supabase bağlantısı olmadan hasta kaydedilemez." }

@@ -1,12 +1,12 @@
 import Link from "next/link"
 
 import { PatientForm } from "@/components/patient-form"
-import { requireAdmin } from "@/lib/auth"
+import { requirePatientManager } from "@/lib/auth"
 
 export const metadata = { title: "Yeni hasta" }
 
 export default async function NewPatientPage() {
-  await requireAdmin()
+  await requirePatientManager()
 
   return (
     <>
@@ -36,7 +36,7 @@ export default async function NewPatientPage() {
           <dl>
             <div>
               <dt>Yetki</dt>
-              <dd>Admin</dd>
+              <dd>Admin / Supervisors</dd>
             </div>
             <div>
               <dt>Arama</dt>
