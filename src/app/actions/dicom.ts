@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
-import { requireAdmin } from "@/lib/auth"
+import { requireTableManager } from "@/lib/auth"
 import { isSupabaseConfigured } from "@/lib/config"
 import { DICOM_STORAGE_BUCKET } from "@/lib/dicom-storage"
 import { createClient } from "@/lib/supabase/server"
@@ -38,7 +38,7 @@ export type DicomActionError = {
 export async function prepareDicomStorageUpload(
   input: DicomUploadInput
 ): Promise<PreparedDicomUpload | DicomActionError> {
-  const user = await requireAdmin()
+  const user = await requireTableManager("instances", "insert")
 
   if (!isSupabaseConfigured) {
     return {
@@ -69,7 +69,7 @@ export async function completeDicomStorageUpload(
     sha256: string
   }
 ): Promise<{ ok: true; studyId: string } | DicomActionError> {
-  const user = await requireAdmin()
+  const user = await requireTableManager("instances", "insert")
 
   if (!isSupabaseConfigured) {
     return {

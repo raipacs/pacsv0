@@ -22,6 +22,12 @@ const users = [
     status: "Supervisors grubu",
   },
   {
+    name: "doctor",
+    email: "doctor@raipacs.com",
+    role: "Doctor",
+    status: "Doctors grubu",
+  },
+  {
     name: "Dr. Murat Önal",
     email: "murat.onal@raipacs.com",
     role: "Doktor",

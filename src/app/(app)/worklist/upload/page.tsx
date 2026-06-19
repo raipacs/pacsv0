@@ -1,7 +1,7 @@
 import Link from "next/link"
 
 import { DicomUploadForm } from "@/components/dicom-upload-form"
-import { requireAdmin } from "@/lib/auth"
+import { requireTableManager } from "@/lib/auth"
 import { isSupabaseConfigured } from "@/lib/config"
 import { getPatients } from "@/lib/data"
 import { MAX_BROWSER_DICOM_UPLOAD_BYTES } from "@/lib/dicom-storage"
@@ -9,7 +9,7 @@ import { MAX_BROWSER_DICOM_UPLOAD_BYTES } from "@/lib/dicom-storage"
 export const metadata = { title: "DICOM Yükle" }
 
 export default async function DicomUploadPage() {
-  const user = await requireAdmin()
+  const user = await requireTableManager("instances", "insert")
   const patients = await getPatients(user.organizationId)
 
   return (
@@ -58,7 +58,7 @@ export default async function DicomUploadPage() {
             </div>
             <div>
               <dt>Yükleme</dt>
-              <dd>Admin</dd>
+              <dd>Admin / Doctors</dd>
             </div>
             <div>
               <dt>Okuma</dt>

@@ -78,6 +78,14 @@ export async function canManagePatients(
   user: CurrentUser,
   action: "insert" | "update" | "delete" = "insert"
 ) {
+  return canManageTable(user, "patients", action)
+}
+
+export async function canManageTable(
+  user: CurrentUser,
+  tableName: string,
+  action: "select" | "insert" | "update" | "delete" = "insert"
+) {
   if (user.role === "admin") return true
   if (!isSupabaseConfigured) return false
 
@@ -85,7 +93,7 @@ export async function canManagePatients(
   const { data, error } = await supabase.rpc("has_group_table_permission", {
     requested_action: action,
     target_organization_id: user.organizationId,
-    target_table_name: "patients",
+    target_table_name: tableName,
   })
 
   if (error) return false
@@ -95,6 +103,16 @@ export async function canManagePatients(
 export async function requirePatientManager() {
   const user = await requireUser()
   const allowed = await canManagePatients(user, "insert")
+  if (!allowed) redirect("/worklist")
+  return user
+}
+
+export async function requireTableManager(
+  tableName: string,
+  action: "select" | "insert" | "update" | "delete" = "insert"
+) {
+  const user = await requireUser()
+  const allowed = await canManageTable(user, tableName, action)
   if (!allowed) redirect("/worklist")
   return user
 }

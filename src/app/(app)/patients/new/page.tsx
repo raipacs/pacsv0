@@ -36,7 +36,7 @@ export default async function NewPatientPage() {
           <dl>
             <div>
               <dt>Yetki</dt>
-              <dd>Admin / Supervisors</dd>
+              <dd>Admin / Supervisors / Doctors</dd>
             </div>
             <div>
               <dt>Arama</dt>
