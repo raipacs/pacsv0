@@ -17,9 +17,11 @@ export default async function PatientsPage() {
           <h1>Hastalar</h1>
           <p>Demografik bilgiler ve tetkik geçmişine kontrollü erişim.</p>
         </div>
-        <button className="button primary" type="button">
-          Yeni hasta
-        </button>
+        {user.role === "admin" ? (
+          <Link className="button primary" href="/patients/new">
+            Yeni hasta
+          </Link>
+        ) : null}
       </header>
       <section className="data-panel">
         <div className="responsive-table">
@@ -45,7 +47,7 @@ export default async function PatientsPage() {
                     </Link>
                     <span>{patient.patientNumber}</span>
                   </td>
-                  <td>{formatDate(patient.birthDate)}</td>
+                  <td>{patient.birthDate ? formatDate(patient.birthDate) : "-"}</td>
                   <td>{patient.sex}</td>
                   <td>
                     <strong>{patient.phone ?? "-"}</strong>
