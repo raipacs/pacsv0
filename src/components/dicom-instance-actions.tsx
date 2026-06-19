@@ -11,8 +11,12 @@ import {
 
 export function DicomInstanceActions({
   instanceId,
+  viewerLabel = "Viewer",
+  showSignedUrl = true,
 }: {
   instanceId: string
+  viewerLabel?: string
+  showSignedUrl?: boolean
 }) {
   const [error, setError] = useState("")
   const [isViewerOpen, setIsViewerOpen] = useState(false)
@@ -131,16 +135,18 @@ export function DicomInstanceActions({
           disabled={isPending}
           onClick={openViewer}
         >
-          {isPending ? "Hazırlanıyor" : "Viewer"}
+          {isPending ? "Hazırlanıyor" : viewerLabel}
         </button>
-        <button
-          className="button subtle small"
-          type="button"
-          disabled={isPending}
-          onClick={openSignedUrl}
-        >
-          Signed URL
-        </button>
+        {showSignedUrl ? (
+          <button
+            className="button subtle small"
+            type="button"
+            disabled={isPending}
+            onClick={openSignedUrl}
+          >
+            Signed URL
+          </button>
+        ) : null}
         {error ? <span className="inline-error">{error}</span> : null}
       </span>
 

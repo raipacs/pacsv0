@@ -74,21 +74,37 @@ export default async function PatientDetailPage({
                   <th>Tarih</th>
                   <th>DICOM</th>
                   <th>Durum</th>
+                  <th>Görüntü</th>
                 </tr>
               </thead>
               <tbody>
-                {studies.map((study) => (
-                  <tr key={study.id}>
-                    <td>{study.description}</td>
-                    <td>{study.modality}</td>
-                    <td>{study.date}</td>
-                    <td>
-                      <strong>{study.instanceCount}</strong>
-                      <span>instance</span>
-                    </td>
-                    <td>{study.status}</td>
-                  </tr>
-                ))}
+                {studies.map((study) => {
+                  const firstInstance = study.instances[0]
+
+                  return (
+                    <tr key={study.id}>
+                      <td>{study.description}</td>
+                      <td>{study.modality}</td>
+                      <td>{study.date}</td>
+                      <td>
+                        <strong>{study.instanceCount}</strong>
+                        <span>instance</span>
+                      </td>
+                      <td>{study.status}</td>
+                      <td>
+                        {firstInstance ? (
+                          <DicomInstanceActions
+                            instanceId={firstInstance.id}
+                            viewerLabel="Göster"
+                            showSignedUrl={false}
+                          />
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
