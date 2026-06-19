@@ -27,22 +27,23 @@ $$;
 alter table public.patients
 add column if not exists search_text text generated always as (
   public.tr_search_normalize(
-    concat_ws(' ', patient_number, first_name, last_name, phone, email)
+    coalesce(patient_number, '') || ' ' ||
+    coalesce(first_name, '') || ' ' ||
+    coalesce(last_name, '') || ' ' ||
+    coalesce(phone, '') || ' ' ||
+    coalesce(email, '')
   )
 ) stored;
 
 alter table public.studies
 add column if not exists search_text text generated always as (
   public.tr_search_normalize(
-    concat_ws(
-      ' ',
-      accession_number,
-      modality,
-      body_part,
-      description,
-      referring_physician,
-      source_ae_title
-    )
+    coalesce(accession_number, '') || ' ' ||
+    coalesce(modality, '') || ' ' ||
+    coalesce(body_part, '') || ' ' ||
+    coalesce(description, '') || ' ' ||
+    coalesce(referring_physician, '') || ' ' ||
+    coalesce(source_ae_title, '')
   )
 ) stored;
 
