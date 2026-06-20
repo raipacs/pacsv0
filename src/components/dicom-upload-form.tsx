@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useTransition } from "react"
+import { useMemo, useRef, useState, useTransition } from "react"
 
 import {
   completeDicomStorageUpload,
@@ -40,6 +40,7 @@ type ImportResult = {
 }
 
 const MAX_PARALLEL_IMPORTS = 3
+const IMPORT_STEP_TIMEOUT_MS = 45000
 
 export function DicomUploadForm({
   patients,
@@ -267,6 +268,7 @@ export function DicomExportImportForm({
   })
   const [details, setDetails] = useState<string[]>([])
   const [isPending, startTransition] = useTransition()
+  const cancelImportRef = useRef(false)
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -290,6 +292,7 @@ export function DicomExportImportForm({
     }
 
     startTransition(async () => {
+      cancelImportRef.current = false
       const result: ImportResult = {
         uploaded: 0,
         existing: 0,
@@ -305,6 +308,8 @@ export function DicomExportImportForm({
       setDetails([])
 
       async function processFile(file: File, index: number) {
+        if (cancelImportRef.current) return
+
         const fileLabel = file.webkitRelativePath || file.name
         const progress = `${index + 1}/${importFiles.length}`
 
@@ -357,7 +362,11 @@ export function DicomExportImportForm({
           type: "idle",
           message: `${progress} ${fileLabel}: Storage yolu hazırlanıyor...`,
         })
-        const prepared = await prepareDicomImportStorageUpload(input)
+        const prepared = await withTimeout(
+          prepareDicomImportStorageUpload(input),
+          IMPORT_STEP_TIMEOUT_MS,
+          "Storage yolu hazırlama"
+        )
         if (!prepared.ok) {
           result.failed += 1
           result.details.push(`${fileLabel}: hazırlık hatası (${prepared.error})`)
@@ -368,19 +377,25 @@ export function DicomExportImportForm({
           type: "idle",
           message: `${progress} ${fileLabel}: dosya özeti hesaplanıyor...`,
         })
-        const sha256 = await digestSha256(file)
+        const sha256 = await withTimeout(
+          digestSha256(file),
+          IMPORT_STEP_TIMEOUT_MS,
+          "SHA-256 hesaplama"
+        )
 
         setStatus({
           type: "idle",
           message: `${progress} ${fileLabel}: Storage'a yükleniyor...`,
         })
-        const { error: uploadError } = await supabase.storage
-          .from(DICOM_STORAGE_BUCKET)
-          .upload(prepared.storageKey, file, {
+        const { error: uploadError } = await withTimeout(
+          supabase.storage.from(DICOM_STORAGE_BUCKET).upload(prepared.storageKey, file, {
             cacheControl: "31536000",
             contentType: file.type || "application/dicom",
             upsert: false,
-          })
+          }),
+          IMPORT_STEP_TIMEOUT_MS,
+          "Storage yükleme"
+        )
 
         const alreadyExists = uploadError ? isDuplicateStorageError(uploadError.message) : false
         if (uploadError && !alreadyExists) {
@@ -393,12 +408,16 @@ export function DicomExportImportForm({
           type: "idle",
           message: `${progress} ${fileLabel}: metadata kaydediliyor...`,
         })
-        const completed = await completeDicomImportStorageUpload({
-          ...input,
-          storageKey: prepared.storageKey,
-          sizeBytes: file.size,
-          sha256,
-        })
+        const completed = await withTimeout(
+          completeDicomImportStorageUpload({
+            ...input,
+            storageKey: prepared.storageKey,
+            sizeBytes: file.size,
+            sha256,
+          }),
+          IMPORT_STEP_TIMEOUT_MS,
+          "metadata kaydetme"
+        )
 
         if (!completed.ok) {
           if (!alreadyExists) {
@@ -417,10 +436,19 @@ export function DicomExportImportForm({
       }
 
       async function runWorker() {
-        while (nextFileIndex < importFiles.length) {
+        while (nextFileIndex < importFiles.length && !cancelImportRef.current) {
           const fileIndex = nextFileIndex
           nextFileIndex += 1
-          await processFile(importFiles[fileIndex], fileIndex)
+          try {
+            await processFile(importFiles[fileIndex], fileIndex)
+          } catch (caught) {
+            const file = importFiles[fileIndex]
+            const fileLabel = file.webkitRelativePath || file.name
+            const message =
+              caught instanceof Error ? caught.message : "Beklenmeyen import hatası."
+            result.failed += 1
+            result.details.push(`${fileLabel}: ${message}`)
+          }
           completedCount += 1
           setStatus({
             type: "idle",
@@ -435,6 +463,15 @@ export function DicomExportImportForm({
           () => runWorker()
         )
       )
+
+      if (cancelImportRef.current) {
+        setDetails(result.details)
+        setStatus({
+          type: "error",
+          message: `Import iptal edildi. ${completedCount}/${importFiles.length} dosya işlendi. ${result.uploaded} yeni, ${result.existing} mevcut, ${result.skipped} atlandı, ${result.failed} başarısız.`,
+        })
+        return
+      }
 
       form.reset()
       const importedCount = result.uploaded + result.existing
@@ -497,6 +534,21 @@ export function DicomExportImportForm({
       >
         {isPending ? "Import ediliyor..." : "Export'u Storage'a import et"}
       </button>
+      {isPending ? (
+        <button
+          className="button subtle"
+          type="button"
+          onClick={() => {
+            cancelImportRef.current = true
+            setStatus({
+              type: "idle",
+              message: "Import iptal ediliyor... Devam eden dosya aşaması kapanınca duracak.",
+            })
+          }}
+        >
+          İptal et
+        </button>
+      ) : null}
     </form>
   )
 }
@@ -573,4 +625,15 @@ function uniqueFiles(files: File[]) {
     seen.add(key)
     return true
   })
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string) {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      window.setTimeout(() => {
+        reject(new Error(`${label} ${Math.round(timeoutMs / 1000)} sn içinde tamamlanmadı.`))
+      }, timeoutMs)
+    }),
+  ])
 }
