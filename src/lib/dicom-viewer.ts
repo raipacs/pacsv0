@@ -72,6 +72,7 @@ export function renderDicomImage(
     width: number
     invert: boolean
     zoom: number
+    rotate: number
     panX: number
     panY: number
   }
@@ -116,11 +117,14 @@ export function renderDicomImage(
   const scale = fit * options.zoom
   const width = columns * scale
   const height = rows * scale
-  const x = (canvas.width - width) / 2 + options.panX
-  const y = (canvas.height - height) / 2 + options.panY
+  const rotation = (((options.rotate % 360) + 360) % 360) * (Math.PI / 180)
 
   targetContext.imageSmoothingEnabled = false
-  targetContext.drawImage(source, x, y, width, height)
+  targetContext.save()
+  targetContext.translate(canvas.width / 2 + options.panX, canvas.height / 2 + options.panY)
+  targetContext.rotate(rotation)
+  targetContext.drawImage(source, -width / 2, -height / 2, width, height)
+  targetContext.restore()
 }
 
 function parseDicomElements(buffer: ArrayBuffer): ParserState {

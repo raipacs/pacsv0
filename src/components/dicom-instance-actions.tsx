@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, useTransition } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 
 import { createDicomSignedUrl } from "@/app/actions/storage"
 import {
@@ -11,13 +11,33 @@ import {
 
 export function DicomInstanceActions({
   instanceId,
+  instances,
   viewerLabel = "Viewer",
   showSignedUrl = true,
 }: {
   instanceId: string
+  instances?: { id: string; instanceNumber: number | null; sopInstanceUid: string }[]
   viewerLabel?: string
   showSignedUrl?: boolean
 }) {
+  const viewerInstances = useMemo(() => {
+    const ordered = instances?.length
+      ? [...instances].sort((left, right) => {
+          const leftNumber = left.instanceNumber ?? Number.MAX_SAFE_INTEGER
+          const rightNumber = right.instanceNumber ?? Number.MAX_SAFE_INTEGER
+          return (
+            leftNumber - rightNumber ||
+            left.sopInstanceUid.localeCompare(right.sopInstanceUid)
+          )
+        })
+      : [{ id: instanceId, instanceNumber: null, sopInstanceUid: "" }]
+
+    return ordered.some((item) => item.id === instanceId)
+      ? ordered
+      : [{ id: instanceId, instanceNumber: null, sopInstanceUid: "" }, ...ordered]
+  }, [instanceId, instances])
+
+  const [activeInstanceId, setActiveInstanceId] = useState(instanceId)
   const [error, setError] = useState("")
   const [isViewerOpen, setIsViewerOpen] = useState(false)
   const [preview, setPreview] = useState<DicomPreview | null>(null)
@@ -27,11 +47,25 @@ export function DicomInstanceActions({
   const [zoom, setZoom] = useState(1)
   const [invert, setInvert] = useState(false)
   const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [rotate, setRotate] = useState(0)
+  const [tool, setTool] = useState<"pan" | "window">("pan")
   const [isPending, startTransition] = useTransition()
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const dragRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(
-    null
+  const dragRef = useRef<{
+    x: number
+    y: number
+    panX: number
+    panY: number
+    center: number
+    width: number
+    tool: "pan" | "window"
+  } | null>(null)
+  const activeIndex = Math.max(
+    0,
+    viewerInstances.findIndex((item) => item.id === activeInstanceId)
   )
+  const activeInstance = viewerInstances[activeIndex]
+  const hasMultipleInstances = viewerInstances.length > 1
 
   useEffect(() => {
     if (!isViewerOpen || !preview || !canvasRef.current) return
@@ -51,6 +85,7 @@ export function DicomInstanceActions({
         width: windowWidth,
         invert,
         zoom,
+        rotate,
         panX: pan.x * ratio,
         panY: pan.y * ratio,
       })
@@ -59,7 +94,7 @@ export function DicomInstanceActions({
     resizeAndRender()
     window.addEventListener("resize", resizeAndRender)
     return () => window.removeEventListener("resize", resizeAndRender)
-  }, [invert, isViewerOpen, pan, preview, windowCenter, windowWidth, zoom])
+  }, [invert, isViewerOpen, pan, preview, rotate, windowCenter, windowWidth, zoom])
 
   function openSignedUrl() {
     setError("")
@@ -73,42 +108,51 @@ export function DicomInstanceActions({
     })
   }
 
-  function openViewer() {
-    setError("")
-    setViewerStatus("DICOM hazırlanıyor...")
-    setIsViewerOpen(true)
-    setPreview(null)
+  const loadInstance = useCallback(
+    (targetInstanceId: string) => {
+      setError("")
+      setViewerStatus("DICOM hazırlanıyor...")
+      setPreview(null)
+      setActiveInstanceId(targetInstanceId)
 
-    startTransition(async () => {
-      const result = await createDicomSignedUrl(instanceId)
-      if (!result.ok) {
-        setError(result.error)
-        setViewerStatus(result.error)
-        return
-      }
-
-      try {
-        setViewerStatus("DICOM indiriliyor...")
-        const response = await fetch(result.url)
-        if (!response.ok) {
-          throw new Error(`DICOM indirilemedi: ${response.status}`)
+      startTransition(async () => {
+        const result = await createDicomSignedUrl(targetInstanceId)
+        if (!result.ok) {
+          setError(result.error)
+          setViewerStatus(result.error)
+          return
         }
 
-        setViewerStatus("Görüntü çözümleniyor...")
-        const decoded = await decodeDicomPreview(await response.arrayBuffer())
-        setPreview(decoded)
-        setWindowCenter(Math.round(decoded.voi.center))
-        setWindowWidth(Math.round(decoded.voi.width))
-        setZoom(1)
-        setInvert(false)
-        setPan({ x: 0, y: 0 })
-        setViewerStatus(decoded.pixels ? "" : "Bu DICOM içinde görüntü pixel verisi yok.")
-      } catch (caught) {
-        const message =
-          caught instanceof Error ? caught.message : "DICOM görüntüsü açılamadı."
-        setViewerStatus(message)
-      }
-    })
+        try {
+          setViewerStatus("DICOM indiriliyor...")
+          const response = await fetch(result.url)
+          if (!response.ok) {
+            throw new Error(`DICOM indirilemedi: ${response.status}`)
+          }
+
+          setViewerStatus("Görüntü çözümleniyor...")
+          const decoded = await decodeDicomPreview(await response.arrayBuffer())
+          setPreview(decoded)
+          setWindowCenter(Math.round(decoded.voi.center))
+          setWindowWidth(Math.round(decoded.voi.width))
+          setZoom(1)
+          setInvert(false)
+          setRotate(0)
+          setPan({ x: 0, y: 0 })
+          setViewerStatus(decoded.pixels ? "" : "Bu DICOM içinde görüntü pixel verisi yok.")
+        } catch (caught) {
+          const message =
+            caught instanceof Error ? caught.message : "DICOM görüntüsü açılamadı."
+          setViewerStatus(message)
+        }
+      })
+    },
+    [startTransition]
+  )
+
+  function openViewer() {
+    setIsViewerOpen(true)
+    loadInstance(activeInstance?.id ?? instanceId)
   }
 
   function closeViewer() {
@@ -123,8 +167,54 @@ export function DicomInstanceActions({
     setWindowWidth(Math.round(preview.voi.width))
     setZoom(1)
     setInvert(false)
+    setRotate(0)
     setPan({ x: 0, y: 0 })
   }
+
+  function moveInstance(direction: -1 | 1) {
+    if (!hasMultipleInstances) return
+    const nextIndex =
+      (activeIndex + direction + viewerInstances.length) % viewerInstances.length
+    loadInstance(viewerInstances[nextIndex].id)
+  }
+
+  function applyPreset(center: number, width: number) {
+    setWindowCenter(center)
+    setWindowWidth(width)
+  }
+
+  function adjustZoom(delta: number) {
+    setZoom((value) => Math.min(6, Math.max(0.25, Number((value + delta).toFixed(2)))))
+  }
+
+  useEffect(() => {
+    if (!isViewerOpen) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeViewer()
+        return
+      }
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault()
+        moveInstance(-1)
+      }
+
+      if (event.key === "ArrowRight") {
+        event.preventDefault()
+        moveInstance(1)
+      }
+
+      if (event.key === "0") resetViewer()
+      if (event.key.toLocaleLowerCase("tr-TR") === "i") {
+        setInvert((value) => !value)
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  })
 
   return (
     <>
@@ -158,13 +248,80 @@ export function DicomInstanceActions({
                 <p className="eyebrow">DICOM viewer</p>
                 <h2>{preview?.metadata.seriesDescription || "Instance önizleme"}</h2>
               </div>
-              <button className="button subtle small" type="button" onClick={closeViewer}>
-                Kapat
-              </button>
+              <div className="viewer-header-actions">
+                {hasMultipleInstances ? (
+                  <span className="viewer-counter">
+                    {activeIndex + 1} / {viewerInstances.length}
+                  </span>
+                ) : null}
+                <button className="button subtle small" type="button" onClick={closeViewer}>
+                  Kapat
+                </button>
+              </div>
             </header>
 
             <div className="viewer-body">
               <div className="viewer-canvas-wrap">
+                <div className="viewer-toolbar" aria-label="Viewer araçları">
+                  <div className="segmented viewer-mode">
+                    <button
+                      type="button"
+                      className={tool === "pan" ? "active" : ""}
+                      onClick={() => setTool("pan")}
+                    >
+                      Pan
+                    </button>
+                    <button
+                      type="button"
+                      className={tool === "window" ? "active" : ""}
+                      onClick={() => setTool("window")}
+                    >
+                      W/L
+                    </button>
+                  </div>
+                  <button className="button subtle small" type="button" onClick={resetViewer}>
+                    0
+                  </button>
+                  <button
+                    className="button subtle small"
+                    type="button"
+                    onClick={() => adjustZoom(-0.25)}
+                  >
+                    -
+                  </button>
+                  <button
+                    className="button subtle small"
+                    type="button"
+                    onClick={() => adjustZoom(0.25)}
+                  >
+                    +
+                  </button>
+                  <button
+                    className="button subtle small"
+                    type="button"
+                    onClick={() => setRotate((value) => (value + 90) % 360)}
+                  >
+                    Döndür
+                  </button>
+                  {hasMultipleInstances ? (
+                    <>
+                      <button
+                        className="button subtle small"
+                        type="button"
+                        onClick={() => moveInstance(-1)}
+                      >
+                        Önceki
+                      </button>
+                      <button
+                        className="button subtle small"
+                        type="button"
+                        onClick={() => moveInstance(1)}
+                      >
+                        Sonraki
+                      </button>
+                    </>
+                  ) : null}
+                </div>
                 {viewerStatus ? <p className="viewer-status">{viewerStatus}</p> : null}
                 <canvas
                   ref={canvasRef}
@@ -175,14 +332,28 @@ export function DicomInstanceActions({
                       y: event.clientY,
                       panX: pan.x,
                       panY: pan.y,
+                      center: windowCenter,
+                      width: windowWidth,
+                      tool,
                     }
                     event.currentTarget.setPointerCapture(event.pointerId)
                   }}
                   onPointerMove={(event) => {
                     if (!dragRef.current) return
+                    const deltaX = event.clientX - dragRef.current.x
+                    const deltaY = event.clientY - dragRef.current.y
+
+                    if (dragRef.current.tool === "window") {
+                      setWindowCenter(Math.round(dragRef.current.center - deltaY * 2))
+                      setWindowWidth(
+                        Math.max(1, Math.round(dragRef.current.width + deltaX * 4))
+                      )
+                      return
+                    }
+
                     setPan({
-                      x: dragRef.current.panX + event.clientX - dragRef.current.x,
-                      y: dragRef.current.panY + event.clientY - dragRef.current.y,
+                      x: dragRef.current.panX + deltaX,
+                      y: dragRef.current.panY + deltaY,
                     })
                   }}
                   onPointerUp={() => {
@@ -207,12 +378,35 @@ export function DicomInstanceActions({
                     İnvert
                   </button>
                 </div>
+                <div className="viewer-presets">
+                  <button
+                    className="button subtle small"
+                    type="button"
+                    onClick={() => applyPreset(40, 400)}
+                  >
+                    Yumuşak
+                  </button>
+                  <button
+                    className="button subtle small"
+                    type="button"
+                    onClick={() => applyPreset(300, 1500)}
+                  >
+                    Kemik
+                  </button>
+                  <button
+                    className="button subtle small"
+                    type="button"
+                    onClick={() => applyPreset(-600, 1500)}
+                  >
+                    Akciğer
+                  </button>
+                </div>
                 <label>
                   Zoom
                   <input
                     type="range"
                     min="0.4"
-                    max="4"
+                    max="6"
                     step="0.1"
                     value={zoom}
                     onChange={(event) => setZoom(Number(event.target.value))}
@@ -240,7 +434,40 @@ export function DicomInstanceActions({
                     onChange={(event) => setWindowWidth(Number(event.target.value))}
                   />
                 </label>
+                <label>
+                  Rotasyon
+                  <input
+                    type="range"
+                    min="0"
+                    max="270"
+                    step="90"
+                    value={rotate}
+                    onChange={(event) => setRotate(Number(event.target.value))}
+                  />
+                </label>
+                {hasMultipleInstances ? (
+                  <label>
+                    Instance
+                    <input
+                      type="range"
+                      min="0"
+                      max={viewerInstances.length - 1}
+                      step="1"
+                      value={activeIndex}
+                      onChange={(event) =>
+                        loadInstance(viewerInstances[Number(event.target.value)].id)
+                      }
+                    />
+                  </label>
+                ) : null}
                 <dl>
+                  <div>
+                    <dt>Instance</dt>
+                    <dd>
+                      {activeInstance?.instanceNumber ?? activeIndex + 1}
+                      {hasMultipleInstances ? ` / ${viewerInstances.length}` : ""}
+                    </dd>
+                  </div>
                   <div>
                     <dt>Modalite</dt>
                     <dd>{preview?.metadata.modality || "-"}</dd>
