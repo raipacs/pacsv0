@@ -75,6 +75,7 @@ export const demoStudies: WorklistStudy[] = [
     date: "17.06.2026 09:42",
     priority: "Acil",
     status: "Okunacak",
+    instances: [],
   },
   {
     id: "study-2",
@@ -87,6 +88,7 @@ export const demoStudies: WorklistStudy[] = [
     date: "17.06.2026 10:18",
     priority: "Rutin",
     status: "Raporlanıyor",
+    instances: [],
   },
   {
     id: "study-3",
@@ -99,6 +101,7 @@ export const demoStudies: WorklistStudy[] = [
     date: "17.06.2026 11:05",
     priority: "Kontrol",
     status: "Tamamlandı",
+    instances: [],
   },
   {
     id: "study-4",
@@ -111,6 +114,7 @@ export const demoStudies: WorklistStudy[] = [
     date: "17.06.2026 13:06",
     priority: "Acil",
     status: "Raporlanıyor",
+    instances: [],
   },
   {
     id: "study-5",
@@ -123,5 +127,6 @@ export const demoStudies: WorklistStudy[] = [
     date: "17.06.2026 13:33",
     priority: "Kontrol",
     status: "Okunacak",
+    instances: [],
   },
 ]

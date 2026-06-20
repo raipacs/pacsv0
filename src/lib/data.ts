@@ -68,10 +68,25 @@ export async function getWorklist(
 
   if (error) throw new Error(`Worklist alınamadı: ${error.message}`)
 
+  const studyIds = (data ?? []).map((study) => study.id)
+  const { data: instances } = studyIds.length
+    ? await supabase
+        .from("instances")
+        .select(
+          "id, study_id, sop_instance_uid, instance_number, storage_bucket, storage_key, size_bytes, sha256, created_at"
+        )
+        .in("study_id", studyIds)
+        .order("instance_number", { ascending: true })
+    : { data: [] }
+
   return (data ?? []).map((study) => {
     const patient = Array.isArray(study.patients)
       ? study.patients[0]
       : study.patients
+    const studyInstances = (instances ?? []).filter(
+      (instance) => instance.study_id === study.id
+    )
+
     return {
       id: study.id,
       patientName: patient
@@ -90,6 +105,16 @@ export async function getWorklist(
         : "-",
       priority: mapPriority(study.priority),
       status: mapStatus(study.status),
+      instances: studyInstances.map((instance) => ({
+        id: instance.id,
+        sopInstanceUid: instance.sop_instance_uid,
+        instanceNumber: instance.instance_number,
+        storageBucket: instance.storage_bucket,
+        storageKey: instance.storage_key,
+        sizeBytes: instance.size_bytes,
+        sha256: instance.sha256,
+        createdAt: instance.created_at,
+      })),
     }
   })
 }

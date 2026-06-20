@@ -24,6 +24,7 @@ export type WorklistStudy = {
   date: string
   priority: "Acil" | "Rutin" | "Kontrol"
   status: "Okunacak" | "Raporlanıyor" | "Tamamlandı"
+  instances: DicomInstance[]
 }
 
 export type DicomInstance = {

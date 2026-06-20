@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 
+import { DicomInstanceActions } from "@/components/dicom-instance-actions"
 import type { WorklistStudy } from "@/lib/types"
 
 export function WorklistTable({ studies }: { studies: WorklistStudy[] }) {
@@ -57,31 +58,52 @@ export function WorklistTable({ studies }: { studies: WorklistStudy[] }) {
               <th>Tarih</th>
               <th>Öncelik</th>
               <th>Durum</th>
+              <th>Görüntü</th>
             </tr>
           </thead>
           <tbody>
-            {visible.map((study) => (
-              <tr key={study.id}>
-                <td>
-                  <strong>{study.patientName}</strong>
-                  <span>{study.patientNumber}</span>
-                </td>
-                <td>
-                  <strong>{study.description}</strong>
-                  <span>{study.accessionNumber}</span>
-                </td>
-                <td>
-                  <span className="modality">{study.modality}</span>
-                </td>
-                <td>{study.date}</td>
-                <td>
-                  <span className={`status ${study.priority.toLowerCase()}`}>
-                    {study.priority}
-                  </span>
-                </td>
-                <td>{study.status}</td>
-              </tr>
-            ))}
+            {visible.map((study) => {
+              const firstInstance = study.instances[0]
+
+              return (
+                <tr key={study.id}>
+                  <td>
+                    <strong>{study.patientName}</strong>
+                    <span>{study.patientNumber}</span>
+                  </td>
+                  <td>
+                    <strong>{study.description}</strong>
+                    <span>{study.accessionNumber}</span>
+                  </td>
+                  <td>
+                    <span className="modality">{study.modality}</span>
+                  </td>
+                  <td>{study.date}</td>
+                  <td>
+                    <span className={`status ${study.priority.toLowerCase()}`}>
+                      {study.priority}
+                    </span>
+                  </td>
+                  <td>{study.status}</td>
+                  <td>
+                    {firstInstance ? (
+                      <DicomInstanceActions
+                        instanceId={firstInstance.id}
+                        instances={study.instances.map((instance) => ({
+                          id: instance.id,
+                          instanceNumber: instance.instanceNumber,
+                          sopInstanceUid: instance.sopInstanceUid,
+                        }))}
+                        viewerLabel="Göster"
+                        showSignedUrl={false}
+                      />
+                    ) : (
+                      "-"
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
