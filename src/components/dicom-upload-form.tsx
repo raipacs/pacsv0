@@ -39,6 +39,8 @@ type ImportResult = {
   details: string[]
 }
 
+const MAX_PARALLEL_IMPORTS = 3
+
 export function DicomUploadForm({
   patients,
   supabaseConfigured,
@@ -296,23 +298,41 @@ export function DicomExportImportForm({
         details: [],
       }
       const supabase = createClient()
+      const importFiles = uniqueFiles(files)
+      let completedCount = 0
+      let nextFileIndex = 0
+
       setDetails([])
 
-      for (const file of files) {
+      async function processFile(file: File, index: number) {
         const fileLabel = file.webkitRelativePath || file.name
+        const progress = `${index + 1}/${importFiles.length}`
+
         setStatus({
           type: "idle",
-          message: `${fileLabel} okunuyor... (${result.uploaded} yeni, ${result.existing} mevcut)`,
+          message: `${progress} ${fileLabel}: DICOM kontrol ediliyor...`,
         })
 
         if (file.size > MAX_BROWSER_DICOM_UPLOAD_BYTES) {
           result.failed += 1
           result.details.push(`${fileLabel}: 512 MB sınırını aştı.`)
-          continue
+          return
+        }
+
+        if (!(await hasDicomPreamble(file))) {
+          result.skipped += 1
+          if (result.details.length < 12) {
+            result.details.push(`${fileLabel}: atlandı (DICOM preamble imzası yok)`)
+          }
+          return
         }
 
         let metadata: ParsedDicomMetadata
         try {
+          setStatus({
+            type: "idle",
+            message: `${progress} ${fileLabel}: metadata okunuyor...`,
+          })
           metadata = await parseDicomMetadata(file)
         } catch (caught) {
           result.skipped += 1
@@ -321,7 +341,7 @@ export function DicomExportImportForm({
               caught instanceof Error ? caught.message : "DICOM metadata okunamadı."
             result.details.push(`${fileLabel}: atlandı (${message})`)
           }
-          continue
+          return
         }
 
         if (!isDicomInstanceMetadata(metadata)) {
@@ -329,18 +349,31 @@ export function DicomExportImportForm({
           if (result.details.length < 12) {
             result.details.push(`${fileLabel}: atlandı (görüntü instance UID bilgisi yok)`)
           }
-          continue
+          return
         }
 
         const input = importInput(metadata)
+        setStatus({
+          type: "idle",
+          message: `${progress} ${fileLabel}: Storage yolu hazırlanıyor...`,
+        })
         const prepared = await prepareDicomImportStorageUpload(input)
         if (!prepared.ok) {
           result.failed += 1
           result.details.push(`${fileLabel}: hazırlık hatası (${prepared.error})`)
-          continue
+          return
         }
 
+        setStatus({
+          type: "idle",
+          message: `${progress} ${fileLabel}: dosya özeti hesaplanıyor...`,
+        })
         const sha256 = await digestSha256(file)
+
+        setStatus({
+          type: "idle",
+          message: `${progress} ${fileLabel}: Storage'a yükleniyor...`,
+        })
         const { error: uploadError } = await supabase.storage
           .from(DICOM_STORAGE_BUCKET)
           .upload(prepared.storageKey, file, {
@@ -353,9 +386,13 @@ export function DicomExportImportForm({
         if (uploadError && !alreadyExists) {
           result.failed += 1
           result.details.push(`${fileLabel}: Storage hatası (${uploadError.message})`)
-          continue
+          return
         }
 
+        setStatus({
+          type: "idle",
+          message: `${progress} ${fileLabel}: metadata kaydediliyor...`,
+        })
         const completed = await completeDicomImportStorageUpload({
           ...input,
           storageKey: prepared.storageKey,
@@ -369,7 +406,7 @@ export function DicomExportImportForm({
           }
           result.failed += 1
           result.details.push(`${fileLabel}: metadata hatası (${completed.error})`)
-          continue
+          return
         }
 
         if (alreadyExists) {
@@ -378,6 +415,26 @@ export function DicomExportImportForm({
           result.uploaded += 1
         }
       }
+
+      async function runWorker() {
+        while (nextFileIndex < importFiles.length) {
+          const fileIndex = nextFileIndex
+          nextFileIndex += 1
+          await processFile(importFiles[fileIndex], fileIndex)
+          completedCount += 1
+          setStatus({
+            type: "idle",
+            message: `${completedCount}/${importFiles.length} dosya tamamlandı. ${result.uploaded} yeni, ${result.existing} mevcut, ${result.skipped} atlandı, ${result.failed} başarısız.`,
+          })
+        }
+      }
+
+      await Promise.all(
+        Array.from(
+          { length: Math.min(MAX_PARALLEL_IMPORTS, importFiles.length) },
+          () => runWorker()
+        )
+      )
 
       form.reset()
       const importedCount = result.uploaded + result.existing
@@ -506,4 +563,14 @@ async function hasDicomPreamble(file: File) {
 
 function isDuplicateStorageError(message: string) {
   return /already exists|duplicate|resource already exists|409/i.test(message)
+}
+
+function uniqueFiles(files: File[]) {
+  const seen = new Set<string>()
+  return files.filter((file) => {
+    const key = `${file.webkitRelativePath || file.name}:${file.size}:${file.lastModified}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
