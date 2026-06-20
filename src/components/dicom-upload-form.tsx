@@ -267,7 +267,7 @@ export function DicomExportImportForm({
     message: "",
   })
   const [details, setDetails] = useState<string[]>([])
-  const [isPending, startTransition] = useTransition()
+  const [isImporting, setIsImporting] = useState(false)
   const cancelImportRef = useRef(false)
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -291,7 +291,11 @@ export function DicomExportImportForm({
       return
     }
 
-    startTransition(async () => {
+    cancelImportRef.current = false
+    setIsImporting(true)
+    setStatus({ type: "idle", message: "Import başlatılıyor..." })
+
+    try {
       cancelImportRef.current = false
       const result: ImportResult = {
         uploaded: 0,
@@ -481,12 +485,14 @@ export function DicomExportImportForm({
         type,
         message: `${result.uploaded} yeni DICOM yüklendi. ${result.existing} mevcut DICOM metadata ile eşlendi. ${result.skipped} dosya atlandı, ${result.failed} dosya başarısız.`,
       })
-    })
+    } finally {
+      setIsImporting(false)
+    }
   }
 
   return (
     <form className="upload-form" onSubmit={onSubmit}>
-      <fieldset disabled={isPending || !supabaseConfigured}>
+      <fieldset disabled={isImporting || !supabaseConfigured}>
         <div className="form-grid">
           <label className="wide">
             DICOM export klasörü
@@ -530,11 +536,11 @@ export function DicomExportImportForm({
       <button
         className="button primary"
         type="submit"
-        disabled={isPending || !supabaseConfigured}
+        disabled={isImporting || !supabaseConfigured}
       >
-        {isPending ? "Import ediliyor..." : "Export'u Storage'a import et"}
+        {isImporting ? "Import ediliyor..." : "Export'u Storage'a import et"}
       </button>
-      {isPending ? (
+      {isImporting ? (
         <button
           className="button subtle"
           type="button"
