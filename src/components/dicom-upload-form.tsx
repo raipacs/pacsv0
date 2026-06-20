@@ -33,8 +33,10 @@ type UploadStatus = {
 
 type ImportResult = {
   uploaded: number
+  existing: number
   skipped: number
   failed: number
+  details: string[]
 }
 
 export function DicomUploadForm({
@@ -261,6 +263,7 @@ export function DicomExportImportForm({
     type: "idle",
     message: "",
   })
+  const [details, setDetails] = useState<string[]>([])
   const [isPending, startTransition] = useTransition()
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -285,30 +288,47 @@ export function DicomExportImportForm({
     }
 
     startTransition(async () => {
-      const result: ImportResult = { uploaded: 0, skipped: 0, failed: 0 }
+      const result: ImportResult = {
+        uploaded: 0,
+        existing: 0,
+        skipped: 0,
+        failed: 0,
+        details: [],
+      }
       const supabase = createClient()
+      setDetails([])
 
       for (const file of files) {
+        const fileLabel = file.webkitRelativePath || file.name
         setStatus({
           type: "idle",
-          message: `${file.name} okunuyor... (${result.uploaded} yüklendi)`,
+          message: `${fileLabel} okunuyor... (${result.uploaded} yeni, ${result.existing} mevcut)`,
         })
 
         if (file.size > MAX_BROWSER_DICOM_UPLOAD_BYTES) {
           result.failed += 1
+          result.details.push(`${fileLabel}: 512 MB sınırını aştı.`)
           continue
         }
 
         let metadata: ParsedDicomMetadata
         try {
           metadata = await parseDicomMetadata(file)
-        } catch {
+        } catch (caught) {
           result.skipped += 1
+          if (result.details.length < 12) {
+            const message =
+              caught instanceof Error ? caught.message : "DICOM metadata okunamadı."
+            result.details.push(`${fileLabel}: atlandı (${message})`)
+          }
           continue
         }
 
         if (!isDicomInstanceMetadata(metadata)) {
           result.skipped += 1
+          if (result.details.length < 12) {
+            result.details.push(`${fileLabel}: atlandı (görüntü instance UID bilgisi yok)`)
+          }
           continue
         }
 
@@ -316,6 +336,7 @@ export function DicomExportImportForm({
         const prepared = await prepareDicomImportStorageUpload(input)
         if (!prepared.ok) {
           result.failed += 1
+          result.details.push(`${fileLabel}: hazırlık hatası (${prepared.error})`)
           continue
         }
 
@@ -328,8 +349,10 @@ export function DicomExportImportForm({
             upsert: false,
           })
 
-        if (uploadError) {
+        const alreadyExists = uploadError ? isDuplicateStorageError(uploadError.message) : false
+        if (uploadError && !alreadyExists) {
           result.failed += 1
+          result.details.push(`${fileLabel}: Storage hatası (${uploadError.message})`)
           continue
         }
 
@@ -341,19 +364,28 @@ export function DicomExportImportForm({
         })
 
         if (!completed.ok) {
-          await supabase.storage.from(prepared.bucket).remove([prepared.storageKey])
+          if (!alreadyExists) {
+            await supabase.storage.from(prepared.bucket).remove([prepared.storageKey])
+          }
           result.failed += 1
+          result.details.push(`${fileLabel}: metadata hatası (${completed.error})`)
           continue
         }
 
-        result.uploaded += 1
+        if (alreadyExists) {
+          result.existing += 1
+        } else {
+          result.uploaded += 1
+        }
       }
 
       form.reset()
-      const type = result.failed ? "error" : "success"
+      const importedCount = result.uploaded + result.existing
+      const type = result.failed || importedCount === 0 ? "error" : "success"
+      setDetails(result.details)
       setStatus({
         type,
-        message: `${result.uploaded} DICOM Storage'a yüklendi. ${result.skipped} dosya atlandı, ${result.failed} dosya başarısız.`,
+        message: `${result.uploaded} yeni DICOM yüklendi. ${result.existing} mevcut DICOM metadata ile eşlendi. ${result.skipped} dosya atlandı, ${result.failed} dosya başarısız.`,
       })
     })
   }
@@ -363,7 +395,7 @@ export function DicomExportImportForm({
       <fieldset disabled={isPending || !supabaseConfigured}>
         <div className="form-grid">
           <label className="wide">
-            DICOM export klasörü veya dosyaları
+            DICOM export klasörü
             <input
               name="dicomExportFiles"
               type="file"
@@ -371,10 +403,29 @@ export function DicomExportImportForm({
               {...{ webkitdirectory: "" }}
             />
           </label>
+          <label className="wide">
+            DICOM dosyaları
+            <input
+              name="dicomExportFiles"
+              type="file"
+              accept=".dcm,application/dicom"
+              multiple
+            />
+          </label>
         </div>
       </fieldset>
       {status.message ? (
         <p className={`form-status ${status.type}`}>{status.message}</p>
+      ) : null}
+      {details.length ? (
+        <details className="import-details">
+          <summary>Import ayrıntıları</summary>
+          <ul>
+            {details.map((detail) => (
+              <li key={detail}>{detail}</li>
+            ))}
+          </ul>
+        </details>
       ) : null}
       {!supabaseConfigured ? (
         <p className="form-status error">
@@ -451,4 +502,8 @@ async function hasDicomPreamble(file: File) {
     bytes[2] === 0x43 &&
     bytes[3] === 0x4d
   )
+}
+
+function isDuplicateStorageError(message: string) {
+  return /already exists|duplicate|resource already exists|409/i.test(message)
 }

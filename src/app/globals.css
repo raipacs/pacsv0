@@ -644,6 +644,30 @@ td span {
   font-weight: 700;
 }
 
+.import-details {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  font-size: 13px;
+}
+
+.import-details summary {
+  color: var(--text);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.import-details ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+}
+
+.import-details li + li {
+  margin-top: 6px;
+}
+
 .viewer-backdrop {
   position: fixed;
   z-index: 50;
