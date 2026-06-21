@@ -4,7 +4,6 @@ import { headers } from "next/headers"
 
 import { requireUser } from "@/lib/auth"
 import { isSupabaseConfigured } from "@/lib/config"
-import { createOhifLaunchToken, hasOhifLaunchSecret } from "@/lib/ohif-launch"
 import { createClient } from "@/lib/supabase/server"
 
 export async function createDicomSignedUrl(instanceId: string) {
@@ -51,13 +50,6 @@ export async function createOhifViewerLaunchUrl(studyId: string) {
     }
   }
 
-  if (!hasOhifLaunchSecret()) {
-    return {
-      ok: false as const,
-      error: "OHIF launch secret tanımlı değil.",
-    }
-  }
-
   const supabase = await createClient()
   const { data: study, error } = await supabase
     .from("studies")
@@ -72,20 +64,11 @@ export async function createOhifViewerLaunchUrl(studyId: string) {
   }
 
   const requestHeaders = await headers()
-  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host")
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? "https"
-  const origin = host ? `${protocol}://${host}` : "https://app.raipacs.com"
-  const token = createOhifLaunchToken({
-    organizationId: user.organizationId,
-    studyId,
-    userId: user.id,
-  })
-  const dicomJsonUrl = `${origin}/api/ohif/studies/${studyId}?token=${encodeURIComponent(
-    token
-  )}`
-  const url = `https://viewer.ohif.org/viewer/dicomjson?url=${encodeURIComponent(
-    dicomJsonUrl
-  )}`
+  const referer = requestHeaders.get("referer")
+  const fromPatient = referer?.match(/\/patients\/([^/?#]+)/)?.[1]
+  const url = fromPatient
+    ? `/viewer/${studyId}?patientId=${encodeURIComponent(fromPatient)}`
+    : `/viewer/${studyId}`
 
   return { ok: true as const, url }
 }
