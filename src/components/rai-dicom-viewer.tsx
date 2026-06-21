@@ -15,6 +15,11 @@ type ViewerInstance = {
   sopInstanceUid: string
 }
 
+type ViewerTool = "scroll" | "pan" | "window" | "zoom"
+
+const MIN_ZOOM = 0.2
+const MAX_ZOOM = 12
+
 export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
   const orderedInstances = useMemo(
     () =>
@@ -35,10 +40,18 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
   const [invert, setInvert] = useState(false)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [rotate, setRotate] = useState(0)
-  const [tool, setTool] = useState<"pan" | "window">("pan")
+  const [flipHorizontal, setFlipHorizontal] = useState(false)
+  const [flipVertical, setFlipVertical] = useState(false)
+  const [tool, setTool] = useState<ViewerTool>("scroll")
+  const [isCinePlaying, setIsCinePlaying] = useState(false)
+  const [cineFps, setCineFps] = useState(12)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const viewerRef = useRef<HTMLDivElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const wheelRef = useRef(0)
+  const loadTokenRef = useRef(0)
+  const previewCacheRef = useRef(new Map<string, DicomPreview>())
   const dragRef = useRef<{
     x: number
     y: number
@@ -46,24 +59,51 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
     panY: number
     center: number
     width: number
-    tool: "pan" | "window"
+    zoom: number
+    index: number
+    scrollStep: number
+    tool: ViewerTool
   } | null>(null)
-  const activeIndex = Math.max(
-    0,
-    orderedInstances.findIndex((item) => item.id === activeInstanceId)
-  )
+
+  const foundIndex = orderedInstances.findIndex((item) => item.id === activeInstanceId)
+  const activeIndex = Math.max(0, foundIndex)
   const activeInstance = orderedInstances[activeIndex]
   const hasMultipleInstances = orderedInstances.length > 1
+
+  const applyDecodedPreview = useCallback((decoded: DicomPreview) => {
+    setPreview(decoded)
+    setWindowCenter(Math.round(decoded.voi.center))
+    setWindowWidth(Math.round(decoded.voi.width))
+    setZoom(1)
+    setInvert(false)
+    setRotate(0)
+    setFlipHorizontal(false)
+    setFlipVertical(false)
+    setPan({ x: 0, y: 0 })
+    setViewerStatus(decoded.pixels ? "" : "Bu DICOM içinde görüntü pixel verisi yok.")
+  }, [])
 
   const loadInstance = useCallback(
     (targetInstanceId: string) => {
       if (!targetInstanceId) return
+
+      const cached = previewCacheRef.current.get(targetInstanceId)
+      if (cached) {
+        setError("")
+        applyDecodedPreview(cached)
+        return
+      }
+
+      const loadToken = loadTokenRef.current + 1
+      loadTokenRef.current = loadToken
       setError("")
       setViewerStatus("DICOM hazırlanıyor...")
       setPreview(null)
 
       startTransition(async () => {
         const result = await createDicomSignedUrl(targetInstanceId)
+        if (loadTokenRef.current !== loadToken) return
+
         if (!result.ok) {
           setError(result.error)
           setViewerStatus(result.error)
@@ -77,17 +117,14 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
             throw new Error(`DICOM indirilemedi: ${response.status}`)
           }
 
+          if (loadTokenRef.current !== loadToken) return
           setViewerStatus("Görüntü çözümleniyor...")
           const decoded = await decodeDicomPreview(await response.arrayBuffer())
-          setPreview(decoded)
-          setWindowCenter(Math.round(decoded.voi.center))
-          setWindowWidth(Math.round(decoded.voi.width))
-          setZoom(1)
-          setInvert(false)
-          setRotate(0)
-          setPan({ x: 0, y: 0 })
-          setViewerStatus(decoded.pixels ? "" : "Bu DICOM içinde görüntü pixel verisi yok.")
+          if (loadTokenRef.current !== loadToken) return
+          previewCacheRef.current.set(targetInstanceId, decoded)
+          applyDecodedPreview(decoded)
         } catch (caught) {
+          if (loadTokenRef.current !== loadToken) return
           const message =
             caught instanceof Error ? caught.message : "DICOM görüntüsü açılamadı."
           setError(message)
@@ -95,7 +132,24 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
         }
       })
     },
-    [startTransition]
+    [applyDecodedPreview, startTransition]
+  )
+
+  const goToInstance = useCallback(
+    (targetIndex: number) => {
+      if (!orderedInstances.length) return
+      const nextIndex = Math.min(orderedInstances.length - 1, Math.max(0, targetIndex))
+      setActiveInstanceId(orderedInstances[nextIndex].id)
+    },
+    [orderedInstances]
+  )
+
+  const moveInstance = useCallback(
+    (direction: -1 | 1) => {
+      if (!hasMultipleInstances) return
+      goToInstance(activeIndex + direction)
+    },
+    [activeIndex, goToInstance, hasMultipleInstances]
   )
 
   useEffect(() => {
@@ -126,13 +180,88 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
         rotate,
         panX: pan.x * ratio,
         panY: pan.y * ratio,
+        flipHorizontal,
+        flipVertical,
       })
     }
 
     resizeAndRender()
     window.addEventListener("resize", resizeAndRender)
     return () => window.removeEventListener("resize", resizeAndRender)
-  }, [invert, pan, preview, rotate, windowCenter, windowWidth, zoom])
+  }, [
+    flipHorizontal,
+    flipVertical,
+    invert,
+    pan,
+    preview,
+    rotate,
+    windowCenter,
+    windowWidth,
+    zoom,
+  ])
+
+  useEffect(() => {
+    if (!isCinePlaying || !hasMultipleInstances) return
+
+    const interval = window.setInterval(() => {
+      setActiveInstanceId((currentId) => {
+        const currentIndex = orderedInstances.findIndex((item) => item.id === currentId)
+        const nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % orderedInstances.length
+        return orderedInstances[nextIndex]?.id ?? currentId
+      })
+    }, Math.max(80, Math.round(1000 / cineFps)))
+
+    return () => window.clearInterval(interval)
+  }, [cineFps, hasMultipleInstances, isCinePlaying, orderedInstances])
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === viewerRef.current)
+    }
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange)
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange)
+  }, [])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase()
+
+      if (event.key === "ArrowLeft" || event.key === "PageUp") {
+        event.preventDefault()
+        moveInstance(-1)
+      }
+
+      if (event.key === "ArrowRight" || event.key === "PageDown") {
+        event.preventDefault()
+        moveInstance(1)
+      }
+
+      if (event.key === "Home") {
+        event.preventDefault()
+        goToInstance(0)
+      }
+
+      if (event.key === "End") {
+        event.preventDefault()
+        goToInstance(orderedInstances.length - 1)
+      }
+
+      if (key === "0") resetViewer()
+      if (key === "i") setInvert((value) => !value)
+      if (key === "s") setTool("scroll")
+      if (key === "p") setTool("pan")
+      if (key === "w") setTool("window")
+      if (key === "z") setTool("zoom")
+      if (event.code === "Space" && hasMultipleInstances) {
+        event.preventDefault()
+        setIsCinePlaying((value) => !value)
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  })
 
   function resetViewer() {
     if (!preview) return
@@ -141,14 +270,9 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
     setZoom(1)
     setInvert(false)
     setRotate(0)
+    setFlipHorizontal(false)
+    setFlipVertical(false)
     setPan({ x: 0, y: 0 })
-  }
-
-  function moveInstance(direction: -1 | 1) {
-    if (!hasMultipleInstances) return
-    const nextIndex =
-      (activeIndex + direction + orderedInstances.length) % orderedInstances.length
-    setActiveInstanceId(orderedInstances[nextIndex].id)
   }
 
   function applyPreset(center: number, width: number) {
@@ -157,50 +281,68 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
   }
 
   function adjustZoom(delta: number) {
-    setZoom((value) => Math.min(8, Math.max(0.2, Number((value + delta).toFixed(2)))))
+    setZoom((value) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number((value + delta).toFixed(2)))))
   }
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "ArrowLeft") {
-        event.preventDefault()
-        moveInstance(-1)
-      }
+  function fitToViewport() {
+    setZoom(1)
+    setPan({ x: 0, y: 0 })
+  }
 
-      if (event.key === "ArrowRight") {
-        event.preventDefault()
-        moveInstance(1)
-      }
+  function setActualSize() {
+    if (!preview || !canvasRef.current?.parentElement) return
 
-      if (event.key === "0") resetViewer()
-      if (event.key.toLocaleLowerCase("tr-TR") === "i") {
-        setInvert((value) => !value)
-      }
+    const rect = canvasRef.current.parentElement.getBoundingClientRect()
+    const fit = Math.min(
+      rect.width / preview.metadata.columns,
+      rect.height / preview.metadata.rows
+    )
+    if (!Number.isFinite(fit) || fit <= 0) return
+    setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number((1 / fit).toFixed(2)))))
+    setPan({ x: 0, y: 0 })
+  }
+
+  async function toggleFullscreen() {
+    if (!viewerRef.current) return
+
+    if (document.fullscreenElement) {
+      await document.exitFullscreen()
+      return
     }
 
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  })
+    await viewerRef.current.requestFullscreen()
+  }
+
+  function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
+    event.preventDefault()
+
+    if (tool === "zoom" || event.ctrlKey || event.metaKey || !hasMultipleInstances) {
+      adjustZoom(event.deltaY > 0 ? -0.12 : 0.12)
+      return
+    }
+
+    const now = Date.now()
+    if (now - wheelRef.current < 70) return
+    wheelRef.current = now
+    moveInstance(event.deltaY > 0 ? 1 : -1)
+  }
 
   if (!orderedInstances.length) {
     return <p className="viewer-status">Bu tetkikte görüntülenecek DICOM yok.</p>
   }
 
   return (
-    <div className="rai-dicom-viewer">
-      <div
-        className="rai-dicom-stage"
-        onWheel={(event) => {
-          if (!hasMultipleInstances) return
-          event.preventDefault()
-          const now = Date.now()
-          if (now - wheelRef.current < 120) return
-          wheelRef.current = now
-          moveInstance(event.deltaY > 0 ? 1 : -1)
-        }}
-      >
+    <div ref={viewerRef} className="rai-dicom-viewer">
+      <div className="rai-dicom-stage" onWheel={handleWheel}>
         <div className="rai-dicom-toolbar" aria-label="Viewer araçları">
           <div className="segmented viewer-mode">
+            <button
+              type="button"
+              className={tool === "scroll" ? "active" : ""}
+              onClick={() => setTool("scroll")}
+            >
+              Scroll
+            </button>
             <button
               type="button"
               className={tool === "pan" ? "active" : ""}
@@ -215,7 +357,20 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
             >
               W/L
             </button>
+            <button
+              type="button"
+              className={tool === "zoom" ? "active" : ""}
+              onClick={() => setTool("zoom")}
+            >
+              Zoom
+            </button>
           </div>
+          <button className="button subtle small" type="button" onClick={fitToViewport}>
+            Fit
+          </button>
+          <button className="button subtle small" type="button" onClick={setActualSize}>
+            1:1
+          </button>
           <button className="button subtle small" type="button" onClick={resetViewer}>
             0
           </button>
@@ -232,21 +387,26 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
           >
             Döndür
           </button>
-          {hasMultipleInstances ? (
-            <>
-              <button className="button subtle small" type="button" onClick={() => moveInstance(-1)}>
-                Önceki
-              </button>
-              <button className="button subtle small" type="button" onClick={() => moveInstance(1)}>
-                Sonraki
-              </button>
-            </>
-          ) : null}
+          <button className="button subtle small" type="button" onClick={toggleFullscreen}>
+            {isFullscreen ? "Çık" : "Tam ekran"}
+          </button>
         </div>
+
+        <div className="rai-dicom-overlay">
+          <span>{preview?.metadata.modality || "DICOM"}</span>
+          <span>
+            I: {activeIndex + 1}/{orderedInstances.length}
+          </span>
+          <span>
+            W/L: {windowWidth}/{windowCenter}
+          </span>
+          <span>Zoom: {Math.round(zoom * 100)}%</span>
+        </div>
+
         {viewerStatus ? <p className="viewer-status">{viewerStatus}</p> : null}
         <canvas
           ref={canvasRef}
-          className="rai-dicom-canvas"
+          className={`rai-dicom-canvas is-${tool}`}
           onPointerDown={(event) => {
             dragRef.current = {
               x: event.clientX,
@@ -255,6 +415,9 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
               panY: pan.y,
               center: windowCenter,
               width: windowWidth,
+              zoom,
+              index: activeIndex,
+              scrollStep: 0,
               tool,
             }
             event.currentTarget.setPointerCapture(event.pointerId)
@@ -264,16 +427,33 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
 
             const deltaX = event.clientX - dragRef.current.x
             const deltaY = event.clientY - dragRef.current.y
+
             if (dragRef.current.tool === "window") {
               setWindowCenter(Math.round(dragRef.current.center - deltaY * 2))
               setWindowWidth(Math.max(1, Math.round(dragRef.current.width + deltaX * 4)))
               return
             }
 
+            if (dragRef.current.tool === "zoom") {
+              const nextZoom = dragRef.current.zoom - deltaY * 0.012
+              setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number(nextZoom.toFixed(2)))))
+              return
+            }
+
+            if (dragRef.current.tool === "scroll" && hasMultipleInstances) {
+              const scrollStep = Math.trunc(deltaY / 36)
+              if (scrollStep !== dragRef.current.scrollStep) {
+                dragRef.current.scrollStep = scrollStep
+                goToInstance(dragRef.current.index + scrollStep)
+              }
+              return
+            }
+
             setPan({ x: dragRef.current.panX + deltaX, y: dragRef.current.panY + deltaY })
           }}
-          onPointerUp={() => {
+          onPointerUp={(event) => {
             dragRef.current = null
+            event.currentTarget.releasePointerCapture(event.pointerId)
           }}
           onPointerCancel={() => {
             dragRef.current = null
@@ -293,6 +473,20 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
           <button className="button subtle small" type="button" onClick={() => setInvert((value) => !value)}>
             İnvert
           </button>
+          <button
+            className="button subtle small"
+            type="button"
+            onClick={() => setFlipHorizontal((value) => !value)}
+          >
+            H Flip
+          </button>
+          <button
+            className="button subtle small"
+            type="button"
+            onClick={() => setFlipVertical((value) => !value)}
+          >
+            V Flip
+          </button>
         </div>
         <div className="viewer-presets">
           <button className="button subtle small" type="button" onClick={() => applyPreset(40, 400)}>
@@ -305,12 +499,34 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
             Akciğer
           </button>
         </div>
+        <div className="viewer-cine">
+          <button
+            className="button subtle small"
+            type="button"
+            disabled={!hasMultipleInstances}
+            onClick={() => setIsCinePlaying((value) => !value)}
+          >
+            {isCinePlaying ? "Durdur" : "Cine"}
+          </button>
+          <label>
+            FPS
+            <input
+              type="range"
+              min="1"
+              max="30"
+              step="1"
+              value={cineFps}
+              onChange={(event) => setCineFps(Number(event.target.value))}
+            />
+            <span>{cineFps}</span>
+          </label>
+        </div>
         <label>
           Zoom
           <input
             type="range"
-            min="0.4"
-            max="8"
+            min={MIN_ZOOM}
+            max={MAX_ZOOM}
             step="0.1"
             value={zoom}
             onChange={(event) => setZoom(Number(event.target.value))}
@@ -347,9 +563,7 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
               max={orderedInstances.length - 1}
               step="1"
               value={activeIndex}
-              onChange={(event) =>
-                setActiveInstanceId(orderedInstances[Number(event.target.value)].id)
-              }
+              onChange={(event) => goToInstance(Number(event.target.value))}
             />
           </label>
         ) : null}
@@ -372,6 +586,10 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
           <div>
             <dt>Transfer syntax</dt>
             <dd>{preview?.metadata.transferSyntaxUid || "-"}</dd>
+          </div>
+          <div>
+            <dt>Araç</dt>
+            <dd>{tool.toUpperCase()}</dd>
           </div>
         </dl>
         {isPending ? <p className="muted">Yükleniyor...</p> : null}

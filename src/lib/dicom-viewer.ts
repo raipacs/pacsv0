@@ -75,6 +75,8 @@ export function renderDicomImage(
     rotate: number
     panX: number
     panY: number
+    flipHorizontal?: boolean
+    flipVertical?: boolean
   }
 ) {
   if (!preview.pixels || preview.metadata.rows <= 0 || preview.metadata.columns <= 0) {
@@ -123,6 +125,7 @@ export function renderDicomImage(
   targetContext.save()
   targetContext.translate(canvas.width / 2 + options.panX, canvas.height / 2 + options.panY)
   targetContext.rotate(rotation)
+  targetContext.scale(options.flipHorizontal ? -1 : 1, options.flipVertical ? -1 : 1)
   targetContext.drawImage(source, -width / 2, -height / 2, width, height)
   targetContext.restore()
 }

@@ -463,16 +463,54 @@ p {
   background: #111827;
 }
 
+.rai-dicom-toolbar .button.subtle:disabled,
+.rai-dicom-side .button.subtle:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.rai-dicom-overlay {
+  position: absolute;
+  inset: auto 14px 14px 14px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.rai-dicom-overlay span {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 6px;
+  padding: 5px 8px;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 800;
+  background: rgba(15, 23, 42, 0.74);
+}
+
 .rai-dicom-canvas {
   display: block;
   width: 100%;
   height: 100%;
   min-height: calc(100dvh - 153px);
+  cursor: ns-resize;
+}
+
+.rai-dicom-canvas.is-pan {
   cursor: grab;
 }
 
-.rai-dicom-canvas:active {
+.rai-dicom-canvas.is-pan:active {
   cursor: grabbing;
+}
+
+.rai-dicom-canvas.is-window {
+  cursor: crosshair;
+}
+
+.rai-dicom-canvas.is-zoom {
+  cursor: zoom-in;
 }
 
 .rai-dicom-side {
@@ -495,6 +533,16 @@ p {
 
 .rai-dicom-side input[type="range"] {
   width: 100%;
+}
+
+.viewer-cine {
+  display: grid;
+  gap: 10px;
+}
+
+.viewer-cine label {
+  grid-template-columns: auto minmax(0, 1fr) 28px;
+  align-items: center;
 }
 
 .rai-dicom-side dl {
