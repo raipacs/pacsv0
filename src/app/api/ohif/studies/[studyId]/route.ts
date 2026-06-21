@@ -79,7 +79,7 @@ export async function GET(request: Request, context: RouteContext) {
     async (instance) => {
       const { data, error } = await supabase.storage
         .from(instance.storage_bucket)
-        .createSignedUrl(instance.storage_key, 10 * 60, { download: true })
+        .createSignedUrl(instance.storage_key, 60 * 60)
 
       if (error) throw new Error(error.message)
       const ohifMetadata = await readSignedDicomMetadata(data.signedUrl)
@@ -146,12 +146,7 @@ export async function GET(request: Request, context: RouteContext) {
                     instance.ohifMetadata.TransferSyntaxUID ??
                     undefined,
                 },
-                url: `wadouri:${createOhifInstanceUrl({
-                  origin: requestUrl.origin,
-                  instanceId: instance.id,
-                  studyId,
-                  token,
-                })}`,
+                url: `wadouri:${instance.signedUrl}`,
               })),
             }
           }),
@@ -160,23 +155,6 @@ export async function GET(request: Request, context: RouteContext) {
     },
     { headers: CORS_HEADERS }
   )
-}
-
-function createOhifInstanceUrl({
-  origin,
-  instanceId,
-  studyId,
-  token,
-}: {
-  origin: string
-  instanceId: string
-  studyId: string
-  token: string
-}) {
-  const url = new URL(`/viewer-data/instances/${instanceId}`, origin)
-  url.searchParams.set("studyId", studyId)
-  url.searchParams.set("token", token)
-  return url.toString()
 }
 
 async function readSignedDicomMetadata(url: string) {
