@@ -9,9 +9,10 @@ type RouteContext = {
 }
 
 const CORS_HEADERS = {
-  "Access-Control-Allow-Headers": "content-type",
+  "Access-Control-Allow-Headers": "content-type, range",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Allow-Origin": "https://viewer.ohif.org",
+  "Access-Control-Expose-Headers": "accept-ranges, content-length, content-range",
   "Cache-Control": "private, no-store",
 }
 const DICOM_HEADER_RANGE_BYTES = 4 * 1024 * 1024
@@ -23,7 +24,8 @@ export async function OPTIONS() {
 
 export async function GET(request: Request, context: RouteContext) {
   const { studyId } = await context.params
-  const token = new URL(request.url).searchParams.get("token") ?? ""
+  const requestUrl = new URL(request.url)
+  const token = requestUrl.searchParams.get("token") ?? ""
   const launch = verifyOhifLaunchToken(token, studyId)
 
   if (!launch) {
@@ -142,7 +144,12 @@ export async function GET(request: Request, context: RouteContext) {
                     instance.ohifMetadata.TransferSyntaxUID ??
                     undefined,
                 },
-                url: `dicomweb:${instance.signedUrl}`,
+                url: `dicomweb:${createOhifInstanceUrl({
+                  origin: requestUrl.origin,
+                  instanceId: instance.id,
+                  studyId,
+                  token,
+                })}`,
               })),
             }
           }),
@@ -151,6 +158,23 @@ export async function GET(request: Request, context: RouteContext) {
     },
     { headers: CORS_HEADERS }
   )
+}
+
+function createOhifInstanceUrl({
+  origin,
+  instanceId,
+  studyId,
+  token,
+}: {
+  origin: string
+  instanceId: string
+  studyId: string
+  token: string
+}) {
+  const url = new URL(`/api/ohif/instances/${instanceId}`, origin)
+  url.searchParams.set("studyId", studyId)
+  url.searchParams.set("token", token)
+  return url.toString()
 }
 
 async function readSignedDicomMetadata(url: string) {

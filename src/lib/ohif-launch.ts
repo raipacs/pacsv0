@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto"
 
-const TOKEN_TTL_SECONDS = 10 * 60
+const TOKEN_TTL_SECONDS = 60 * 60
 
 type OhifLaunchPayload = {
   exp: number
