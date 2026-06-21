@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 
-import { createDicomSignedUrl } from "@/app/actions/storage"
+import { createDicomSignedUrls } from "@/app/actions/storage"
 import {
   decodeDicomPreview,
   renderDicomImage,
@@ -21,6 +21,8 @@ const MIN_ZOOM = 0.2
 const MAX_ZOOM = 12
 const SIGNED_URL_TIMEOUT_MS = 15_000
 const DICOM_FETCH_TIMEOUT_MS = 25_000
+const PREVIEW_CACHE_LIMIT = 10
+const PREFETCH_RADIUS = 2
 
 export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
   const orderedInstances = useMemo(
@@ -48,12 +50,16 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
   const [isCinePlaying, setIsCinePlaying] = useState(false)
   const [cineFps, setCineFps] = useState(12)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [cacheStats, setCacheStats] = useState({ ready: 0, loading: 0 })
   const [isPending, startTransition] = useTransition()
   const viewerRef = useRef<HTMLDivElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const wheelRef = useRef(0)
   const loadTokenRef = useRef(0)
   const previewCacheRef = useRef(new Map<string, DicomPreview>())
+  const signedUrlCacheRef = useRef(new Map<string, string>())
+  const pendingPreviewRef = useRef(new Map<string, Promise<DicomPreview>>())
+  const hasLoadedPreviewRef = useRef(false)
   const dragRef = useRef<{
     x: number
     y: number
@@ -73,16 +79,123 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
   const loadableInstanceId = activeInstance?.id ?? ""
   const hasMultipleInstances = orderedInstances.length > 1
 
+  const refreshCacheStats = useCallback(() => {
+    setCacheStats({
+      ready: previewCacheRef.current.size,
+      loading: pendingPreviewRef.current.size,
+    })
+  }, [])
+
+  const cachePreview = useCallback(
+    (instanceId: string, decoded: DicomPreview) => {
+      const cache = previewCacheRef.current
+      cache.delete(instanceId)
+      cache.set(instanceId, decoded)
+
+      while (cache.size > PREVIEW_CACHE_LIMIT) {
+        const oldestKey = cache.keys().next().value
+        if (!oldestKey) break
+        cache.delete(oldestKey)
+      }
+
+      refreshCacheStats()
+    },
+    [refreshCacheStats]
+  )
+
+  const getSignedUrls = useCallback(
+    async (instanceIds: string[]) => {
+      const uniqueIds = Array.from(new Set(instanceIds)).filter(Boolean)
+      const missingIds = uniqueIds.filter((id) => !signedUrlCacheRef.current.has(id))
+
+      if (missingIds.length) {
+        const result = await withTimeout(
+          createDicomSignedUrls(missingIds),
+          SIGNED_URL_TIMEOUT_MS,
+          "DICOM signed URL üretimi zaman aşımına uğradı."
+        )
+
+        if (!result.ok) throw new Error(result.error)
+
+        Object.entries(result.urls).forEach(([instanceId, url]) => {
+          signedUrlCacheRef.current.set(instanceId, url)
+        })
+      }
+
+      return new Map(
+        uniqueIds
+          .map((id) => [id, signedUrlCacheRef.current.get(id)] as const)
+          .filter((entry): entry is readonly [string, string] => Boolean(entry[1]))
+      )
+    },
+    []
+  )
+
+  const decodeInstancePreview = useCallback(
+    async (instanceId: string, onStatus?: (status: string) => void) => {
+      const cached = previewCacheRef.current.get(instanceId)
+      if (cached) {
+        previewCacheRef.current.delete(instanceId)
+        previewCacheRef.current.set(instanceId, cached)
+        refreshCacheStats()
+        return cached
+      }
+
+      const pending = pendingPreviewRef.current.get(instanceId)
+      if (pending) return pending
+
+      const pendingPreview = (async () => {
+        onStatus?.("DICOM imzalı bağlantı hazırlanıyor...")
+        const urls = await getSignedUrls([instanceId])
+        const url = urls.get(instanceId)
+        if (!url) throw new Error("DICOM signed URL alınamadı.")
+
+        onStatus?.("DICOM indiriliyor...")
+        let response = await fetchDicomUrl(url)
+
+        if ([400, 401, 403].includes(response.status)) {
+          signedUrlCacheRef.current.delete(instanceId)
+          const refreshedUrls = await getSignedUrls([instanceId])
+          const refreshedUrl = refreshedUrls.get(instanceId)
+          if (refreshedUrl) response = await fetchDicomUrl(refreshedUrl)
+        }
+
+        if (!response.ok) throw new Error(`DICOM indirilemedi: ${response.status}`)
+
+        onStatus?.("Görüntü çözümleniyor...")
+        const decoded = await decodeDicomPreview(await response.arrayBuffer())
+        cachePreview(instanceId, decoded)
+        return decoded
+      })()
+
+      pendingPreviewRef.current.set(instanceId, pendingPreview)
+      refreshCacheStats()
+
+      try {
+        return await pendingPreview
+      } finally {
+        pendingPreviewRef.current.delete(instanceId)
+        refreshCacheStats()
+      }
+    },
+    [cachePreview, getSignedUrls, refreshCacheStats]
+  )
+
   const applyDecodedPreview = useCallback((decoded: DicomPreview) => {
     setPreview(decoded)
-    setWindowCenter(Math.round(decoded.voi.center))
-    setWindowWidth(Math.round(decoded.voi.width))
-    setZoom(1)
-    setInvert(false)
-    setRotate(0)
-    setFlipHorizontal(false)
-    setFlipVertical(false)
-    setPan({ x: 0, y: 0 })
+
+    if (!hasLoadedPreviewRef.current) {
+      setWindowCenter(Math.round(decoded.voi.center))
+      setWindowWidth(Math.round(decoded.voi.width))
+      setZoom(1)
+      setInvert(false)
+      setRotate(0)
+      setFlipHorizontal(false)
+      setFlipVertical(false)
+      setPan({ x: 0, y: 0 })
+      hasLoadedPreviewRef.current = true
+    }
+
     setViewerStatus(decoded.pixels ? "" : "Bu DICOM içinde görüntü pixel verisi yok.")
   }, [])
 
@@ -104,35 +217,9 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
       setPreview(null)
 
       startTransition(async () => {
-        const result = await withTimeout(
-          createDicomSignedUrl(targetInstanceId),
-          SIGNED_URL_TIMEOUT_MS,
-          "DICOM signed URL üretimi zaman aşımına uğradı."
-        )
-        if (loadTokenRef.current !== loadToken) return
-
-        if (!result.ok) {
-          setError(result.error)
-          setViewerStatus(result.error)
-          return
-        }
-
         try {
-          setViewerStatus("DICOM indiriliyor...")
-          const controller = new AbortController()
-          const timeout = window.setTimeout(() => controller.abort(), DICOM_FETCH_TIMEOUT_MS)
-          const response = await fetch(result.url, { signal: controller.signal }).finally(() =>
-            window.clearTimeout(timeout)
-          )
-          if (!response.ok) {
-            throw new Error(`DICOM indirilemedi: ${response.status}`)
-          }
-
+          const decoded = await decodeInstancePreview(targetInstanceId, setViewerStatus)
           if (loadTokenRef.current !== loadToken) return
-          setViewerStatus("Görüntü çözümleniyor...")
-          const decoded = await decodeDicomPreview(await response.arrayBuffer())
-          if (loadTokenRef.current !== loadToken) return
-          previewCacheRef.current.set(targetInstanceId, decoded)
           applyDecodedPreview(decoded)
         } catch (caught) {
           if (loadTokenRef.current !== loadToken) return
@@ -143,7 +230,33 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
         }
       })
     },
-    [applyDecodedPreview, startTransition]
+    [applyDecodedPreview, decodeInstancePreview, startTransition]
+  )
+
+  const prefetchNearbyInstances = useCallback(
+    (centerIndex: number) => {
+      if (!hasMultipleInstances) return
+
+      const nearbyIds: string[] = []
+      for (let offset = 1; offset <= PREFETCH_RADIUS; offset += 1) {
+        const next = orderedInstances[centerIndex + offset]?.id
+        const previous = orderedInstances[centerIndex - offset]?.id
+        if (next) nearbyIds.push(next)
+        if (previous) nearbyIds.push(previous)
+      }
+
+      const idsToPrefetch = nearbyIds.filter(
+        (id) => !previewCacheRef.current.has(id) && !pendingPreviewRef.current.has(id)
+      )
+      if (!idsToPrefetch.length) return
+
+      void getSignedUrls(idsToPrefetch)
+        .then(() => Promise.allSettled(idsToPrefetch.map((id) => decodeInstancePreview(id))))
+        .catch(() => {
+          // Prefetch is opportunistic; active viewport loading reports real errors.
+        })
+    },
+    [decodeInstancePreview, getSignedUrls, hasMultipleInstances, orderedInstances]
   )
 
   const goToInstance = useCallback(
@@ -169,6 +282,13 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
     const timeout = window.setTimeout(() => loadInstance(loadableInstanceId), 0)
     return () => window.clearTimeout(timeout)
   }, [loadInstance, loadableInstanceId])
+
+  useEffect(() => {
+    if (!hasMultipleInstances) return
+
+    const timeout = window.setTimeout(() => prefetchNearbyInstances(activeIndex), 220)
+    return () => window.clearTimeout(timeout)
+  }, [activeIndex, hasMultipleInstances, prefetchNearbyInstances])
 
   useEffect(() => {
     if (!preview || !canvasRef.current) return
@@ -412,6 +532,10 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
             W/L: {windowWidth}/{windowCenter}
           </span>
           <span>Zoom: {Math.round(zoom * 100)}%</span>
+          <span>
+            Cache: {cacheStats.ready}
+            {cacheStats.loading ? ` +${cacheStats.loading}` : ""}
+          </span>
         </div>
 
         {viewerStatus ? <p className="viewer-status">{viewerStatus}</p> : null}
@@ -602,6 +726,13 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
             <dt>Araç</dt>
             <dd>{tool.toUpperCase()}</dd>
           </div>
+          <div>
+            <dt>Cache</dt>
+            <dd>
+              {cacheStats.ready} hazır
+              {cacheStats.loading ? `, ${cacheStats.loading} yükleniyor` : ""}
+            </dd>
+          </div>
         </dl>
         {isPending ? <p className="muted">Yükleniyor...</p> : null}
       </aside>
@@ -619,4 +750,11 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string)
   return Promise.race([promise, timeoutPromise]).finally(() => {
     if (timeout !== undefined) window.clearTimeout(timeout)
   })
+}
+
+function fetchDicomUrl(url: string) {
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), DICOM_FETCH_TIMEOUT_MS)
+
+  return fetch(url, { signal: controller.signal }).finally(() => window.clearTimeout(timeout))
 }
