@@ -2,6 +2,7 @@ import Link from "next/link"
 import { headers } from "next/headers"
 import { notFound } from "next/navigation"
 
+import { RaiDicomViewer } from "@/components/rai-dicom-viewer"
 import { requireUser } from "@/lib/auth"
 import { isSupabaseConfigured } from "@/lib/config"
 import { hasOhifLaunchSecret } from "@/lib/ohif-launch"
@@ -43,6 +44,17 @@ export default async function RaiViewerPage({
 
   if (error) throw new Error(`Viewer tetkiki alınamadı: ${error.message}`)
   if (!study) notFound()
+
+  const { data: instances, error: instancesError } = await supabase
+    .from("instances")
+    .select("id, sop_instance_uid, instance_number")
+    .eq("study_id", study.id)
+    .eq("organization_id", user.organizationId)
+    .order("instance_number", { ascending: true })
+
+  if (instancesError) {
+    throw new Error(`Viewer instance listesi alınamadı: ${instancesError.message}`)
+  }
 
   const patient = Array.isArray(study.patients) ? study.patients[0] : study.patients
   const requestHeaders = await headers()
@@ -89,17 +101,17 @@ export default async function RaiViewerPage({
             rel="noreferrer"
             target="_blank"
           >
-            Yeni sekme
+            OHIF yeni sekme
           </a>
         </nav>
       </header>
-      <div className="rai-viewer-frame">
-        <iframe
-          allow="fullscreen; clipboard-read; clipboard-write"
-          src={viewerUrl}
-          title="RAI DICOM Viewer"
-        />
-      </div>
+      <RaiDicomViewer
+        instances={(instances ?? []).map((instance) => ({
+          id: instance.id,
+          instanceNumber: instance.instance_number,
+          sopInstanceUid: instance.sop_instance_uid,
+        }))}
+      />
     </section>
   )
 }
