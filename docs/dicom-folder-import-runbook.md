@@ -51,7 +51,7 @@ Use the publishable key from Supabase Dashboard > Connect. Do not commit it to
 the repository if copied into a shell.
 
 ```bash
-RAI_PACS_SUPABASE_URL="https://mmksimbjasvkgekqcacf.supabase.co" \
+RAI_PACS_SUPABASE_URL="https://api.raipacs.com" \
 RAI_PACS_SUPABASE_PUBLISHABLE_KEY="SUPABASE_PUBLISHABLE_KEY" \
 RAI_PACS_IMPORT_EMAIL="IMPORTER_EMAIL" \
 RAI_PACS_IMPORT_PASSWORD="IMPORTER_PASSWORD" \
