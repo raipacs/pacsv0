@@ -95,6 +95,7 @@ export default async function PatientDetailPage({
                         {firstInstance ? (
                           <DicomInstanceActions
                             instanceId={firstInstance.id}
+                            studyId={study.id}
                             instances={study.instances.map((instance) => ({
                               id: instance.id,
                               instanceNumber: instance.instanceNumber,

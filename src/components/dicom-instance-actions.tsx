@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 
-import { createDicomSignedUrl } from "@/app/actions/storage"
+import { createDicomSignedUrl, createOhifViewerLaunchUrl } from "@/app/actions/storage"
 import {
   decodeDicomPreview,
   renderDicomImage,
@@ -12,11 +12,13 @@ import {
 export function DicomInstanceActions({
   instanceId,
   instances,
+  studyId,
   viewerLabel = "Viewer",
   showSignedUrl = true,
 }: {
   instanceId: string
   instances?: { id: string; instanceNumber: number | null; sopInstanceUid: string }[]
+  studyId?: string
   viewerLabel?: string
   showSignedUrl?: boolean
 }) {
@@ -150,9 +152,28 @@ export function DicomInstanceActions({
     [startTransition]
   )
 
-  function openViewer() {
+  function openLegacyViewer() {
     setIsViewerOpen(true)
     loadInstance(activeInstance?.id ?? instanceId)
+  }
+
+  function openViewer() {
+    setError("")
+
+    if (!studyId) {
+      openLegacyViewer()
+      return
+    }
+
+    startTransition(async () => {
+      const result = await createOhifViewerLaunchUrl(studyId)
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+
+      window.open(result.url, "_blank", "noopener,noreferrer")
+    })
   }
 
   function closeViewer() {

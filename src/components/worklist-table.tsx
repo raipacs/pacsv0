@@ -89,6 +89,7 @@ export function WorklistTable({ studies }: { studies: WorklistStudy[] }) {
                     {firstInstance ? (
                       <DicomInstanceActions
                         instanceId={firstInstance.id}
+                        studyId={study.id}
                         instances={study.instances.map((instance) => ({
                           id: instance.id,
                           instanceNumber: instance.instanceNumber,
