@@ -144,7 +144,7 @@ export async function GET(request: Request, context: RouteContext) {
                     instance.ohifMetadata.TransferSyntaxUID ??
                     undefined,
                 },
-                url: `dicomweb:${createOhifInstanceUrl({
+                url: `wadouri:${createOhifInstanceUrl({
                   origin: requestUrl.origin,
                   instanceId: instance.id,
                   studyId,
