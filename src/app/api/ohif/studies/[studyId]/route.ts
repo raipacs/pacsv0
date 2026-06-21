@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 
+import { readOhifInstanceMetadata } from "@/lib/dicom-metadata"
 import { verifyOhifLaunchToken } from "@/lib/ohif-launch"
 import { createServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service"
 
@@ -13,6 +14,8 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "https://viewer.ohif.org",
   "Cache-Control": "private, no-store",
 }
+const DICOM_HEADER_RANGE_BYTES = 4 * 1024 * 1024
+const METADATA_FETCH_CONCURRENCY = 8
 
 export async function OPTIONS() {
   return new NextResponse(null, { headers: CORS_HEADERS })
@@ -66,15 +69,18 @@ export async function GET(request: Request, context: RouteContext) {
   if (instancesError) return jsonError(instancesError.message, 500)
 
   const patient = Array.isArray(study.patients) ? study.patients[0] : study.patients
-  const signedInstances = await Promise.all(
-    (instances ?? []).map(async (instance) => {
+  const signedInstances = await mapWithConcurrency(
+    instances ?? [],
+    METADATA_FETCH_CONCURRENCY,
+    async (instance) => {
       const { data, error } = await supabase.storage
         .from(instance.storage_bucket)
         .createSignedUrl(instance.storage_key, 10 * 60, { download: true })
 
       if (error) throw new Error(error.message)
-      return { ...instance, signedUrl: data.signedUrl }
-    })
+      const ohifMetadata = await readSignedDicomMetadata(data.signedUrl)
+      return { ...instance, signedUrl: data.signedUrl, ohifMetadata }
+    }
   )
   const modalities = Array.from(
     new Set((series ?? []).map((item) => item.modality).filter(Boolean))
@@ -112,21 +118,29 @@ export async function GET(request: Request, context: RouteContext) {
               SeriesDescription: seriesItem.description ?? "",
               instances: seriesInstances.map((instance) => ({
                 metadata: {
+                  ...instance.ohifMetadata,
                   AccessionNumber: study.accession_number,
-                  InstanceNumber: instance.instance_number ?? undefined,
+                  InstanceNumber:
+                    instance.instance_number ??
+                    instance.ohifMetadata.InstanceNumber ??
+                    undefined,
                   Modality: seriesItem.modality,
                   PatientID: patient?.patient_number ?? "",
                   PatientName: patientName,
                   SeriesDescription: seriesItem.description ?? "",
                   SeriesInstanceUID: seriesItem.series_instance_uid,
                   SeriesNumber: seriesItem.series_number ?? undefined,
-                  SOPClassUID: instance.sop_class_uid ?? undefined,
+                  SOPClassUID:
+                    instance.sop_class_uid ?? instance.ohifMetadata.SOPClassUID ?? undefined,
                   SOPInstanceUID: instance.sop_instance_uid,
                   StudyDate: studyDate,
                   StudyDescription: study.description ?? "",
                   StudyInstanceUID: study.study_instance_uid,
                   StudyTime: studyTime,
-                  TransferSyntaxUID: instance.transfer_syntax_uid ?? undefined,
+                  TransferSyntaxUID:
+                    instance.transfer_syntax_uid ??
+                    instance.ohifMetadata.TransferSyntaxUID ??
+                    undefined,
                 },
                 url: `dicomweb:${instance.signedUrl}`,
               })),
@@ -137,6 +151,40 @@ export async function GET(request: Request, context: RouteContext) {
     },
     { headers: CORS_HEADERS }
   )
+}
+
+async function readSignedDicomMetadata(url: string) {
+  try {
+    const response = await fetch(url, {
+      headers: { Range: `bytes=0-${DICOM_HEADER_RANGE_BYTES - 1}` },
+    })
+    if (!response.ok) return {}
+    return readOhifInstanceMetadata(await response.arrayBuffer())
+  } catch {
+    return {}
+  }
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>
+) {
+  const results: R[] = []
+  let nextIndex = 0
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex
+      nextIndex += 1
+      results[index] = await mapper(items[index])
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => worker())
+  )
+  return results
 }
 
 function jsonError(error: string, status: number) {
