@@ -16,7 +16,7 @@ export function createOhifDicomJsonViewerUrl({
     studyId,
     userId,
   })
-  const dicomJsonUrl = `${origin}/api/ohif/studies/${studyId}?token=${encodeURIComponent(
+  const dicomJsonUrl = `${origin}/viewer-data/studies/${studyId}?token=${encodeURIComponent(
     token
   )}`
 

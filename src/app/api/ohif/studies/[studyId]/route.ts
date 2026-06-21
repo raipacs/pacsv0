@@ -171,7 +171,7 @@ function createOhifInstanceUrl({
   studyId: string
   token: string
 }) {
-  const url = new URL(`/api/ohif/instances/${instanceId}`, origin)
+  const url = new URL(`/viewer-data/instances/${instanceId}`, origin)
   url.searchParams.set("studyId", studyId)
   url.searchParams.set("token", token)
   return url.toString()
