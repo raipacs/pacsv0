@@ -668,6 +668,105 @@ td span {
   margin-top: 6px;
 }
 
+.import-progress {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: #ffffff;
+  box-shadow: var(--shadow);
+}
+
+.import-progress.success {
+  border-color: rgba(15, 118, 110, 0.32);
+}
+
+.import-progress.error {
+  border-color: rgba(220, 38, 38, 0.32);
+}
+
+.import-progress-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.import-progress-header div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.import-progress-header strong {
+  color: var(--text);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.import-progress-header span {
+  overflow-wrap: anywhere;
+}
+
+.import-progress-track {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e5e7eb;
+}
+
+.import-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+  transition: width 180ms ease;
+}
+
+.import-progress.success .import-progress-track span {
+  background: #0f766e;
+}
+
+.import-progress.error .import-progress-track span {
+  background: var(--danger);
+}
+
+.import-progress-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.import-progress-grid div {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 9px 10px;
+  background: var(--surface-soft);
+}
+
+.import-progress-grid dt {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.import-progress-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .viewer-backdrop {
   position: fixed;
   z-index: 50;
@@ -887,6 +986,10 @@ td span {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .import-progress-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .viewer-body {
     grid-template-columns: 1fr;
   }
@@ -928,6 +1031,7 @@ td span {
 
   .metric-row,
   .detail-grid,
+  .import-progress-grid,
   .upload-layout,
   .form-grid,
   .info-panel dl {

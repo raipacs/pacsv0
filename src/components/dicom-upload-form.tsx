@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState, useTransition } from "react"
+import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 
 import {
   completeDicomStorageUpload,
@@ -37,6 +37,22 @@ type ImportResult = {
   skipped: number
   failed: number
   details: string[]
+}
+
+type ImportProgress = {
+  totalFiles: number
+  completedFiles: number
+  totalBytes: number
+  completedBytes: number
+  startedAt: number
+  finishedAt: number | null
+  currentFile: string
+  currentIndex: number
+  phase: string
+  uploaded: number
+  existing: number
+  skipped: number
+  failed: number
 }
 
 const MAX_PARALLEL_IMPORTS = 3
@@ -268,7 +284,15 @@ export function DicomExportImportForm({
   })
   const [details, setDetails] = useState<string[]>([])
   const [isImporting, setIsImporting] = useState(false)
+  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null)
+  const [clockNow, setClockNow] = useState(() => Date.now())
   const cancelImportRef = useRef(false)
+
+  useEffect(() => {
+    if (!isImporting) return
+    const timer = window.setInterval(() => setClockNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [isImporting])
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -306,10 +330,29 @@ export function DicomExportImportForm({
       }
       const supabase = createClient()
       const importFiles = uniqueFiles(files)
+      const totalBytes = importFiles.reduce((sum, file) => sum + file.size, 0)
       let completedCount = 0
+      let completedBytes = 0
       let nextFileIndex = 0
 
       setDetails([])
+      const startedAt = getCurrentTime()
+      setClockNow(startedAt)
+      setImportProgress({
+        totalFiles: importFiles.length,
+        completedFiles: 0,
+        totalBytes,
+        completedBytes: 0,
+        startedAt,
+        finishedAt: null,
+        currentFile: "",
+        currentIndex: 0,
+        phase: "Başlıyor",
+        uploaded: 0,
+        existing: 0,
+        skipped: 0,
+        failed: 0,
+      })
 
       async function processFile(file: File, index: number) {
         if (cancelImportRef.current) return
@@ -317,6 +360,11 @@ export function DicomExportImportForm({
         const fileLabel = file.webkitRelativePath || file.name
         const progress = `${index + 1}/${importFiles.length}`
 
+        updateImportProgress({
+          currentFile: fileLabel,
+          currentIndex: index + 1,
+          phase: "DICOM kontrol ediliyor",
+        })
         setStatus({
           type: "idle",
           message: `${progress} ${fileLabel}: DICOM kontrol ediliyor...`,
@@ -338,6 +386,11 @@ export function DicomExportImportForm({
 
         let metadata: ParsedDicomMetadata
         try {
+          updateImportProgress({
+            currentFile: fileLabel,
+            currentIndex: index + 1,
+            phase: "Metadata okunuyor",
+          })
           setStatus({
             type: "idle",
             message: `${progress} ${fileLabel}: metadata okunuyor...`,
@@ -362,6 +415,11 @@ export function DicomExportImportForm({
         }
 
         const input = importInput(metadata)
+        updateImportProgress({
+          currentFile: fileLabel,
+          currentIndex: index + 1,
+          phase: "Storage yolu hazırlanıyor",
+        })
         setStatus({
           type: "idle",
           message: `${progress} ${fileLabel}: Storage yolu hazırlanıyor...`,
@@ -377,6 +435,11 @@ export function DicomExportImportForm({
           return
         }
 
+        updateImportProgress({
+          currentFile: fileLabel,
+          currentIndex: index + 1,
+          phase: "Dosya özeti hesaplanıyor",
+        })
         setStatus({
           type: "idle",
           message: `${progress} ${fileLabel}: dosya özeti hesaplanıyor...`,
@@ -387,6 +450,11 @@ export function DicomExportImportForm({
           "SHA-256 hesaplama"
         )
 
+        updateImportProgress({
+          currentFile: fileLabel,
+          currentIndex: index + 1,
+          phase: "Storage'a yükleniyor",
+        })
         setStatus({
           type: "idle",
           message: `${progress} ${fileLabel}: Storage'a yükleniyor...`,
@@ -408,6 +476,11 @@ export function DicomExportImportForm({
           return
         }
 
+        updateImportProgress({
+          currentFile: fileLabel,
+          currentIndex: index + 1,
+          phase: "Metadata kaydediliyor",
+        })
         setStatus({
           type: "idle",
           message: `${progress} ${fileLabel}: metadata kaydediliyor...`,
@@ -443,10 +516,10 @@ export function DicomExportImportForm({
         while (nextFileIndex < importFiles.length && !cancelImportRef.current) {
           const fileIndex = nextFileIndex
           nextFileIndex += 1
+          const file = importFiles[fileIndex]
           try {
-            await processFile(importFiles[fileIndex], fileIndex)
+            await processFile(file, fileIndex)
           } catch (caught) {
-            const file = importFiles[fileIndex]
             const fileLabel = file.webkitRelativePath || file.name
             const message =
               caught instanceof Error ? caught.message : "Beklenmeyen import hatası."
@@ -454,6 +527,16 @@ export function DicomExportImportForm({
             result.details.push(`${fileLabel}: ${message}`)
           }
           completedCount += 1
+          completedBytes += file.size
+          updateImportProgress({
+            completedFiles: completedCount,
+            completedBytes,
+            uploaded: result.uploaded,
+            existing: result.existing,
+            skipped: result.skipped,
+            failed: result.failed,
+            phase: cancelImportRef.current ? "İptal ediliyor" : "Devam ediyor",
+          })
           setStatus({
             type: "idle",
             message: `${completedCount}/${importFiles.length} dosya tamamlandı. ${result.uploaded} yeni, ${result.existing} mevcut, ${result.skipped} atlandı, ${result.failed} başarısız.`,
@@ -470,6 +553,14 @@ export function DicomExportImportForm({
 
       if (cancelImportRef.current) {
         setDetails(result.details)
+        updateImportProgress({
+          finishedAt: getCurrentTime(),
+          phase: "İptal edildi",
+          uploaded: result.uploaded,
+          existing: result.existing,
+          skipped: result.skipped,
+          failed: result.failed,
+        })
         setStatus({
           type: "error",
           message: `Import iptal edildi. ${completedCount}/${importFiles.length} dosya işlendi. ${result.uploaded} yeni, ${result.existing} mevcut, ${result.skipped} atlandı, ${result.failed} başarısız.`,
@@ -481,13 +572,34 @@ export function DicomExportImportForm({
       const importedCount = result.uploaded + result.existing
       const type = result.failed || importedCount === 0 ? "error" : "success"
       setDetails(result.details)
+      updateImportProgress({
+        completedFiles: completedCount,
+        completedBytes,
+        finishedAt: getCurrentTime(),
+        phase: type === "success" ? "Tamamlandı" : "Hata ile tamamlandı",
+        uploaded: result.uploaded,
+        existing: result.existing,
+        skipped: result.skipped,
+        failed: result.failed,
+      })
       setStatus({
         type,
         message: `${result.uploaded} yeni DICOM yüklendi. ${result.existing} mevcut DICOM metadata ile eşlendi. ${result.skipped} dosya atlandı, ${result.failed} dosya başarısız.`,
       })
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Beklenmeyen import hatası."
+      updateImportProgress({
+        finishedAt: getCurrentTime(),
+        phase: "Hata oluştu",
+      })
+      setStatus({ type: "error", message })
     } finally {
       setIsImporting(false)
     }
+  }
+
+  function updateImportProgress(patch: Partial<ImportProgress>) {
+    setImportProgress((current) => (current ? { ...current, ...patch } : current))
   }
 
   return (
@@ -516,6 +628,13 @@ export function DicomExportImportForm({
       </fieldset>
       {status.message ? (
         <p className={`form-status ${status.type}`}>{status.message}</p>
+      ) : null}
+      {importProgress ? (
+        <ImportProgressPanel
+          now={clockNow}
+          progress={importProgress}
+          statusType={status.type}
+        />
       ) : null}
       {details.length ? (
         <details className="import-details">
@@ -556,6 +675,78 @@ export function DicomExportImportForm({
         </button>
       ) : null}
     </form>
+  )
+}
+
+function ImportProgressPanel({
+  now,
+  progress,
+  statusType,
+}: {
+  now: number
+  progress: ImportProgress
+  statusType: UploadStatus["type"]
+}) {
+  const percent =
+    progress.totalFiles > 0
+      ? Math.min(100, Math.round((progress.completedFiles / progress.totalFiles) * 100))
+      : 0
+  const finishedAt = progress.finishedAt
+  const elapsedMs = Math.max(0, (finishedAt ?? now) - progress.startedAt)
+
+  return (
+    <section className={`import-progress ${statusType}`} aria-live="polite">
+      <div className="import-progress-header">
+        <div>
+          <strong>{percent}%</strong>
+          <span>
+            {progress.completedFiles} / {progress.totalFiles} dosya
+          </span>
+        </div>
+        <span>{progress.phase}</span>
+      </div>
+      <div
+        className="import-progress-track"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+        aria-label="DICOM import ilerlemesi"
+      >
+        <span style={{ width: `${percent}%` }} />
+      </div>
+      <dl className="import-progress-grid">
+        <div>
+          <dt>Başlangıç</dt>
+          <dd>{formatDateTime(progress.startedAt)}</dd>
+        </div>
+        <div>
+          <dt>Bitiş</dt>
+          <dd>{finishedAt ? formatDateTime(finishedAt) : "Devam ediyor"}</dd>
+        </div>
+        <div>
+          <dt>Süre</dt>
+          <dd>{formatDuration(elapsedMs)}</dd>
+        </div>
+        <div>
+          <dt>Boyut</dt>
+          <dd>
+            {formatBytes(progress.completedBytes)} / {formatBytes(progress.totalBytes)}
+          </dd>
+        </div>
+        <div>
+          <dt>Son dosya</dt>
+          <dd>{progress.currentFile || "-"}</dd>
+        </div>
+        <div>
+          <dt>Sonuç</dt>
+          <dd>
+            {progress.uploaded} yeni, {progress.existing} mevcut, {progress.skipped} atlandı,{" "}
+            {progress.failed} başarısız
+          </dd>
+        </div>
+      </dl>
+    </section>
   )
 }
 
@@ -631,6 +822,42 @@ function uniqueFiles(files: File[]) {
     seen.add(key)
     return true
   })
+}
+
+function getCurrentTime() {
+  return new Date().getTime()
+}
+
+function formatDateTime(value: number) {
+  return new Intl.DateTimeFormat("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(new Date(value))
+}
+
+function formatDuration(milliseconds: number) {
+  const totalSeconds = Math.floor(milliseconds / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  if (minutes === 0) return `${seconds} sn`
+  return `${minutes} dk ${seconds.toString().padStart(2, "0")} sn`
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  const units = ["KB", "MB", "GB"]
+  let value = bytes / 1024
+  let unitIndex = 0
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024
+    unitIndex += 1
+  }
+  const fractionDigits = value >= 100 ? 0 : value >= 10 ? 1 : 2
+  return `${value.toFixed(fractionDigits)} ${units[unitIndex]}`
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string) {
