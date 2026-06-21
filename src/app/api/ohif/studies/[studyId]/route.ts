@@ -9,10 +9,12 @@ type RouteContext = {
 }
 
 const CORS_HEADERS = {
-  "Access-Control-Allow-Headers": "content-type, range",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "accept, authorization, content-type, origin, range, x-requested-with",
+  "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
   "Access-Control-Allow-Origin": "https://viewer.ohif.org",
-  "Access-Control-Expose-Headers": "accept-ranges, content-length, content-range",
+  "Access-Control-Expose-Headers":
+    "accept-ranges, content-length, content-range, content-type",
   "Cache-Control": "private, no-store",
 }
 const DICOM_HEADER_RANGE_BYTES = 4 * 1024 * 1024

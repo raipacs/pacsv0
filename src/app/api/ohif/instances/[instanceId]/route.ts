@@ -8,10 +8,12 @@ type RouteContext = {
 }
 
 const CORS_HEADERS = {
-  "Access-Control-Allow-Headers": "content-type, range",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "accept, authorization, content-type, origin, range, x-requested-with",
+  "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
   "Access-Control-Allow-Origin": "https://viewer.ohif.org",
-  "Access-Control-Expose-Headers": "accept-ranges, content-length, content-range",
+  "Access-Control-Expose-Headers":
+    "accept-ranges, content-length, content-range, content-type",
   "Cache-Control": "private, no-store",
   "Cross-Origin-Resource-Policy": "cross-origin",
 }
@@ -20,7 +22,19 @@ export async function OPTIONS() {
   return new NextResponse(null, { headers: CORS_HEADERS })
 }
 
+export async function HEAD(request: Request, context: RouteContext) {
+  return proxyDicomInstance(request, context, "HEAD")
+}
+
 export async function GET(request: Request, context: RouteContext) {
+  return proxyDicomInstance(request, context, "GET")
+}
+
+async function proxyDicomInstance(
+  request: Request,
+  context: RouteContext,
+  method: "GET" | "HEAD"
+) {
   const { instanceId } = await context.params
   const requestUrl = new URL(request.url)
   const studyId = requestUrl.searchParams.get("studyId") ?? ""
@@ -55,6 +69,7 @@ export async function GET(request: Request, context: RouteContext) {
 
   const upstream = await fetch(signedUrl.signedUrl, {
     headers: copyRangeHeader(request),
+    method,
   })
 
   if (!upstream.ok && upstream.status !== 206) {
@@ -63,12 +78,12 @@ export async function GET(request: Request, context: RouteContext) {
 
   const headers = new Headers(CORS_HEADERS)
   headers.set("Content-Type", upstream.headers.get("content-type") ?? "application/dicom")
+  headers.set("Accept-Ranges", upstream.headers.get("accept-ranges") ?? "bytes")
 
-  copyHeader(upstream.headers, headers, "accept-ranges")
   copyHeader(upstream.headers, headers, "content-length")
   copyHeader(upstream.headers, headers, "content-range")
 
-  return new NextResponse(upstream.body, {
+  return new NextResponse(method === "HEAD" ? null : upstream.body, {
     headers,
     status: upstream.status,
   })
