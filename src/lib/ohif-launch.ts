@@ -74,6 +74,7 @@ function readSecret() {
   return (
     process.env.RAI_PACS_OHIF_LAUNCH_SECRET ||
     process.env.SUPABASE_SECRET_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
   )
 }

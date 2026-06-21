@@ -22,11 +22,17 @@ Copy `.env.example` to `.env.local` and provide:
 ```text
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-SUPABASE_SECRET_KEY
+SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY
+RAI_PACS_OHIF_LAUNCH_SECRET
 ```
 
 The secret key must only be used by server-side administration flows. It must
 never be exposed to the browser.
+
+`RAI_PACS_OHIF_LAUNCH_SECRET` signs short-lived OHIF launch URLs. If it is not
+set, the app falls back to the Supabase service-role key for signing. For Vercel
+deployments, add these values to Production, Preview and Development as needed,
+then redeploy.
 
 ## 4. Bootstrap the first admin
 
