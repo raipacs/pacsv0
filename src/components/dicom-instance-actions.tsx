@@ -165,14 +165,27 @@ export function DicomInstanceActions({
       return
     }
 
+    const viewerWindow = window.open("about:blank", "_blank")
+    if (viewerWindow) {
+      viewerWindow.document.title = "OHIF hazırlanıyor..."
+      viewerWindow.document.body.innerHTML =
+        "<p style=\"font-family: system-ui, sans-serif; padding: 24px;\">OHIF viewer hazırlanıyor...</p>"
+    }
+
     startTransition(async () => {
       const result = await createOhifViewerLaunchUrl(studyId)
       if (!result.ok) {
+        viewerWindow?.close()
         setError(result.error)
         return
       }
 
-      window.open(result.url, "_blank", "noopener,noreferrer")
+      if (viewerWindow) {
+        viewerWindow.location.href = result.url
+        return
+      }
+
+      window.location.href = result.url
     })
   }
 
