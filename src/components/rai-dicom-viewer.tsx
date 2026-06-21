@@ -19,6 +19,8 @@ type ViewerTool = "scroll" | "pan" | "window" | "zoom"
 
 const MIN_ZOOM = 0.2
 const MAX_ZOOM = 12
+const SIGNED_URL_TIMEOUT_MS = 15_000
+const DICOM_FETCH_TIMEOUT_MS = 25_000
 
 export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
   const orderedInstances = useMemo(
@@ -68,6 +70,7 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
   const foundIndex = orderedInstances.findIndex((item) => item.id === activeInstanceId)
   const activeIndex = Math.max(0, foundIndex)
   const activeInstance = orderedInstances[activeIndex]
+  const loadableInstanceId = activeInstance?.id ?? ""
   const hasMultipleInstances = orderedInstances.length > 1
 
   const applyDecodedPreview = useCallback((decoded: DicomPreview) => {
@@ -101,7 +104,11 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
       setPreview(null)
 
       startTransition(async () => {
-        const result = await createDicomSignedUrl(targetInstanceId)
+        const result = await withTimeout(
+          createDicomSignedUrl(targetInstanceId),
+          SIGNED_URL_TIMEOUT_MS,
+          "DICOM signed URL üretimi zaman aşımına uğradı."
+        )
         if (loadTokenRef.current !== loadToken) return
 
         if (!result.ok) {
@@ -112,7 +119,11 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
 
         try {
           setViewerStatus("DICOM indiriliyor...")
-          const response = await fetch(result.url)
+          const controller = new AbortController()
+          const timeout = window.setTimeout(() => controller.abort(), DICOM_FETCH_TIMEOUT_MS)
+          const response = await fetch(result.url, { signal: controller.signal }).finally(() =>
+            window.clearTimeout(timeout)
+          )
           if (!response.ok) {
             throw new Error(`DICOM indirilemedi: ${response.status}`)
           }
@@ -153,11 +164,11 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
   )
 
   useEffect(() => {
-    if (!activeInstanceId) return
+    if (!loadableInstanceId) return
 
-    const timeout = window.setTimeout(() => loadInstance(activeInstanceId), 0)
+    const timeout = window.setTimeout(() => loadInstance(loadableInstanceId), 0)
     return () => window.clearTimeout(timeout)
-  }, [activeInstanceId, loadInstance])
+  }, [loadInstance, loadableInstanceId])
 
   useEffect(() => {
     if (!preview || !canvasRef.current) return
@@ -596,4 +607,16 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
       </aside>
     </div>
   )
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
+  let timeout: number | undefined
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeout = window.setTimeout(() => reject(new Error(message)), timeoutMs)
+  })
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeout !== undefined) window.clearTimeout(timeout)
+  })
 }
