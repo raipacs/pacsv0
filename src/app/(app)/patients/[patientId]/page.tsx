@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 
 import { DicomInstanceActions } from "@/components/dicom-instance-actions"
+import { MaskedPatientId, MaskedPatientName } from "@/components/privacy-mode"
 import { requireUser } from "@/lib/auth"
 import { getPatient, getPatientStudies } from "@/lib/data"
 
@@ -26,9 +27,11 @@ export default async function PatientDetailPage({
     <>
       <header className="page-header">
         <div>
-          <p className="eyebrow">{patient.patientNumber}</p>
+          <p className="eyebrow">
+            <MaskedPatientId value={patient.patientNumber} />
+          </p>
           <h1>
-            {patient.firstName} {patient.lastName}
+            <MaskedPatientName value={`${patient.firstName} ${patient.lastName}`} />
           </h1>
           <p>Hasta bilgileri ve görüntüleme geçmişi.</p>
         </div>

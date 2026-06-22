@@ -1,5 +1,6 @@
 import Link from "next/link"
 
+import { MaskedPatientId, MaskedPatientName } from "@/components/privacy-mode"
 import { canManagePatients, requireUser } from "@/lib/auth"
 import { getPatients } from "@/lib/data"
 
@@ -43,10 +44,14 @@ export default async function PatientsPage() {
                   <td>
                     <Link href={`/patients/${patient.id}`}>
                       <strong>
-                        {patient.firstName} {patient.lastName}
+                        <MaskedPatientName
+                          value={`${patient.firstName} ${patient.lastName}`}
+                        />
                       </strong>
                     </Link>
-                    <span>{patient.patientNumber}</span>
+                    <span>
+                      <MaskedPatientId value={patient.patientNumber} />
+                    </span>
                   </td>
                   <td>{formatDate(patient.birthDate)}</td>
                   <td>{patient.sex}</td>

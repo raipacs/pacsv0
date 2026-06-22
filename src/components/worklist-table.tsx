@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 
 import { DicomInstanceActions } from "@/components/dicom-instance-actions"
+import { MaskedPatientId, MaskedPatientName } from "@/components/privacy-mode"
 import type { WorklistStudy } from "@/lib/types"
 
 export function WorklistTable({ studies }: { studies: WorklistStudy[] }) {
@@ -68,8 +69,12 @@ export function WorklistTable({ studies }: { studies: WorklistStudy[] }) {
               return (
                 <tr key={study.id}>
                   <td>
-                    <strong>{study.patientName}</strong>
-                    <span>{study.patientNumber}</span>
+                    <strong>
+                      <MaskedPatientName value={study.patientName} />
+                    </strong>
+                    <span>
+                      <MaskedPatientId value={study.patientNumber} />
+                    </span>
                   </td>
                   <td>
                     <strong>{study.description}</strong>

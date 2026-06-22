@@ -301,6 +301,63 @@ p {
   font-size: 12px;
 }
 
+.privacy-toggle {
+  position: relative;
+  display: inline-grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(15, 118, 110, 0.16);
+  border-radius: 999px;
+  color: #123b33;
+  background: #eef6ef;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.privacy-toggle:hover {
+  border-color: rgba(15, 118, 110, 0.38);
+  transform: translateY(-1px);
+}
+
+.privacy-toggle.active {
+  color: white;
+  background: var(--primary);
+}
+
+.privacy-eye {
+  position: relative;
+  width: 21px;
+  height: 14px;
+}
+
+.privacy-eye::before {
+  position: absolute;
+  inset: 1px 0 0;
+  border-bottom: 3px solid currentColor;
+  border-radius: 0 0 18px 18px;
+  content: "";
+}
+
+.privacy-eye::after {
+  position: absolute;
+  top: 7px;
+  left: 2px;
+  width: 3px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow:
+    7px 2px 0 currentColor,
+    14px 0 0 currentColor;
+  content: "";
+}
+
 .demo-banner {
   border-bottom: 1px solid #fedf89;
   padding: 9px 24px;

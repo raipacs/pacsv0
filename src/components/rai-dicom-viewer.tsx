@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 
 import { createDicomSignedUrls } from "@/app/actions/storage"
+import { usePrivacyMode } from "@/components/privacy-mode"
 import {
   decodeDicomPreview,
   renderDicomImage,
@@ -52,6 +53,7 @@ export function RaiDicomViewer({
   instances: ViewerInstance[]
   study: ViewerStudyContext
 }) {
+  const { enabled: privacyEnabled, maskId, maskName } = usePrivacyMode()
   const allOrderedInstances = useMemo(
     () =>
       [...instances].sort((left, right) => {
@@ -157,6 +159,16 @@ export function RaiDicomViewer({
   const canGoPrevious = hasMultipleInstances && activeIndex > 0
   const canGoNext = hasMultipleInstances && activeIndex < orderedInstances.length - 1
   const studyDateTime = formatViewerDateTime(study.studyAt)
+  const displayPatientName = formatPrivateValue(
+    normalizeDicomName(study.patientName || preview?.metadata.patientName || ""),
+    privacyEnabled,
+    maskName
+  )
+  const displayPatientId = formatPrivateValue(
+    study.patientNumber || preview?.metadata.patientId || "",
+    privacyEnabled,
+    maskId
+  )
 
   const refreshCacheStats = useCallback(() => {
     setCacheStats({
@@ -749,11 +761,11 @@ export function RaiDicomViewer({
           <dl className="dicom-corner corner-top-right">
             <div>
               <dt>Hasta</dt>
-              <dd>{study.patientName || preview?.metadata.patientName || "-"}</dd>
+              <dd>{displayPatientName}</dd>
             </div>
             <div>
               <dt>ID</dt>
-              <dd>{study.patientNumber || preview?.metadata.patientId || "-"}</dd>
+              <dd>{displayPatientId}</dd>
             </div>
             <div>
               <dt>Accession</dt>
@@ -1118,6 +1130,20 @@ function formatViewerDateTime(value: string | null) {
     dateStyle: "short",
     timeStyle: "short",
   }).format(date)
+}
+
+function normalizeDicomName(value: string) {
+  return value.replace(/\^+/g, " ").trim()
+}
+
+function formatPrivateValue(
+  value: string,
+  privacyEnabled: boolean,
+  masker: (value: string) => string
+) {
+  const normalized = value.trim()
+  if (!normalized) return "-"
+  return privacyEnabled ? masker(normalized) : normalized
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {

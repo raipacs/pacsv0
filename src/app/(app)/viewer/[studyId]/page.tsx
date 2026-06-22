@@ -2,6 +2,7 @@ import Link from "next/link"
 import { headers } from "next/headers"
 import { notFound } from "next/navigation"
 
+import { MaskedPatientId, MaskedPatientName } from "@/components/privacy-mode"
 import { RaiDicomViewer } from "@/components/rai-dicom-viewer"
 import { requireUser } from "@/lib/auth"
 import { isSupabaseConfigured } from "@/lib/config"
@@ -95,9 +96,16 @@ export default async function RaiViewerPage({
           <p className="eyebrow">RAI Viewer</p>
           <h1>{study.description ?? "DICOM görüntüleme"}</h1>
           <p>
-            {patient
-              ? `${patient.first_name} ${patient.last_name} · ${patient.patient_number}`
-              : "Hasta bilgisi yok"}{" "}
+            {patient ? (
+              <>
+                <MaskedPatientName
+                  value={`${patient.first_name} ${patient.last_name}`}
+                />{" "}
+                · <MaskedPatientId value={patient.patient_number} />
+              </>
+            ) : (
+              "Hasta bilgisi yok"
+            )}{" "}
             · {study.modality} · {study.accession_number}
           </p>
         </div>

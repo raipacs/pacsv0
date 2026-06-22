@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 
 import { createDicomSignedUrl, createOhifViewerLaunchUrl } from "@/app/actions/storage"
+import { usePrivacyMode } from "@/components/privacy-mode"
 import {
   decodeDicomPreview,
   renderDicomImage,
@@ -22,6 +23,7 @@ export function DicomInstanceActions({
   viewerLabel?: string
   showSignedUrl?: boolean
 }) {
+  const { enabled: privacyEnabled, maskName } = usePrivacyMode()
   const viewerInstances = useMemo(() => {
     const ordered = instances?.length
       ? [...instances].sort((left, right) => {
@@ -511,7 +513,13 @@ export function DicomInstanceActions({
                   </div>
                   <div>
                     <dt>Hasta</dt>
-                    <dd>{preview?.metadata.patientName.replace("^", " ") || "-"}</dd>
+                    <dd>
+                      {formatPreviewPatientName(
+                        preview?.metadata.patientName,
+                        privacyEnabled,
+                        maskName
+                      )}
+                    </dd>
                   </div>
                 </dl>
               </aside>
@@ -521,4 +529,14 @@ export function DicomInstanceActions({
       ) : null}
     </>
   )
+}
+
+function formatPreviewPatientName(
+  value: string | undefined,
+  privacyEnabled: boolean,
+  maskName: (value: string) => string
+) {
+  const normalized = value?.replace(/\^+/g, " ").trim()
+  if (!normalized) return "-"
+  return privacyEnabled ? maskName(normalized) : normalized
 }
