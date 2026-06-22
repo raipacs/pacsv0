@@ -11,7 +11,7 @@ export type LoginState = {
 }
 
 const loginSchema = z.object({
-  email: z.email().trim(),
+  email: z.preprocess((value) => normalizeLoginEmail(value), z.email()),
   password: z.string().min(8),
 })
 
@@ -43,4 +43,10 @@ export async function signOut() {
     await supabase.auth.signOut()
   }
   redirect("/login")
+}
+
+function normalizeLoginEmail(value: unknown) {
+  const email = String(value ?? "").trim().toLocaleLowerCase("tr-TR")
+  if (!email || email.includes("@")) return email
+  return `${email}@raipacs.com`
 }
