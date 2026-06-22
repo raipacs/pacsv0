@@ -126,7 +126,10 @@ export default async function PatientDetailPage({
               </thead>
               <tbody>
                 {patientRecordRows.map((row) => (
-                  <tr className={row.isBlank ? "is-blank" : undefined} key={row.key}>
+                  <tr
+                    className={row.isBlank ? "is-blank" : undefined}
+                    key={`${row.source}-${row.key}`}
+                  >
                     <td>{row.source}</td>
                     <td>
                       <strong>{row.label}</strong>

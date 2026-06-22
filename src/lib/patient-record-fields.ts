@@ -160,10 +160,10 @@ export const PATIENT_EMPTY_RECORD_FIELDS = [
   "Adi2",
 ] as const
 
-const ALL_PATIENT_RECORD_FIELDS = [
+const ALL_PATIENT_RECORD_FIELD_KEYS = new Set<string>([
   ...PATIENT_RECORD_FIELDS,
   ...PATIENT_EMPTY_RECORD_FIELDS,
-] as const
+])
 
 const ACRONYMS = new Map([
   ["Id", "ID"],
@@ -194,18 +194,23 @@ export function buildPatientRecordRows(
 ): PatientRecordRow[] {
   if (!data) return []
 
-  const ordered = ALL_PATIENT_RECORD_FIELDS.map((key) => ({
-    key,
-    source: (PATIENT_EMPTY_RECORD_FIELDS.includes(
-      key as (typeof PATIENT_EMPTY_RECORD_FIELDS)[number]
-    )
-      ? "VeriIcermeyenKolonlar"
-      : "PendikHastanesi") as PatientRecordSource,
-    value: data[key],
-  }))
+  const ordered = [
+    ...PATIENT_RECORD_FIELDS.map((key) => ({
+      key,
+      source: "PendikHastanesi" as const,
+      value: data[key],
+    })),
+    ...PATIENT_EMPTY_RECORD_FIELDS.filter(
+      (key) => !PATIENT_RECORD_FIELDS.includes(key as never)
+    ).map((key) => ({
+      key,
+      source: "VeriIcermeyenKolonlar" as const,
+      value: data[key],
+    })),
+  ]
 
   const extras = Object.entries(data)
-    .filter(([key]) => !ALL_PATIENT_RECORD_FIELDS.includes(key as never))
+    .filter(([key]) => !ALL_PATIENT_RECORD_FIELD_KEYS.has(key))
     .map(([key, value]) => ({ key, source: "Ek alan" as const, value }))
 
   return [...ordered, ...extras].map((row) => {
