@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 
-import { readOhifInstanceMetadata } from "@/lib/dicom-metadata"
 import { verifyOhifLaunchToken } from "@/lib/ohif-launch"
 import { createServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service"
 
@@ -17,8 +16,6 @@ const CORS_HEADERS = {
     "accept-ranges, content-length, content-range, content-type",
   "Cache-Control": "private, no-store",
 }
-const DICOM_HEADER_RANGE_BYTES = 4 * 1024 * 1024
-const METADATA_FETCH_CONCURRENCY = 8
 
 export async function OPTIONS() {
   return new NextResponse(null, { headers: CORS_HEADERS })
@@ -63,7 +60,7 @@ export async function GET(request: Request, context: RouteContext) {
       supabase
         .from("instances")
         .select(
-          "id, series_id, sop_instance_uid, sop_class_uid, transfer_syntax_uid, instance_number, storage_bucket, storage_key"
+          "id, series_id, sop_instance_uid, sop_class_uid, transfer_syntax_uid, instance_number"
         )
         .eq("study_id", study.id)
         .eq("organization_id", launch.organizationId)
@@ -73,20 +70,8 @@ export async function GET(request: Request, context: RouteContext) {
   if (seriesError) return jsonError(seriesError.message, 500)
   if (instancesError) return jsonError(instancesError.message, 500)
 
+  const studyInstances = instances ?? []
   const patient = Array.isArray(study.patients) ? study.patients[0] : study.patients
-  const signedInstances = await mapWithConcurrency(
-    instances ?? [],
-    METADATA_FETCH_CONCURRENCY,
-    async (instance) => {
-      const { data, error } = await supabase.storage
-        .from(instance.storage_bucket)
-        .createSignedUrl(instance.storage_key, 60 * 60)
-
-      if (error) throw new Error(error.message)
-      const ohifMetadata = await readSignedDicomMetadata(data.signedUrl)
-      return { ...instance, signedUrl: data.signedUrl, ohifMetadata }
-    }
-  )
   const modalities = Array.from(
     new Set((series ?? []).map((item) => item.modality).filter(Boolean))
   )
@@ -109,10 +94,10 @@ export async function GET(request: Request, context: RouteContext) {
           PatientSex: patient?.sex ?? "",
           AccessionNumber: study.accession_number,
           StudyDescription: study.description ?? "",
-          NumInstances: signedInstances.length,
+          NumInstances: studyInstances.length,
           Modalities: modalities.join("\\"),
           series: (series ?? []).map((seriesItem) => {
-            const seriesInstances = signedInstances.filter(
+            const seriesInstances = studyInstances.filter(
               (instance) => instance.series_id === seriesItem.id
             )
 
@@ -123,29 +108,21 @@ export async function GET(request: Request, context: RouteContext) {
               SeriesDescription: seriesItem.description ?? "",
               instances: seriesInstances.map((instance) => ({
                 metadata: {
-                  ...instance.ohifMetadata,
                   AccessionNumber: study.accession_number,
-                  InstanceNumber:
-                    instance.instance_number ??
-                    instance.ohifMetadata.InstanceNumber ??
-                    undefined,
+                  InstanceNumber: instance.instance_number ?? undefined,
                   Modality: seriesItem.modality,
                   PatientID: patient?.patient_number ?? "",
                   PatientName: patientName,
                   SeriesDescription: seriesItem.description ?? "",
                   SeriesInstanceUID: seriesItem.series_instance_uid,
                   SeriesNumber: seriesItem.series_number ?? undefined,
-                  SOPClassUID:
-                    instance.sop_class_uid ?? instance.ohifMetadata.SOPClassUID ?? undefined,
+                  SOPClassUID: instance.sop_class_uid ?? undefined,
                   SOPInstanceUID: instance.sop_instance_uid,
                   StudyDate: studyDate,
                   StudyDescription: study.description ?? "",
                   StudyInstanceUID: study.study_instance_uid,
                   StudyTime: studyTime,
-                  TransferSyntaxUID:
-                    instance.transfer_syntax_uid ??
-                    instance.ohifMetadata.TransferSyntaxUID ??
-                    undefined,
+                  TransferSyntaxUID: instance.transfer_syntax_uid ?? undefined,
                 },
                 url: `wadouri:${createProxyInstanceUrl({
                   instanceId: instance.id,
@@ -178,40 +155,6 @@ function createProxyInstanceUrl({
   url.searchParams.set("studyId", studyId)
   url.searchParams.set("token", token)
   return url.toString()
-}
-
-async function readSignedDicomMetadata(url: string) {
-  try {
-    const response = await fetch(url, {
-      headers: { Range: `bytes=0-${DICOM_HEADER_RANGE_BYTES - 1}` },
-    })
-    if (!response.ok) return {}
-    return readOhifInstanceMetadata(await response.arrayBuffer())
-  } catch {
-    return {}
-  }
-}
-
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  concurrency: number,
-  mapper: (item: T) => Promise<R>
-) {
-  const results: R[] = []
-  let nextIndex = 0
-
-  async function worker() {
-    while (nextIndex < items.length) {
-      const index = nextIndex
-      nextIndex += 1
-      results[index] = await mapper(items[index])
-    }
-  }
-
-  await Promise.all(
-    Array.from({ length: Math.min(concurrency, items.length) }, () => worker())
-  )
-  return results
 }
 
 function jsonError(error: string, status: number) {
