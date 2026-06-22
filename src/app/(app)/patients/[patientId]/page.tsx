@@ -17,6 +17,10 @@ export default async function PatientDetailPage({
   if (!patient) notFound()
 
   const studies = await getPatientStudies(user.organizationId, patient.id)
+  const storageInstanceCount = studies.reduce(
+    (total, study) => total + study.instances.length,
+    0
+  )
 
   return (
     <>
@@ -118,11 +122,17 @@ export default async function PatientDetailPage({
           <p className="empty-state">Bu hasta için demo tetkik bulunmuyor.</p>
         )}
       </section>
-      <section className="data-panel storage-panel">
-        <div className="panel-heading">
-          <h2>Storage instance referanslari</h2>
-        </div>
-        {studies.some((study) => study.instances.length > 0) ? (
+      <details className="data-panel storage-panel collapsible-panel">
+        <summary className="panel-heading">
+          <div>
+            <h2>Storage instance referansları</h2>
+            <small>Teknik DICOM dosya referansları</small>
+          </div>
+          <span className="panel-toggle">
+            {storageInstanceCount ? `${storageInstanceCount} kayıt` : "Kayıt yok"}
+          </span>
+        </summary>
+        {storageInstanceCount > 0 ? (
           <div className="responsive-table">
             <table>
               <thead>
@@ -158,7 +168,7 @@ export default async function PatientDetailPage({
             Bu hasta için Storage kayıtlı DICOM instance henüz yok.
           </p>
         )}
-      </section>
+      </details>
     </>
   )
 }

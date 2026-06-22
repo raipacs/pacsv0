@@ -378,6 +378,75 @@ p {
   overflow: hidden;
 }
 
+.collapsible-panel {
+  display: block;
+}
+
+.collapsible-panel > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.collapsible-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.collapsible-panel > summary.panel-heading {
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  user-select: none;
+}
+
+.collapsible-panel > summary.panel-heading h2 {
+  margin: 0;
+}
+
+.collapsible-panel > summary.panel-heading small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.panel-toggle {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 10px;
+  color: #475467;
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.panel-toggle::after {
+  content: "↓";
+  color: var(--primary);
+  font-size: 14px;
+}
+
+.collapsible-panel[open] .panel-toggle::after {
+  content: "↑";
+}
+
+.collapsible-panel > summary:hover .panel-toggle,
+.collapsible-panel > summary:focus-visible .panel-toggle {
+  border-color: rgba(15, 118, 110, 0.42);
+  color: var(--primary-dark);
+  background: #f0fdfa;
+}
+
+.collapsible-panel > summary:focus-visible {
+  outline: 3px solid rgba(15, 118, 110, 0.18);
+  outline-offset: -3px;
+}
+
 .rai-viewer-page {
   display: grid;
   min-height: calc(100dvh - 69px);
