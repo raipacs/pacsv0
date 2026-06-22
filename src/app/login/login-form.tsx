@@ -17,9 +17,7 @@ export function LoginForm({ demoMode }: { demoMode: boolean }) {
           name="email"
           type="text"
           autoComplete="email"
-          defaultValue={demoMode ? "admin@raipacs.com" : ""}
           inputMode="email"
-          placeholder="doctor veya doctor@raipacs.com"
           required
         />
       </label>
