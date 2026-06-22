@@ -185,7 +185,10 @@ function parseExplicitElements(
     elements.set(tag, { dataOffset: position, length, vr })
 
     if (group === 0x7fe0 && element === 0x0010) break
-    if (length === 0xffffffff) break
+    if (length === 0xffffffff) {
+      position = findUndefinedLengthSequenceEnd(view, position)
+      continue
+    }
     if (position + length > view.byteLength) break
 
     position += length + (length % 2)
@@ -213,11 +216,43 @@ function parseImplicitElements(
     elements.set(tag, { dataOffset: position, length, vr: "UN" })
 
     if (group === 0x7fe0 && element === 0x0010) break
-    if (length === 0xffffffff) break
+    if (length === 0xffffffff) {
+      position = findUndefinedLengthSequenceEnd(view, position)
+      continue
+    }
     if (position + length > view.byteLength) break
 
     position += length + (length % 2)
   }
+}
+
+function findUndefinedLengthSequenceEnd(view: DataView, offset: number) {
+  let position = offset
+
+  while (position + 8 <= view.byteLength) {
+    const group = view.getUint16(position, true)
+    const element = view.getUint16(position + 2, true)
+    const length = view.getUint32(position + 4, true)
+
+    position += 8
+
+    if (group === 0xfffe && element === 0xe0dd) {
+      return position + length
+    }
+
+    if (length === 0xffffffff) {
+      position = findUndefinedLengthSequenceEnd(view, position)
+      continue
+    }
+
+    if (position + length > view.byteLength) {
+      return view.byteLength
+    }
+
+    position += length + (length % 2)
+  }
+
+  return view.byteLength
 }
 
 function readMetadata(buffer: ArrayBuffer, state: ParserState): DicomPreviewMetadata {

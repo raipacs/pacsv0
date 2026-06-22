@@ -155,7 +155,11 @@ function parseExplicitVr(
       position += 2
     }
 
-    if (length === 0xffffffff || position + length > view.byteLength) break
+    if (length === 0xffffffff) {
+      position = findUndefinedLengthSequenceEnd(view, position)
+      continue
+    }
+    if (position + length > view.byteLength) break
 
     readValue(view, bytes, position, length, state, decoder, group, element)
     if (group === 0x0008 && element === 0x0005) {
@@ -187,7 +191,11 @@ function parseImplicitVr(
     const length = view.getUint32(position, true)
     position += 4
 
-    if (length === 0xffffffff || position + length > view.byteLength) break
+    if (length === 0xffffffff) {
+      position = findUndefinedLengthSequenceEnd(view, position)
+      continue
+    }
+    if (position + length > view.byteLength) break
 
     readValue(view, bytes, position, length, state, decoder, group, element)
     if (group === 0x0008 && element === 0x0005) {
@@ -196,6 +204,35 @@ function parseImplicitVr(
 
     position += length + (length % 2)
   }
+}
+
+function findUndefinedLengthSequenceEnd(view: DataView, offset: number) {
+  let position = offset
+
+  while (position + 8 <= view.byteLength) {
+    const group = view.getUint16(position, true)
+    const element = view.getUint16(position + 2, true)
+    const length = view.getUint32(position + 4, true)
+
+    position += 8
+
+    if (group === 0xfffe && element === 0xe0dd) {
+      return position + length
+    }
+
+    if (length === 0xffffffff) {
+      position = findUndefinedLengthSequenceEnd(view, position)
+      continue
+    }
+
+    if (position + length > view.byteLength) {
+      return view.byteLength
+    }
+
+    position += length + (length % 2)
+  }
+
+  return view.byteLength
 }
 
 function readValue(
