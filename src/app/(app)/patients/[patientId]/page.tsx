@@ -21,7 +21,9 @@ export default async function PatientDetailPage({
 
   const studies = await getPatientStudies(user.organizationId, patient.id)
   const isAdmin = user.role === "admin"
-  const patientRecordRows = buildPatientRecordRows(patient.externalData)
+  const patientRecordRows = isAdmin
+    ? buildPatientRecordRows(patient.externalData)
+    : []
   const storageInstanceCount = studies.reduce(
     (total, study) => total + study.instances.length,
     0
@@ -104,7 +106,7 @@ export default async function PatientDetailPage({
           <p className="muted">Toplam kayıtlı tetkik</p>
         </article>
       </section>
-      {patientRecordRows.length ? (
+      {isAdmin && patientRecordRows.length ? (
         <details className="data-panel patient-record-panel collapsible-panel">
           <summary className="panel-heading">
             <div>
