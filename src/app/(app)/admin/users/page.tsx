@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/auth"
 
-export const metadata = { title: "Kullanıcılar" }
+export const metadata = { title: "Admin" }
 
 const users = [
   {
@@ -42,15 +42,18 @@ export default async function UsersPage() {
     <>
       <header className="page-header">
         <div>
-          <p className="eyebrow">Admin</p>
-          <h1>Kullanıcılar</h1>
-          <p>Doktor ve yönetici hesaplarını kurum bazında yönetin.</p>
+          <p className="eyebrow">Yönetim</p>
+          <h1>Admin</h1>
+          <p>Kullanıcı, grup ve kurum yönetimi ekranlarını buradan yönetin.</p>
         </div>
         <button className="button primary" type="button">
           Kullanıcı davet et
         </button>
       </header>
       <section className="data-panel">
+        <div className="panel-heading">
+          <h2>Kullanıcılar</h2>
+        </div>
         <div className="responsive-table">
           <table>
             <thead>

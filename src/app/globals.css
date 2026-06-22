@@ -79,6 +79,17 @@ p {
   background: var(--surface);
 }
 
+.button.danger {
+  border-color: #fda29b;
+  color: var(--danger);
+  background: #fff1f0;
+}
+
+.button.danger:hover {
+  border-color: #f97066;
+  background: #fee4e2;
+}
+
 .button.small {
   min-height: 32px;
   padding: 0 10px;
@@ -434,6 +445,17 @@ p {
 .page-header p:last-child {
   margin-bottom: 0;
   color: var(--muted);
+}
+
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.inline-action-form {
+  display: inline-flex;
 }
 
 .metric-row {
@@ -1822,6 +1844,11 @@ td span {
   }
 
   .page-header .button {
+    width: 100%;
+  }
+
+  .page-actions,
+  .inline-action-form {
     width: 100%;
   }
 

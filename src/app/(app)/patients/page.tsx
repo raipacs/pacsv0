@@ -1,5 +1,6 @@
 import Link from "next/link"
 
+import { DeletePatientButton } from "@/components/admin-delete-button"
 import { MaskedPatientId, MaskedPatientName } from "@/components/privacy-mode"
 import { canManagePatients, requireUser } from "@/lib/auth"
 import { getPatients } from "@/lib/data"
@@ -10,6 +11,7 @@ export default async function PatientsPage() {
   const user = await requireUser()
   const patients = await getPatients(user.organizationId)
   const canCreatePatient = await canManagePatients(user, "insert")
+  const canDeletePatients = user.role === "admin"
 
   return (
     <>
@@ -36,6 +38,7 @@ export default async function PatientsPage() {
                 <th>İletişim</th>
                 <th>Tetkik</th>
                 <th>Son tetkik</th>
+                {canDeletePatients ? <th>Admin</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -63,6 +66,11 @@ export default async function PatientsPage() {
                   <td>
                     {formatDate(patient.lastStudyAt, { dateStyle: "medium" })}
                   </td>
+                  {canDeletePatients ? (
+                    <td>
+                      <DeletePatientButton patientId={patient.id} />
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>

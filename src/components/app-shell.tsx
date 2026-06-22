@@ -18,7 +18,7 @@ export function AppShell({
 }) {
   const links =
     user.role === "admin"
-      ? [...mainLinks, { href: "/admin/users", label: "Kullanıcılar" }]
+      ? [...mainLinks, { href: "/admin/users", label: "Admin" }]
       : mainLinks
 
   return (

@@ -2,11 +2,18 @@
 
 import { useMemo, useState } from "react"
 
+import { DeleteStudyButton } from "@/components/admin-delete-button"
 import { DicomInstanceActions } from "@/components/dicom-instance-actions"
 import { MaskedPatientId, MaskedPatientName } from "@/components/privacy-mode"
 import type { WorklistStudy } from "@/lib/types"
 
-export function WorklistTable({ studies }: { studies: WorklistStudy[] }) {
+export function WorklistTable({
+  canDeleteStudies = false,
+  studies,
+}: {
+  canDeleteStudies?: boolean
+  studies: WorklistStudy[]
+}) {
   const [query, setQuery] = useState("")
   const [modality, setModality] = useState("Tümü")
 
@@ -60,6 +67,7 @@ export function WorklistTable({ studies }: { studies: WorklistStudy[] }) {
               <th>Öncelik</th>
               <th>Durum</th>
               <th>Görüntü</th>
+              {canDeleteStudies ? <th>Admin</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -107,6 +115,11 @@ export function WorklistTable({ studies }: { studies: WorklistStudy[] }) {
                       "-"
                     )}
                   </td>
+                  {canDeleteStudies ? (
+                    <td>
+                      <DeleteStudyButton returnTo="/worklist" studyId={study.id} />
+                    </td>
+                  ) : null}
                 </tr>
               )
             })}

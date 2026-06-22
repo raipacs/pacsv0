@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 
+import { DeletePatientButton, DeleteStudyButton } from "@/components/admin-delete-button"
 import { DicomInstanceActions } from "@/components/dicom-instance-actions"
 import { MaskedPatientId, MaskedPatientName } from "@/components/privacy-mode"
 import { requireUser } from "@/lib/auth"
@@ -18,6 +19,7 @@ export default async function PatientDetailPage({
   if (!patient) notFound()
 
   const studies = await getPatientStudies(user.organizationId, patient.id)
+  const isAdmin = user.role === "admin"
   const storageInstanceCount = studies.reduce(
     (total, study) => total + study.instances.length,
     0
@@ -35,9 +37,12 @@ export default async function PatientDetailPage({
           </h1>
           <p>Hasta bilgileri ve görüntüleme geçmişi.</p>
         </div>
-        <button className="button primary" type="button">
-          Bilgileri düzenle
-        </button>
+        <div className="page-actions">
+          <button className="button primary" type="button">
+            Bilgileri düzenle
+          </button>
+          {isAdmin ? <DeletePatientButton patientId={patient.id} /> : null}
+        </div>
       </header>
       <section className="detail-grid">
         <article className="info-panel">
@@ -82,6 +87,7 @@ export default async function PatientDetailPage({
                   <th>DICOM</th>
                   <th>Durum</th>
                   <th>Görüntü</th>
+                  {isAdmin ? <th>Admin</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -115,6 +121,14 @@ export default async function PatientDetailPage({
                           "-"
                         )}
                       </td>
+                      {isAdmin ? (
+                        <td>
+                          <DeleteStudyButton
+                            returnTo={`/patients/${patient.id}`}
+                            studyId={study.id}
+                          />
+                        </td>
+                      ) : null}
                     </tr>
                   )
                 })}

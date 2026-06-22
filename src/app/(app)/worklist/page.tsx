@@ -44,7 +44,7 @@ export default async function WorklistPage() {
           <strong>1.8 sn</strong>
         </article>
       </section>
-      <WorklistTable studies={studies} />
+      <WorklistTable canDeleteStudies={user.role === "admin"} studies={studies} />
     </>
   )
 }
