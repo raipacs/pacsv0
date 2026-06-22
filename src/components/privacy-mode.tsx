@@ -3,7 +3,6 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -17,30 +16,16 @@ type PrivacyModeContextValue = {
 }
 
 const PrivacyModeContext = createContext<PrivacyModeContextValue | null>(null)
-const STORAGE_KEY = "rai-pacs-privacy-mode"
 
 export function PrivacyModeProvider({ children }: { children: ReactNode }) {
-  const [enabled, setEnabled] = useState(() => getStoredPrivacyMode())
-
-  useEffect(() => {
-    const syncPrivacyMode = () => setEnabled(getStoredPrivacyMode())
-    window.addEventListener("storage", syncPrivacyMode)
-
-    return () => window.removeEventListener("storage", syncPrivacyMode)
-  }, [])
+  const [enabled, setEnabled] = useState(false)
 
   const value = useMemo<PrivacyModeContextValue>(
     () => ({
       enabled,
       maskId,
       maskName,
-      toggle: () => {
-        setEnabled((current) => {
-          const next = !current
-          window.localStorage.setItem(STORAGE_KEY, next ? "on" : "off")
-          return next
-        })
-      },
+      toggle: () => setEnabled((current) => !current),
     }),
     [enabled]
   )
@@ -65,6 +50,10 @@ export function PrivacyToggle() {
       onClick={toggle}
     >
       <span className="privacy-eye" aria-hidden="true" />
+      <span className="privacy-toggle-label">Privacy</span>
+      <span className="privacy-switch" aria-hidden="true">
+        <span />
+      </span>
     </button>
   )
 }
@@ -107,9 +96,4 @@ function maskToken(value: string, visibleEdge: number) {
   const last = chars.slice(-visibleEdge).join("")
   const maskedLength = Math.min(6, Math.max(2, chars.length - visibleEdge * 2))
   return `${first}${"*".repeat(maskedLength)}${last}`
-}
-
-function getStoredPrivacyMode() {
-  if (typeof window === "undefined") return false
-  return window.localStorage.getItem(STORAGE_KEY) === "on"
 }

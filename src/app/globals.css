@@ -303,15 +303,16 @@ p {
 
 .privacy-toggle {
   position: relative;
-  display: inline-grid;
-  width: 42px;
+  display: inline-flex;
   height: 42px;
   flex: 0 0 auto;
-  place-items: center;
+  align-items: center;
+  gap: 8px;
   border: 1px solid rgba(15, 118, 110, 0.16);
   border-radius: 999px;
+  padding: 0 8px 0 12px;
   color: #123b33;
-  background: #eef6ef;
+  background: #f3f7f5;
   cursor: pointer;
   transition:
     border-color 160ms ease,
@@ -332,8 +333,9 @@ p {
 
 .privacy-eye {
   position: relative;
-  width: 21px;
-  height: 14px;
+  width: 18px;
+  height: 13px;
+  flex: 0 0 auto;
 }
 
 .privacy-eye::before {
@@ -356,6 +358,42 @@ p {
     7px 2px 0 currentColor,
     14px 0 0 currentColor;
   content: "";
+}
+
+.privacy-toggle-label {
+  color: currentColor;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.privacy-switch {
+  display: inline-flex;
+  width: 34px;
+  height: 20px;
+  flex: 0 0 auto;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px;
+  background: #cbd5e1;
+  transition: background 160ms ease;
+}
+
+.privacy-switch span {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: white;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.24);
+  transition: transform 160ms ease;
+}
+
+.privacy-toggle.active .privacy-switch {
+  background: rgba(255, 255, 255, 0.38);
+}
+
+.privacy-toggle.active .privacy-switch span {
+  transform: translateX(14px);
 }
 
 .demo-banner {
