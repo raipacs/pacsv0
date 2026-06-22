@@ -11,11 +11,23 @@ import {
 
 type ViewerInstance = {
   id: string
+  seriesId: string | null
+  seriesNumber: number | null
+  seriesDescription: string | null
+  seriesModality: string | null
   instanceNumber: number | null
   sopInstanceUid: string
 }
 
 type ViewerTool = "scroll" | "pan" | "window" | "zoom"
+
+type ViewerSeries = {
+  id: string
+  number: number | null
+  description: string
+  modality: string
+  instances: ViewerInstance[]
+}
 
 const MIN_ZOOM = 0.2
 const MAX_ZOOM = 12
@@ -25,19 +37,61 @@ const PREVIEW_CACHE_LIMIT = 10
 const PREFETCH_RADIUS = 2
 
 export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
-  const orderedInstances = useMemo(
+  const allOrderedInstances = useMemo(
     () =>
       [...instances].sort((left, right) => {
+        const leftSeriesNumber = left.seriesNumber ?? Number.MAX_SAFE_INTEGER
+        const rightSeriesNumber = right.seriesNumber ?? Number.MAX_SAFE_INTEGER
+        if (leftSeriesNumber !== rightSeriesNumber) return leftSeriesNumber - rightSeriesNumber
+
         const leftNumber = left.instanceNumber ?? Number.MAX_SAFE_INTEGER
         const rightNumber = right.instanceNumber ?? Number.MAX_SAFE_INTEGER
         return leftNumber - rightNumber || left.sopInstanceUid.localeCompare(right.sopInstanceUid)
       }),
     [instances]
   )
+
+  const seriesGroups = useMemo(() => {
+    const groups = new Map<string, ViewerSeries>()
+
+    allOrderedInstances.forEach((instance) => {
+      const key = instance.seriesId ?? "study"
+      const existing = groups.get(key)
+
+      if (existing) {
+        existing.instances.push(instance)
+        return
+      }
+
+      const numberLabel =
+        instance.seriesNumber === null ? "Seri" : `Seri ${instance.seriesNumber}`
+      groups.set(key, {
+        id: key,
+        number: instance.seriesNumber,
+        description: instance.seriesDescription?.trim() || numberLabel,
+        modality: instance.seriesModality?.trim() || "DICOM",
+        instances: [instance],
+      })
+    })
+
+    return Array.from(groups.values()).sort((left, right) => {
+      const leftNumber = left.number ?? Number.MAX_SAFE_INTEGER
+      const rightNumber = right.number ?? Number.MAX_SAFE_INTEGER
+      return leftNumber - rightNumber || left.description.localeCompare(right.description)
+    })
+  }, [allOrderedInstances])
+
+  const [activeSeriesId, setActiveSeriesId] = useState(seriesGroups[0]?.id ?? "")
+  const activeSeries = useMemo(
+    () => seriesGroups.find((series) => series.id === activeSeriesId) ?? seriesGroups[0],
+    [activeSeriesId, seriesGroups]
+  )
+  const orderedInstances = useMemo(() => activeSeries?.instances ?? [], [activeSeries])
   const [activeInstanceId, setActiveInstanceId] = useState(orderedInstances[0]?.id ?? "")
   const [error, setError] = useState("")
   const [preview, setPreview] = useState<DicomPreview | null>(null)
   const [viewerStatus, setViewerStatus] = useState("")
+  const [seriesThumbnails, setSeriesThumbnails] = useState<Record<string, string>>({})
   const [windowCenter, setWindowCenter] = useState(0)
   const [windowWidth, setWindowWidth] = useState(1)
   const [zoom, setZoom] = useState(1)
@@ -73,7 +127,12 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
     tool: ViewerTool
   } | null>(null)
 
-  const foundIndex = orderedInstances.findIndex((item) => item.id === activeInstanceId)
+  const resolvedActiveInstanceId = orderedInstances.some(
+    (item) => item.id === activeInstanceId
+  )
+    ? activeInstanceId
+    : orderedInstances[0]?.id ?? ""
+  const foundIndex = orderedInstances.findIndex((item) => item.id === resolvedActiveInstanceId)
   const activeIndex = Math.max(0, foundIndex)
   const activeInstance = orderedInstances[activeIndex]
   const loadableInstanceId = activeInstance?.id ?? ""
@@ -183,6 +242,19 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
     [cachePreview, getSignedUrls, refreshCacheStats]
   )
 
+  const selectSeries = useCallback(
+    (seriesId: string) => {
+      const nextSeries = seriesGroups.find((series) => series.id === seriesId)
+      if (!nextSeries) return
+
+      hasLoadedPreviewRef.current = false
+      setIsCinePlaying(false)
+      setActiveSeriesId(seriesId)
+      setActiveInstanceId(nextSeries.instances[0]?.id ?? "")
+    },
+    [seriesGroups]
+  )
+
   const applyDecodedPreview = useCallback((decoded: DicomPreview) => {
     setPreview(decoded)
 
@@ -284,6 +356,35 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
     const timeout = window.setTimeout(() => loadInstance(loadableInstanceId), 0)
     return () => window.clearTimeout(timeout)
   }, [loadInstance, loadableInstanceId])
+
+  useEffect(() => {
+    if (!seriesGroups.length) return
+
+    let cancelled = false
+    const missingSeries = seriesGroups
+      .filter((series) => !seriesThumbnails[series.id] && series.instances[0]?.id)
+      .slice(0, 16)
+
+    missingSeries.forEach((series) => {
+      const firstInstanceId = series.instances[0]?.id
+      if (!firstInstanceId) return
+
+      void decodeInstancePreview(firstInstanceId)
+        .then((decoded) => {
+          if (cancelled) return
+          const thumbnail = renderPreviewThumbnail(decoded)
+          if (!thumbnail) return
+          setSeriesThumbnails((current) => ({ ...current, [series.id]: thumbnail }))
+        })
+        .catch(() => {
+          // Thumbnail loading is non-blocking; active viewport reports real errors.
+        })
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [decodeInstancePreview, seriesGroups, seriesThumbnails])
 
   useEffect(() => {
     if (!hasMultipleInstances) return
@@ -460,12 +561,52 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
     moveInstance(event.deltaY > 0 ? 1 : -1)
   }
 
-  if (!orderedInstances.length) {
+  if (!allOrderedInstances.length) {
     return <p className="viewer-status">Bu tetkikte görüntülenecek DICOM yok.</p>
   }
 
   return (
     <div ref={viewerRef} className="rai-dicom-viewer">
+      <aside className="rai-dicom-series" aria-label="Seri listesi">
+        <div className="series-panel-header">
+          <div>
+            <strong>Seriler</strong>
+            <span>{seriesGroups.length} seri</span>
+          </div>
+          <span>{allOrderedInstances.length} görüntü</span>
+        </div>
+        <div className="series-list">
+          {seriesGroups.map((series) => {
+            const thumbnail = seriesThumbnails[series.id]
+            const isActive = series.id === activeSeries?.id
+
+            return (
+              <button
+                key={series.id}
+                className={`series-card${isActive ? " active" : ""}`}
+                type="button"
+                onClick={() => selectSeries(series.id)}
+              >
+                <span className="series-thumb" aria-hidden="true">
+                  {thumbnail ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img alt="" src={thumbnail} />
+                  ) : (
+                    <span>{series.modality}</span>
+                  )}
+                </span>
+                <span className="series-card-body">
+                  <span className="series-title">{series.description}</span>
+                  <span className="series-meta">
+                    {series.number === null ? "Seri" : `${series.number}. seri`} ·{" "}
+                    {series.modality} · {series.instances.length} görüntü
+                  </span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </aside>
       <div className="rai-dicom-stage" onWheel={handleWheel}>
         <div className="rai-dicom-toolbar" aria-label="Viewer araçları">
           <div className="segmented viewer-mode">
@@ -527,6 +668,7 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
 
         <div className="rai-dicom-overlay">
           <span>{preview?.metadata.modality || "DICOM"}</span>
+          <span>{activeSeries?.description ?? "Seri"}</span>
           <span>
             I: {activeIndex + 1}/{orderedInstances.length}
           </span>
@@ -724,6 +866,14 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
         ) : null}
         <dl>
           <div>
+            <dt>Seri</dt>
+            <dd>
+              {activeSeries
+                ? `${activeSeries.description} (${activeSeries.instances.length})`
+                : "-"}
+            </dd>
+          </div>
+          <div>
             <dt>Instance</dt>
             <dd>
               {activeInstance?.instanceNumber ?? activeIndex + 1}
@@ -758,6 +908,27 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
       </aside>
     </div>
   )
+}
+
+function renderPreviewThumbnail(preview: DicomPreview) {
+  if (!preview.pixels) return ""
+
+  const ratio = window.devicePixelRatio || 1
+  const canvas = document.createElement("canvas")
+  canvas.width = Math.round(72 * ratio)
+  canvas.height = Math.round(72 * ratio)
+
+  renderDicomImage(canvas, preview, {
+    center: preview.voi.center,
+    width: preview.voi.width,
+    invert: false,
+    zoom: 1,
+    rotate: 0,
+    panX: 0,
+    panY: 0,
+  })
+
+  return canvas.toDataURL("image/jpeg", 0.72)
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {

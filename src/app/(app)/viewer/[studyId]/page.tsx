@@ -45,12 +45,25 @@ export default async function RaiViewerPage({
   if (error) throw new Error(`Viewer tetkiki alınamadı: ${error.message}`)
   if (!study) notFound()
 
-  const { data: instances, error: instancesError } = await supabase
-    .from("instances")
-    .select("id, sop_instance_uid, instance_number")
-    .eq("study_id", study.id)
-    .eq("organization_id", user.organizationId)
-    .order("instance_number", { ascending: true })
+  const [{ data: series, error: seriesError }, { data: instances, error: instancesError }] =
+    await Promise.all([
+      supabase
+        .from("series")
+        .select("id, series_number, modality, description")
+        .eq("study_id", study.id)
+        .eq("organization_id", user.organizationId)
+        .order("series_number", { ascending: true }),
+      supabase
+        .from("instances")
+        .select("id, series_id, sop_instance_uid, instance_number")
+        .eq("study_id", study.id)
+        .eq("organization_id", user.organizationId)
+        .order("instance_number", { ascending: true }),
+    ])
+
+  if (seriesError) {
+    throw new Error(`Viewer seri listesi alınamadı: ${seriesError.message}`)
+  }
 
   if (instancesError) {
     throw new Error(`Viewer instance listesi alınamadı: ${instancesError.message}`)
@@ -72,6 +85,8 @@ export default async function RaiViewerPage({
     : patient?.id
       ? `/patients/${patient.id}`
       : null
+
+  const seriesById = new Map((series ?? []).map((item) => [item.id, item]))
 
   return (
     <section className="rai-viewer-page">
@@ -108,6 +123,10 @@ export default async function RaiViewerPage({
       <RaiDicomViewer
         instances={(instances ?? []).map((instance) => ({
           id: instance.id,
+          seriesId: instance.series_id,
+          seriesNumber: seriesById.get(instance.series_id)?.series_number ?? null,
+          seriesDescription: seriesById.get(instance.series_id)?.description ?? null,
+          seriesModality: seriesById.get(instance.series_id)?.modality ?? study.modality,
           instanceNumber: instance.instance_number,
           sopInstanceUid: instance.sop_instance_uid,
         }))}
