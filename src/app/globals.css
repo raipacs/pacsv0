@@ -661,6 +661,51 @@ p {
   background: rgba(15, 23, 42, 0.74);
 }
 
+.rai-dicom-ruler {
+  position: absolute;
+  inset: 26% 14px auto auto;
+  z-index: 2;
+  width: 30px;
+  height: min(48dvh, 420px);
+  pointer-events: none;
+  color: #e2e8f0;
+  background:
+    linear-gradient(#e2e8f0, #e2e8f0) right center / 2px 100% no-repeat,
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 9px,
+      rgba(226, 232, 240, 0.95) 9px,
+      rgba(226, 232, 240, 0.95) 10px
+    );
+}
+
+.rai-dicom-ruler::before,
+.rai-dicom-ruler::after {
+  position: absolute;
+  right: 0;
+  width: 14px;
+  height: 2px;
+  background: #e2e8f0;
+  content: "";
+}
+
+.rai-dicom-ruler::before {
+  top: 0;
+}
+
+.rai-dicom-ruler::after {
+  bottom: 0;
+}
+
+.rai-dicom-ruler span {
+  position: absolute;
+  right: 0;
+  bottom: -20px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .rai-dicom-canvas {
   display: block;
   width: 100%;
@@ -683,6 +728,63 @@ p {
 
 .rai-dicom-canvas.is-zoom {
   cursor: zoom-in;
+}
+
+.rai-dicom-scrubber {
+  position: absolute;
+  inset: auto 18px 18px 18px;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: 34px 72px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 8px;
+  padding: 10px;
+  color: #e2e8f0;
+  background: rgba(15, 23, 42, 0.82);
+  box-shadow: 0 16px 40px rgba(2, 6, 23, 0.32);
+  backdrop-filter: blur(12px);
+}
+
+.rai-dicom-scrubber button {
+  height: 32px;
+  border: 1px solid #334155;
+  border-radius: 7px;
+  color: #e2e8f0;
+  font-weight: 900;
+  background: #111827;
+  cursor: pointer;
+}
+
+.rai-dicom-scrubber button:hover:not(:disabled) {
+  border-color: #14b8a6;
+  color: #ccfbf1;
+}
+
+.rai-dicom-scrubber button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.rai-dicom-scrubber label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rai-dicom-scrubber label span {
+  overflow: hidden;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rai-dicom-scrubber input[type="range"] {
+  width: 100%;
+  accent-color: #14b8a6;
 }
 
 .rai-dicom-side {
@@ -1557,6 +1659,19 @@ td span {
 
   .rai-dicom-toolbar {
     inset: 10px;
+  }
+
+  .rai-dicom-ruler {
+    display: none;
+  }
+
+  .rai-dicom-scrubber {
+    inset: auto 10px 10px 10px;
+    grid-template-columns: 32px minmax(0, 1fr) 32px;
+  }
+
+  .rai-dicom-scrubber button:nth-child(2) {
+    display: none;
   }
 
   .rai-dicom-side {

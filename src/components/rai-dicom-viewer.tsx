@@ -682,6 +682,10 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
           </span>
         </div>
 
+        <div className="rai-dicom-ruler" aria-hidden="true">
+          <span>mm</span>
+        </div>
+
         {viewerStatus ? <p className="viewer-status">{viewerStatus}</p> : null}
         <canvas
           ref={canvasRef}
@@ -738,6 +742,46 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
             dragRef.current = null
           }}
         />
+        <div className="rai-dicom-scrubber" aria-label="Seri görüntü gezgini">
+          <button
+            type="button"
+            aria-label="Önceki görüntü"
+            disabled={!canGoPrevious}
+            onClick={() => moveInstance(-1)}
+          >
+            ←
+          </button>
+          <button
+            type="button"
+            disabled={!hasMultipleInstances}
+            onClick={() => setIsCinePlaying((value) => !value)}
+          >
+            {isCinePlaying ? "Durdur" : "Cine"}
+          </button>
+          <label>
+            <span>
+              {activeSeries?.description ?? "Seri"} · {activeIndex + 1}/
+              {orderedInstances.length}
+            </span>
+            <input
+              type="range"
+              min="0"
+              max={Math.max(0, orderedInstances.length - 1)}
+              step="1"
+              value={activeIndex}
+              disabled={!hasMultipleInstances}
+              onChange={(event) => goToInstance(Number(event.target.value))}
+            />
+          </label>
+          <button
+            type="button"
+            aria-label="Sonraki görüntü"
+            disabled={!canGoNext}
+            onClick={() => moveInstance(1)}
+          >
+            →
+          </button>
+        </div>
       </div>
 
       <aside className="rai-dicom-side">
