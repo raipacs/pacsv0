@@ -156,7 +156,9 @@ function parseExplicitVr(
     }
 
     if (length === 0xffffffff) {
-      position = findUndefinedLengthSequenceEnd(view, position)
+      const sequenceEnd = findUndefinedLengthSequenceEnd(view, position)
+      if (sequenceEnd < 0) break
+      position = sequenceEnd
       continue
     }
     if (position + length > view.byteLength) break
@@ -192,7 +194,9 @@ function parseImplicitVr(
     position += 4
 
     if (length === 0xffffffff) {
-      position = findUndefinedLengthSequenceEnd(view, position)
+      const sequenceEnd = findUndefinedLengthSequenceEnd(view, position)
+      if (sequenceEnd < 0) break
+      position = sequenceEnd
       continue
     }
     if (position + length > view.byteLength) break
@@ -207,32 +211,16 @@ function parseImplicitVr(
 }
 
 function findUndefinedLengthSequenceEnd(view: DataView, offset: number) {
-  let position = offset
-
-  while (position + 8 <= view.byteLength) {
+  for (let position = offset; position + 8 <= view.byteLength; position += 2) {
     const group = view.getUint16(position, true)
     const element = view.getUint16(position + 2, true)
-    const length = view.getUint32(position + 4, true)
-
-    position += 8
 
     if (group === 0xfffe && element === 0xe0dd) {
-      return position + length
+      return position + 8
     }
-
-    if (length === 0xffffffff) {
-      position = findUndefinedLengthSequenceEnd(view, position)
-      continue
-    }
-
-    if (position + length > view.byteLength) {
-      return view.byteLength
-    }
-
-    position += length + (length % 2)
   }
 
-  return view.byteLength
+  return -1
 }
 
 function readValue(
