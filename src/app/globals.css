@@ -682,6 +682,29 @@ p {
   grid-column: 1 / -1;
 }
 
+.upload-choice {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: #ffffff;
+}
+
+.upload-choice.recommended {
+  border-color: rgba(14, 126, 113, 0.32);
+  background: #f0fdfa;
+}
+
+.upload-choice span {
+  color: var(--text);
+}
+
+.upload-choice small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
 .upload-form input[type="file"] {
   padding: 9px 12px;
 }

@@ -606,8 +606,13 @@ export function DicomExportImportForm({
     <form className="upload-form" onSubmit={onSubmit}>
       <fieldset disabled={isImporting || !supabaseConfigured}>
         <div className="form-grid">
-          <label className="wide">
-            DICOM export klasörü
+          <label className="wide upload-choice recommended">
+            <span>DICOM export klasörü</span>
+            <small>
+              Önerilen yol. PACS/Synapse export ana klasörünü veya DICOMOBJ
+              klasörünü seçin; alt klasörlerdeki DICOM dosyaları birlikte
+              import edilir.
+            </small>
             <input
               name="dicomExportFiles"
               type="file"
@@ -615,8 +620,13 @@ export function DicomExportImportForm({
               {...{ webkitdirectory: "" }}
             />
           </label>
-          <label className="wide">
-            DICOM dosyaları
+          <label className="wide upload-choice">
+            <span>DICOM dosyaları</span>
+            <small>
+              Alternatif yol. Klasör seçimi çalışmazsa veya sadece birkaç
+              instance yükleyecekseniz birden fazla .dcm dosyasını buradan
+              seçin.
+            </small>
             <input
               name="dicomExportFiles"
               type="file"
