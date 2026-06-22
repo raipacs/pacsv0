@@ -689,11 +689,6 @@ p {
   background: #ffffff;
 }
 
-.upload-choice.recommended {
-  border-color: rgba(14, 126, 113, 0.32);
-  background: #f0fdfa;
-}
-
 .upload-choice span {
   color: var(--text);
 }
