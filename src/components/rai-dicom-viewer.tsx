@@ -30,6 +30,7 @@ type ViewerStudyContext = {
 }
 
 type ViewerTool = "scroll" | "pan" | "window" | "zoom"
+type SeriesPanelMode = "list" | "preview"
 
 type ViewerSeries = {
   id: string
@@ -122,6 +123,7 @@ export function RaiDicomViewer({
   const [cineFps, setCineFps] = useState(12)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isSeriesPanelOpen, setIsSeriesPanelOpen] = useState(true)
+  const [seriesPanelMode, setSeriesPanelMode] = useState<SeriesPanelMode>("preview")
   const [isToolsPanelOpen, setIsToolsPanelOpen] = useState(false)
   const [cacheStats, setCacheStats] = useState({ ready: 0, loading: 0 })
   const [isPending, startTransition] = useTransition()
@@ -606,63 +608,119 @@ export function RaiDicomViewer({
       {isSeriesPanelOpen ? (
         <aside className="rai-dicom-series" aria-label="Seri listesi">
           <div className="series-panel-header">
-            <div>
+            <div className="series-titlebar">
+              <span className="series-title-spacer" aria-hidden="true" />
               <strong>Seriler</strong>
-              <span>{seriesGroups.length} seri</span>
-            </div>
-            <div className="panel-header-actions">
-              <span>{allOrderedInstances.length} görüntü</span>
               <button
+                className="series-icon-button"
                 type="button"
                 aria-label="Seriler panelini kapat"
+                title="Seriler panelini kapat"
                 onClick={() => setIsSeriesPanelOpen(false)}
               >
-                Kapat
+                ←
               </button>
             </div>
-          </div>
-          <div className="series-list">
-            {seriesGroups.map((series) => {
-              const thumbnail = seriesThumbnails[series.id]
-              const isActive = series.id === activeSeries?.id
-
-              return (
+            <div className="series-panel-summary">
+              <span>{seriesGroups.length} seri</span>
+              <span>{allOrderedInstances.length} görüntü</span>
+            </div>
+            <div className="series-panel-controls" aria-label="Seri görünümü">
+              <span className="series-filter-icon" aria-hidden="true">
+                ≡
+              </span>
+              <div className="series-view-switch">
                 <button
-                  key={series.id}
-                  className={`series-card${isActive ? " active" : ""}`}
                   type="button"
-                  onClick={() => selectSeries(series.id)}
+                  className={seriesPanelMode === "list" ? "active" : ""}
+                  aria-pressed={seriesPanelMode === "list"}
+                  onClick={() => setSeriesPanelMode("list")}
                 >
-                  <span className="series-thumb" aria-hidden="true">
-                    {thumbnail ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img alt="" src={thumbnail} />
-                    ) : (
-                      <span>{series.modality}</span>
-                    )}
-                  </span>
-                  <span className="series-card-body">
-                    <span className="series-title">{series.description}</span>
-                    <span className="series-meta">
-                      {series.number === null ? "Seri" : `${series.number}. seri`} ·{" "}
-                      {series.modality} · {series.instances.length} görüntü
-                    </span>
-                  </span>
+                  Liste
                 </button>
-              )
-            })}
+                <button
+                  type="button"
+                  className={seriesPanelMode === "preview" ? "active" : ""}
+                  aria-pressed={seriesPanelMode === "preview"}
+                  onClick={() => setSeriesPanelMode("preview")}
+                >
+                  Preview
+                </button>
+              </div>
+            </div>
           </div>
+          {seriesPanelMode === "preview" ? (
+            <div className="series-list series-preview-grid">
+              {seriesGroups.map((series) => {
+                const thumbnail = seriesThumbnails[series.id]
+                const isActive = series.id === activeSeries?.id
+
+                return (
+                  <button
+                    key={series.id}
+                    className={`series-card${isActive ? " active" : ""}`}
+                    type="button"
+                    onClick={() => selectSeries(series.id)}
+                  >
+                    <span className="series-thumb" aria-hidden="true">
+                      {thumbnail ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img alt="" src={thumbnail} />
+                      ) : (
+                        <span>{series.modality}</span>
+                      )}
+                    </span>
+                    <span className="series-card-body">
+                      <span className="series-title">{series.description}</span>
+                      <span className="series-meta">
+                        {series.number === null ? "Seri" : `${series.number}. seri`} ·{" "}
+                        {series.modality} · {series.instances.length} görüntü
+                      </span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <ol className="series-list series-row-list">
+              {seriesGroups.map((series, index) => {
+                const isActive = series.id === activeSeries?.id
+
+                return (
+                  <li key={series.id}>
+                    <button
+                      className={`series-row${isActive ? " active" : ""}`}
+                      type="button"
+                      onClick={() => selectSeries(series.id)}
+                    >
+                      <span className="series-row-index">{index + 1}</span>
+                      <span className="series-row-body">
+                        <span className="series-title">{series.description}</span>
+                        <span className="series-meta">
+                          {series.number === null ? "Seri" : `S:${series.number}`} ·{" "}
+                          {series.modality} · {series.instances.length} görüntü
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ol>
+          )}
         </aside>
       ) : null}
       <div className="rai-dicom-stage" onWheel={handleWheel}>
         <div className="viewer-panel-toggles" aria-label="Viewer panel kontrolleri">
           {!isSeriesPanelOpen ? (
             <button
+              className="series-reopen-button"
               type="button"
               aria-expanded={isSeriesPanelOpen}
+              aria-label="Seriler panelini aç"
+              title="Seriler panelini aç"
               onClick={() => setIsSeriesPanelOpen(true)}
             >
-              Seriler
+              →
             </button>
           ) : null}
         </div>

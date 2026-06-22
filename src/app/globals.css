@@ -674,11 +674,8 @@ body:has(.rai-viewer-page) .app-header {
 }
 
 .series-panel-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  display: grid;
   gap: 8px;
-  min-height: 34px;
   border-bottom: 1px solid rgba(37, 99, 235, 0.22);
   padding: 0 4px 8px;
   color: #94a3b8;
@@ -701,7 +698,9 @@ body:has(.rai-viewer-page) .app-header {
 
 .panel-header-actions button,
 .side-panel-header button,
-.viewer-panel-toggles button {
+.viewer-panel-toggles button,
+.series-icon-button,
+.series-view-switch button {
   border: 1px solid #24446f;
   border-radius: 5px;
   padding: 6px 8px;
@@ -714,33 +713,113 @@ body:has(.rai-viewer-page) .app-header {
 
 .panel-header-actions button:hover,
 .side-panel-header button:hover,
-.viewer-panel-toggles button:hover {
+.viewer-panel-toggles button:hover,
+.series-icon-button:hover,
+.series-view-switch button:hover,
+.series-view-switch button.active {
   border-color: #14b8a6;
   color: #ccfbf1;
 }
 
 .viewer-panel-toggles {
   position: absolute;
-  inset: 14px 14px auto auto;
+  inset: 10px auto auto 8px;
   z-index: 4;
   display: flex;
   gap: 8px;
 }
 
-.series-panel-header div {
+.series-titlebar {
   display: grid;
-  gap: 3px;
+  grid-template-columns: 30px minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
 }
 
-.series-panel-header strong {
+.series-titlebar strong {
   color: #e2e8f0;
   font-size: 15px;
+  text-align: center;
+}
+
+.series-title-spacer {
+  width: 30px;
+  height: 30px;
+}
+
+.series-icon-button,
+.series-reopen-button {
+  display: grid;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  place-items: center;
+  padding: 0;
+  color: #60a5fa;
+  font-size: 16px;
+}
+
+.series-panel-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #8fb5e9;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.series-panel-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid rgba(37, 99, 235, 0.2);
+  padding-top: 8px;
+}
+
+.series-filter-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid #24446f;
+  border-radius: 5px;
+  color: #60a5fa;
+  background: #061a3f;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.series-view-switch {
+  display: flex;
+  gap: 4px;
+}
+
+.series-view-switch button {
+  min-height: 30px;
+  padding: 0 9px;
+  color: #93c5fd;
+}
+
+.series-view-switch button.active {
+  color: #061a3f;
+  background: #67e8f9;
 }
 
 .series-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
+}
+
+.series-preview-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.series-row-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .series-card {
@@ -766,6 +845,46 @@ body:has(.rai-viewer-page) .app-header {
 .series-card:focus-visible {
   outline: 2px solid #14b8a6;
   outline-offset: 2px;
+}
+
+.series-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 8px;
+  width: 100%;
+  align-items: center;
+  border: 1px solid rgba(37, 99, 235, 0.28);
+  border-radius: 4px;
+  padding: 7px;
+  color: #cbd5e1;
+  text-align: left;
+  background: #0b1230;
+  cursor: pointer;
+}
+
+.series-row:hover,
+.series-row.active {
+  border-color: #19b7d8;
+  background: #0b2454;
+}
+
+.series-row-index {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid rgba(147, 197, 253, 0.24);
+  border-radius: 50%;
+  color: #93c5fd;
+  background: #061a3f;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.series-row-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
 }
 
 .series-thumb {
@@ -1881,7 +2000,7 @@ td span {
     border-bottom: 1px solid #1e293b;
   }
 
-  .series-list {
+  .series-preview-grid {
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   }
 
@@ -2029,7 +2148,7 @@ td span {
     max-height: 220px;
   }
 
-  .series-list {
+  .series-preview-grid {
     grid-template-columns: 1fr;
   }
 
