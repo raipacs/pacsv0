@@ -43,8 +43,8 @@ const MIN_ZOOM = 0.2
 const MAX_ZOOM = 12
 const SIGNED_URL_TIMEOUT_MS = 15_000
 const DICOM_FETCH_TIMEOUT_MS = 25_000
-const PREVIEW_CACHE_LIMIT = 10
-const PREFETCH_RADIUS = 2
+const PREVIEW_CACHE_LIMIT = 48
+const PREFETCH_RADIUS = 4
 
 export function RaiDicomViewer({
   instances,
@@ -122,7 +122,7 @@ export function RaiDicomViewer({
   const [cineFps, setCineFps] = useState(12)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isSeriesPanelOpen, setIsSeriesPanelOpen] = useState(true)
-  const [isToolsPanelOpen, setIsToolsPanelOpen] = useState(true)
+  const [isToolsPanelOpen, setIsToolsPanelOpen] = useState(false)
   const [cacheStats, setCacheStats] = useState({ ready: 0, loading: 0 })
   const [isPending, startTransition] = useTransition()
   const viewerRef = useRef<HTMLDivElement | null>(null)
@@ -318,7 +318,6 @@ export function RaiDicomViewer({
       loadTokenRef.current = loadToken
       setError("")
       setViewerStatus("DICOM hazırlanıyor...")
-      setPreview(null)
 
       startTransition(async () => {
         try {
@@ -586,9 +585,11 @@ export function RaiDicomViewer({
     }
 
     const now = Date.now()
-    if (now - wheelRef.current < 70) return
+    if (now - wheelRef.current < 42) return
     wheelRef.current = now
-    moveInstance(event.deltaY > 0 ? 1 : -1)
+    const absDelta = Math.abs(event.deltaY)
+    const step = absDelta > 240 ? 3 : absDelta > 120 ? 2 : 1
+    goToInstance(activeIndex + (event.deltaY > 0 ? step : -step))
   }
 
   if (!allOrderedInstances.length) {
@@ -729,6 +730,51 @@ export function RaiDicomViewer({
           </button>
           <button className="button subtle small" type="button" onClick={toggleFullscreen}>
             {isFullscreen ? "Çık" : "Tam ekran"}
+          </button>
+        </div>
+        <div className="rai-dicom-quick-rail" aria-label="Hızlı viewer araçları">
+          <button
+            type="button"
+            className={tool === "window" ? "active" : ""}
+            aria-label="Window level aracı"
+            title="Window/Level"
+            onClick={() => setTool("window")}
+          >
+            W/L
+          </button>
+          <button
+            type="button"
+            className={tool === "zoom" ? "active" : ""}
+            aria-label="Zoom aracı"
+            title="Zoom"
+            onClick={() => setTool("zoom")}
+          >
+            Z
+          </button>
+          <button
+            type="button"
+            className={tool === "pan" ? "active" : ""}
+            aria-label="Pan aracı"
+            title="Pan"
+            onClick={() => setTool("pan")}
+          >
+            Pan
+          </button>
+          <button
+            type="button"
+            aria-label="İnvert"
+            title="Invert"
+            onClick={() => setInvert((value) => !value)}
+          >
+            Inv
+          </button>
+          <button
+            type="button"
+            aria-label="Araçlar panelini aç veya kapat"
+            title="Araçlar"
+            onClick={() => setIsToolsPanelOpen((value) => !value)}
+          >
+            ⚙
           </button>
         </div>
 
@@ -1105,8 +1151,8 @@ function renderPreviewThumbnail(preview: DicomPreview) {
 
   const ratio = window.devicePixelRatio || 1
   const canvas = document.createElement("canvas")
-  canvas.width = Math.round(72 * ratio)
-  canvas.height = Math.round(72 * ratio)
+  canvas.width = Math.round(128 * ratio)
+  canvas.height = Math.round(112 * ratio)
 
   renderDicomImage(canvas, preview, {
     center: preview.voi.center,
@@ -1118,7 +1164,7 @@ function renderPreviewThumbnail(preview: DicomPreview) {
     panY: 0,
   })
 
-  return canvas.toDataURL("image/jpeg", 0.72)
+  return canvas.toDataURL("image/jpeg", 0.76)
 }
 
 function formatViewerDateTime(value: string | null) {
