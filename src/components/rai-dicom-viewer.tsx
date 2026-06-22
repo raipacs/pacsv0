@@ -665,15 +665,6 @@ export function RaiDicomViewer({
               Seriler
             </button>
           ) : null}
-          {!isToolsPanelOpen ? (
-            <button
-              type="button"
-              aria-expanded={isToolsPanelOpen}
-              onClick={() => setIsToolsPanelOpen(true)}
-            >
-              Araçlar
-            </button>
-          ) : null}
         </div>
         <div className="rai-dicom-toolbar" aria-label="Viewer araçları">
           <div className="segmented viewer-mode">

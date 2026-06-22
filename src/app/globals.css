@@ -847,6 +847,19 @@ body:has(.rai-viewer-page) .app-header {
   opacity: 0.45;
 }
 
+.rai-dicom-toolbar .segmented button {
+  border: 1px solid #24446f;
+  color: #bfdbfe;
+  background: #0b2148;
+}
+
+.rai-dicom-toolbar .segmented button:hover,
+.rai-dicom-toolbar .segmented button.active {
+  border-color: #22d3ee;
+  color: #061a3f;
+  background: #67e8f9;
+}
+
 .rai-dicom-quick-rail {
   position: absolute;
   inset: 10px 8px auto auto;
