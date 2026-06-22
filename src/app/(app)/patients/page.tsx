@@ -48,7 +48,7 @@ export default async function PatientsPage() {
                     </Link>
                     <span>{patient.patientNumber}</span>
                   </td>
-                  <td>{patient.birthDate ? formatDate(patient.birthDate) : "-"}</td>
+                  <td>{formatDate(patient.birthDate)}</td>
                   <td>{patient.sex}</td>
                   <td>
                     <strong>{patient.phone ?? "-"}</strong>
@@ -56,11 +56,7 @@ export default async function PatientsPage() {
                   </td>
                   <td>{patient.studyCount}</td>
                   <td>
-                    {patient.lastStudyAt
-                      ? new Intl.DateTimeFormat("tr-TR", {
-                          dateStyle: "medium",
-                        }).format(new Date(patient.lastStudyAt))
-                      : "-"}
+                    {formatDate(patient.lastStudyAt, { dateStyle: "medium" })}
                   </td>
                 </tr>
               ))}
@@ -72,6 +68,14 @@ export default async function PatientsPage() {
   )
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("tr-TR").format(new Date(value))
+function formatDate(
+  value: string | null,
+  options?: Intl.DateTimeFormatOptions
+) {
+  if (!value) return "-"
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "-"
+
+  return new Intl.DateTimeFormat("tr-TR", options).format(date)
 }

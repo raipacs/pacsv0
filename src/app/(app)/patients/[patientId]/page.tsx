@@ -38,7 +38,7 @@ export default async function PatientDetailPage({
           <dl>
             <div>
               <dt>Doğum tarihi</dt>
-              <dd>{new Intl.DateTimeFormat("tr-TR").format(new Date(patient.birthDate))}</dd>
+              <dd>{formatDate(patient.birthDate)}</dd>
             </div>
             <div>
               <dt>Cinsiyet</dt>
@@ -167,4 +167,13 @@ function formatBytes(value: number) {
   if (value < 1024) return `${value} B`
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
   return `${(value / 1024 / 1024).toFixed(1)} MB`
+}
+
+function formatDate(value: string) {
+  if (!value) return "-"
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "-"
+
+  return new Intl.DateTimeFormat("tr-TR").format(date)
 }
