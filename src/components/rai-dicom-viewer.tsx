@@ -733,8 +733,12 @@ export function RaiDicomViewer({
             <div>
               <dt>Görüntü</dt>
               <dd>
-                {activeInstance?.instanceNumber ?? activeIndex + 1} / {orderedInstances.length}
+                {activeIndex + 1} / {orderedInstances.length}
               </dd>
+            </div>
+            <div>
+              <dt>Instance no</dt>
+              <dd>{activeInstance?.instanceNumber ?? "-"}</dd>
             </div>
             <div>
               <dt>Boyut</dt>
