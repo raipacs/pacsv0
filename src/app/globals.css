@@ -1019,6 +1019,50 @@ td span {
   text-align: center;
 }
 
+.frame-navigator {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px;
+}
+
+.frame-navigator span {
+  min-width: 0;
+  padding: 0 8px;
+}
+
+.frame-navigator button {
+  display: inline-grid;
+  width: 40px;
+  min-width: 40px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 6px;
+  color: #e2e8f0;
+  background: rgba(15, 23, 42, 0.88);
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.frame-navigator button:hover:not(:disabled) {
+  border-color: rgba(94, 234, 212, 0.55);
+  background: rgba(20, 83, 73, 0.72);
+}
+
+.frame-navigator button:focus-visible {
+  outline: 2px solid #5eead4;
+  outline-offset: 2px;
+}
+
+.frame-navigator button:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
 .viewer-shell .button.subtle {
   border-color: rgba(148, 163, 184, 0.34);
   color: #e2e8f0;

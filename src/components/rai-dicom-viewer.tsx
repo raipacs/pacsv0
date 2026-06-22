@@ -78,6 +78,8 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
   const activeInstance = orderedInstances[activeIndex]
   const loadableInstanceId = activeInstance?.id ?? ""
   const hasMultipleInstances = orderedInstances.length > 1
+  const canGoPrevious = hasMultipleInstances && activeIndex > 0
+  const canGoNext = hasMultipleInstances && activeIndex < orderedInstances.length - 1
 
   const refreshCacheStats = useCallback(() => {
     setCacheStats({
@@ -597,8 +599,26 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
       </div>
 
       <aside className="rai-dicom-side">
-        <div className="viewer-counter">
-          {activeIndex + 1} / {orderedInstances.length}
+        <div className="viewer-counter frame-navigator" aria-label="Görüntü sırası">
+          <button
+            type="button"
+            aria-label="Önceki görüntü"
+            disabled={!canGoPrevious}
+            onClick={() => moveInstance(-1)}
+          >
+            ←
+          </button>
+          <span>
+            {activeIndex + 1} / {orderedInstances.length}
+          </span>
+          <button
+            type="button"
+            aria-label="Sonraki görüntü"
+            disabled={!canGoNext}
+            onClick={() => moveInstance(1)}
+          >
+            →
+          </button>
         </div>
         {error ? <p className="inline-error">{error}</p> : null}
         <div className="viewer-tools">
