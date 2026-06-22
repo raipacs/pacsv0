@@ -1,1 +1,1 @@
-export { GET, OPTIONS } from "@/app/api/ohif/instances/[instanceId]/route"
+export { GET, HEAD, OPTIONS } from "@/app/api/ohif/instances/[instanceId]/route"

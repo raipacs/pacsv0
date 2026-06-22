@@ -29,6 +29,7 @@ export async function GET(request: Request, context: RouteContext) {
   const requestUrl = new URL(request.url)
   const token = requestUrl.searchParams.get("token") ?? ""
   const launch = verifyOhifLaunchToken(token, studyId)
+  const origin = requestUrl.origin
 
   if (!launch) {
     return jsonError("OHIF launch token geçersiz veya süresi doldu.", 401)
@@ -146,7 +147,12 @@ export async function GET(request: Request, context: RouteContext) {
                     instance.ohifMetadata.TransferSyntaxUID ??
                     undefined,
                 },
-                url: `wadouri:${instance.signedUrl}`,
+                url: `wadouri:${createProxyInstanceUrl({
+                  instanceId: instance.id,
+                  origin,
+                  studyId: study.id,
+                  token,
+                })}`,
               })),
             }
           }),
@@ -155,6 +161,23 @@ export async function GET(request: Request, context: RouteContext) {
     },
     { headers: CORS_HEADERS }
   )
+}
+
+function createProxyInstanceUrl({
+  instanceId,
+  origin,
+  studyId,
+  token,
+}: {
+  instanceId: string
+  origin: string
+  studyId: string
+  token: string
+}) {
+  const url = new URL(`/viewer-data/instances/${instanceId}`, origin)
+  url.searchParams.set("studyId", studyId)
+  url.searchParams.set("token", token)
+  return url.toString()
 }
 
 async function readSignedDicomMetadata(url: string) {
