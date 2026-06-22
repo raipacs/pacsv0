@@ -298,7 +298,13 @@ function parseExplicitVr(buffer, offset, metadata, metaOnly) {
       position += 2
     }
 
-    if (length === 0xffffffff || position + length > buffer.length) break
+    if (length === 0xffffffff) {
+      const sequenceEnd = findUndefinedLengthSequenceEnd(buffer, position)
+      if (sequenceEnd < 0) break
+      position = sequenceEnd
+      continue
+    }
+    if (position + length > buffer.length) break
 
     readValue(buffer, position, length, group, element, metadata)
     position += length + (length % 2)
@@ -320,7 +326,13 @@ function parseImplicitVr(buffer, offset, metadata) {
     const length = buffer.readUInt32LE(position)
     position += 4
 
-    if (length === 0xffffffff || position + length > buffer.length) break
+    if (length === 0xffffffff) {
+      const sequenceEnd = findUndefinedLengthSequenceEnd(buffer, position)
+      if (sequenceEnd < 0) break
+      position = sequenceEnd
+      continue
+    }
+    if (position + length > buffer.length) break
 
     readValue(buffer, position, length, group, element, metadata)
     position += length + (length % 2)
@@ -349,6 +361,19 @@ function readValue(buffer, offset, length, group, element, metadata) {
     .toString("utf8")
     .replace(/\0/g, "")
     .trim()
+}
+
+function findUndefinedLengthSequenceEnd(buffer, offset) {
+  for (let position = offset; position + 8 <= buffer.length; position += 2) {
+    const group = buffer.readUInt16LE(position)
+    const element = buffer.readUInt16LE(position + 2)
+
+    if (group === 0xfffe && element === 0xe0dd) {
+      return position + 8
+    }
+  }
+
+  return -1
 }
 
 function splitDicomPatientName(value = "") {

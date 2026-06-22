@@ -138,7 +138,12 @@ function parseExplicitElements(
     elements.set(tagKey(group, element), { dataOffset: position, length, vr })
 
     if (group === 0x7fe0 && element === 0x0010) break
-    if (length === 0xffffffff) break
+    if (length === 0xffffffff) {
+      const sequenceEnd = findUndefinedLengthSequenceEnd(view, position)
+      if (sequenceEnd < 0) break
+      position = sequenceEnd
+      continue
+    }
     if (position + length > view.byteLength) break
 
     position += length + (length % 2)
@@ -165,7 +170,12 @@ function parseImplicitElements(
     elements.set(tagKey(group, element), { dataOffset: position, length, vr: "UN" })
 
     if (group === 0x7fe0 && element === 0x0010) break
-    if (length === 0xffffffff) break
+    if (length === 0xffffffff) {
+      const sequenceEnd = findUndefinedLengthSequenceEnd(view, position)
+      if (sequenceEnd < 0) break
+      position = sequenceEnd
+      continue
+    }
     if (position + length > view.byteLength) break
 
     position += length + (length % 2)
@@ -190,6 +200,19 @@ function tagKey(group: number, element: number) {
 function readUint16(buffer: ArrayBuffer, element?: ParsedElement) {
   if (!element || element.length < 2) return undefined
   return new DataView(buffer).getUint16(element.dataOffset, true)
+}
+
+function findUndefinedLengthSequenceEnd(view: DataView, offset: number) {
+  for (let position = offset; position + 8 <= view.byteLength; position += 2) {
+    const group = view.getUint16(position, true)
+    const element = view.getUint16(position + 2, true)
+
+    if (group === 0xfffe && element === 0xe0dd) {
+      return position + 8
+    }
+  }
+
+  return -1
 }
 
 function readText(buffer: ArrayBuffer, element?: ParsedElement) {
