@@ -1,7 +1,35 @@
 import { isSupabaseConfigured } from "@/lib/config"
 import { demoPatients, demoStudies } from "@/lib/demo-data"
 import { createClient } from "@/lib/supabase/server"
-import type { Patient, PatientStudy, WorklistStudy } from "@/lib/types"
+import type {
+  Patient,
+  PatientExternalData,
+  PatientStudy,
+  WorklistStudy,
+} from "@/lib/types"
+
+type PatientBaseRow = {
+  id: string
+  patient_number: string
+  first_name: string
+  last_name: string
+  birth_date: string | null
+  sex: string
+  phone: string | null
+  email: string | null
+}
+
+type PatientExtensionRow = {
+  source_system: string | null
+  external_patient_id: string | null
+  national_id: string | null
+  passport_number: string | null
+  mother_name: string | null
+  father_name: string | null
+  birth_place: string | null
+  mobile_phone_e164: string | null
+  external_data: PatientExternalData | null
+}
 
 export async function getPatients(organizationId: string): Promise<Patient[]> {
   if (!isSupabaseConfigured) return demoPatients
@@ -29,18 +57,7 @@ export async function getPatients(organizationId: string): Promise<Patient[]> {
     const patientStudies = (studies ?? []).filter(
       (study) => study.patient_id === patient.id
     )
-    return {
-      id: patient.id,
-      patientNumber: patient.patient_number,
-      firstName: patient.first_name,
-      lastName: patient.last_name,
-      birthDate: patient.birth_date ?? "",
-      sex: mapSex(patient.sex),
-      phone: patient.phone,
-      email: patient.email,
-      studyCount: patientStudies.length,
-      lastStudyAt: patientStudies[0]?.study_at ?? null,
-    }
+    return mapPatientBase(patient, patientStudies.length, patientStudies[0]?.study_at)
   })
 }
 
@@ -49,7 +66,22 @@ export async function getPatient(
   patientId: string
 ): Promise<Patient | null> {
   const patients = await getPatients(organizationId)
-  return patients.find((patient) => patient.id === patientId) ?? null
+  const patient = patients.find((item) => item.id === patientId) ?? null
+  if (!patient || !isSupabaseConfigured) return patient
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("patients")
+    .select(
+      "source_system, external_patient_id, national_id, passport_number, mother_name, father_name, birth_place, mobile_phone_e164, external_data"
+    )
+    .eq("organization_id", organizationId)
+    .eq("id", patientId)
+    .maybeSingle()
+
+  if (error || !data) return patient
+
+  return applyPatientExtension(patient, data as PatientExtensionRow)
 }
 
 export async function getWorklist(
@@ -206,6 +238,57 @@ function mapSex(value: string): Patient["sex"] {
   if (value === "F") return "K"
   if (value === "M") return "E"
   return "D"
+}
+
+function mapPatientBase(
+  patient: PatientBaseRow,
+  studyCount: number,
+  lastStudyAt: string | null | undefined
+): Patient {
+  return {
+    id: patient.id,
+    patientNumber: patient.patient_number,
+    firstName: patient.first_name,
+    lastName: patient.last_name,
+    birthDate: patient.birth_date ?? "",
+    sex: mapSex(patient.sex),
+    phone: patient.phone,
+    email: patient.email,
+    sourceSystem: null,
+    externalPatientId: null,
+    nationalId: null,
+    passportNumber: null,
+    motherName: null,
+    fatherName: null,
+    birthPlace: null,
+    mobilePhoneE164: null,
+    externalData: null,
+    studyCount,
+    lastStudyAt: lastStudyAt ?? null,
+  }
+}
+
+function applyPatientExtension(
+  patient: Patient,
+  extension: PatientExtensionRow
+): Patient {
+  return {
+    ...patient,
+    sourceSystem: extension.source_system,
+    externalPatientId: extension.external_patient_id,
+    nationalId: extension.national_id,
+    passportNumber: extension.passport_number,
+    motherName: extension.mother_name,
+    fatherName: extension.father_name,
+    birthPlace: extension.birth_place,
+    mobilePhoneE164: extension.mobile_phone_e164,
+    externalData: normalizeExternalData(extension.external_data),
+  }
+}
+
+function normalizeExternalData(value: unknown): PatientExternalData | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null
+  return value as PatientExternalData
 }
 
 function mapPriority(value: string): WorklistStudy["priority"] {

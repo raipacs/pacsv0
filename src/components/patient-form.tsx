@@ -46,6 +46,38 @@ export function PatientForm() {
             E-posta
             <input name="email" type="email" autoComplete="email" />
           </label>
+          <label>
+            TC kimlik no
+            <input name="nationalId" inputMode="numeric" maxLength={20} />
+          </label>
+          <label>
+            Pasaport no
+            <input name="passportNumber" maxLength={40} />
+          </label>
+          <label>
+            Anne adı
+            <input name="motherName" autoComplete="off" />
+          </label>
+          <label>
+            Baba adı
+            <input name="fatherName" autoComplete="off" />
+          </label>
+          <label>
+            Doğum yeri
+            <input name="birthPlace" autoComplete="address-level2" />
+          </label>
+          <label>
+            Mobil E.164
+            <input name="mobilePhoneE164" inputMode="tel" />
+          </label>
+          <label>
+            Kaynak sistem
+            <input name="sourceSystem" placeholder="HIS, DICOM, manuel" />
+          </label>
+          <label>
+            Kaynak hasta ID
+            <input name="externalPatientId" />
+          </label>
         </div>
       </fieldset>
       {state.error ? <p className="form-status error">{state.error}</p> : null}

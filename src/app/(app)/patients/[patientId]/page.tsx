@@ -5,6 +5,7 @@ import { DicomInstanceActions } from "@/components/dicom-instance-actions"
 import { MaskedPatientId, MaskedPatientName } from "@/components/privacy-mode"
 import { requireUser } from "@/lib/auth"
 import { getPatient, getPatientStudies } from "@/lib/data"
+import { buildPatientRecordRows } from "@/lib/patient-record-fields"
 
 export const metadata = { title: "Hasta detayı" }
 
@@ -20,6 +21,7 @@ export default async function PatientDetailPage({
 
   const studies = await getPatientStudies(user.organizationId, patient.id)
   const isAdmin = user.role === "admin"
+  const patientRecordRows = buildPatientRecordRows(patient.externalData)
   const storageInstanceCount = studies.reduce(
     (total, study) => total + study.instances.length,
     0
@@ -57,12 +59,42 @@ export default async function PatientDetailPage({
               <dd>{patient.sex}</dd>
             </div>
             <div>
+              <dt>TC kimlik no</dt>
+              <dd>
+                {patient.nationalId ? (
+                  <MaskedPatientId value={patient.nationalId} />
+                ) : (
+                  "-"
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>Doğum yeri</dt>
+              <dd>{patient.birthPlace ?? "-"}</dd>
+            </div>
+            <div>
+              <dt>Anne adı</dt>
+              <dd>{patient.motherName ?? "-"}</dd>
+            </div>
+            <div>
+              <dt>Baba adı</dt>
+              <dd>{patient.fatherName ?? "-"}</dd>
+            </div>
+            <div>
               <dt>Telefon</dt>
               <dd>{patient.phone ?? "-"}</dd>
             </div>
             <div>
+              <dt>Mobil E.164</dt>
+              <dd>{patient.mobilePhoneE164 ?? "-"}</dd>
+            </div>
+            <div>
               <dt>E-posta</dt>
               <dd>{patient.email ?? "-"}</dd>
+            </div>
+            <div>
+              <dt>Kaynak hasta ID</dt>
+              <dd>{patient.externalPatientId ?? "-"}</dd>
             </div>
           </dl>
         </article>
@@ -72,6 +104,42 @@ export default async function PatientDetailPage({
           <p className="muted">Toplam kayıtlı tetkik</p>
         </article>
       </section>
+      {patientRecordRows.length ? (
+        <details className="data-panel patient-record-panel collapsible-panel">
+          <summary className="panel-heading">
+            <div>
+              <h2>HIS kaynak alanları</h2>
+              <small>
+                {patient.sourceSystem ?? "Kaynak sistem"} hasta kayıt alanları
+              </small>
+            </div>
+            <span className="panel-toggle">{patientRecordRows.length} alan</span>
+          </summary>
+          <div className="responsive-table patient-record-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Kaynak</th>
+                  <th>Alan</th>
+                  <th>Değer</th>
+                </tr>
+              </thead>
+              <tbody>
+                {patientRecordRows.map((row) => (
+                  <tr className={row.isBlank ? "is-blank" : undefined} key={row.key}>
+                    <td>{row.source}</td>
+                    <td>
+                      <strong>{row.label}</strong>
+                      <span>{row.key}</span>
+                    </td>
+                    <td className="patient-record-value">{row.value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      ) : null}
       <section className="data-panel">
         <div className="panel-heading">
           <h2>Tetkikler</h2>

@@ -1411,6 +1411,28 @@ body:has(.rai-viewer-page) .app-header {
   overflow-x: auto;
 }
 
+.patient-record-panel {
+  margin-bottom: 16px;
+}
+
+.patient-record-table table {
+  min-width: 760px;
+}
+
+.patient-record-table td {
+  vertical-align: top;
+}
+
+.patient-record-table tr.is-blank {
+  color: #98a2b3;
+}
+
+.patient-record-value {
+  max-width: 520px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 table {
   width: 100%;
   min-width: 820px;

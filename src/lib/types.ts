@@ -1,5 +1,9 @@
 export type AppRole = "admin" | "doctor"
 
+export type PatientExternalValue = string | number | boolean | null | undefined
+
+export type PatientExternalData = Record<string, PatientExternalValue>
+
 export type Patient = {
   id: string
   patientNumber: string
@@ -9,6 +13,15 @@ export type Patient = {
   sex: "K" | "E" | "D"
   phone: string | null
   email: string | null
+  sourceSystem?: string | null
+  externalPatientId?: string | null
+  nationalId?: string | null
+  passportNumber?: string | null
+  motherName?: string | null
+  fatherName?: string | null
+  birthPlace?: string | null
+  mobilePhoneE164?: string | null
+  externalData?: PatientExternalData | null
   studyCount: number
   lastStudyAt: string | null
 }
