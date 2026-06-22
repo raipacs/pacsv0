@@ -19,6 +19,15 @@ type ViewerInstance = {
   sopInstanceUid: string
 }
 
+type ViewerStudyContext = {
+  accessionNumber: string
+  description: string
+  modality: string
+  patientName: string
+  patientNumber: string
+  studyAt: string | null
+}
+
 type ViewerTool = "scroll" | "pan" | "window" | "zoom"
 
 type ViewerSeries = {
@@ -36,7 +45,13 @@ const DICOM_FETCH_TIMEOUT_MS = 25_000
 const PREVIEW_CACHE_LIMIT = 10
 const PREFETCH_RADIUS = 2
 
-export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
+export function RaiDicomViewer({
+  instances,
+  study,
+}: {
+  instances: ViewerInstance[]
+  study: ViewerStudyContext
+}) {
   const allOrderedInstances = useMemo(
     () =>
       [...instances].sort((left, right) => {
@@ -141,6 +156,7 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
   const hasMultipleInstances = orderedInstances.length > 1
   const canGoPrevious = hasMultipleInstances && activeIndex > 0
   const canGoNext = hasMultipleInstances && activeIndex < orderedInstances.length - 1
+  const studyDateTime = formatViewerDateTime(study.studyAt)
 
   const refreshCacheStats = useCallback(() => {
     setCacheStats({
@@ -704,20 +720,81 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
           </button>
         </div>
 
-        <div className="rai-dicom-overlay">
-          <span>{preview?.metadata.modality || "DICOM"}</span>
-          <span>{activeSeries?.description ?? "Seri"}</span>
-          <span>
-            I: {activeIndex + 1}/{orderedInstances.length}
-          </span>
-          <span>
-            W/L: {windowWidth}/{windowCenter}
-          </span>
-          <span>Zoom: {Math.round(zoom * 100)}%</span>
-          <span>
-            Cache: {cacheStats.ready}
-            {cacheStats.loading ? ` +${cacheStats.loading}` : ""}
-          </span>
+        <div className="dicom-corner-overlays" aria-hidden="true">
+          <dl className="dicom-corner corner-top-left">
+            <div>
+              <dt>Tetkik</dt>
+              <dd>{study.description || preview?.metadata.studyDescription || "-"}</dd>
+            </div>
+            <div>
+              <dt>Seri</dt>
+              <dd>{activeSeries?.description ?? preview?.metadata.seriesDescription ?? "-"}</dd>
+            </div>
+            <div>
+              <dt>Görüntü</dt>
+              <dd>
+                {activeInstance?.instanceNumber ?? activeIndex + 1} / {orderedInstances.length}
+              </dd>
+            </div>
+            <div>
+              <dt>Boyut</dt>
+              <dd>{preview ? `${preview.metadata.columns} x ${preview.metadata.rows}` : "-"}</dd>
+            </div>
+          </dl>
+
+          <dl className="dicom-corner corner-top-right">
+            <div>
+              <dt>Hasta</dt>
+              <dd>{study.patientName || preview?.metadata.patientName || "-"}</dd>
+            </div>
+            <div>
+              <dt>ID</dt>
+              <dd>{study.patientNumber || preview?.metadata.patientId || "-"}</dd>
+            </div>
+            <div>
+              <dt>Accession</dt>
+              <dd>{study.accessionNumber || "-"}</dd>
+            </div>
+            <div>
+              <dt>Tarih</dt>
+              <dd>{studyDateTime}</dd>
+            </div>
+          </dl>
+
+          <dl className="dicom-corner corner-bottom-left">
+            <div>
+              <dt>Araç</dt>
+              <dd>{tool.toUpperCase()}</dd>
+            </div>
+            <div>
+              <dt>W/L</dt>
+              <dd>
+                {windowWidth}/{windowCenter}
+              </dd>
+            </div>
+            <div>
+              <dt>Zoom</dt>
+              <dd>{Math.round(zoom * 100)}%</dd>
+            </div>
+          </dl>
+
+          <dl className="dicom-corner corner-bottom-right">
+            <div>
+              <dt>Modalite</dt>
+              <dd>{preview?.metadata.modality || study.modality || "-"}</dd>
+            </div>
+            <div>
+              <dt>Transfer syntax</dt>
+              <dd>{preview?.metadata.transferSyntaxUid || "-"}</dd>
+            </div>
+            <div>
+              <dt>Cache</dt>
+              <dd>
+                {cacheStats.ready} hazır
+                {cacheStats.loading ? `, ${cacheStats.loading} yükleniyor` : ""}
+              </dd>
+            </div>
+          </dl>
         </div>
 
         <div className="rai-dicom-ruler" aria-hidden="true">
@@ -1026,6 +1103,17 @@ function renderPreviewThumbnail(preview: DicomPreview) {
   })
 
   return canvas.toDataURL("image/jpeg", 0.72)
+}
+
+function formatViewerDateTime(value: string | null) {
+  if (!value) return "-"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "-"
+
+  return new Intl.DateTimeFormat("tr-TR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date)
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {

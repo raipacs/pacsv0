@@ -121,6 +121,14 @@ export default async function RaiViewerPage({
         </nav>
       </header>
       <RaiDicomViewer
+        study={{
+          accessionNumber: study.accession_number,
+          description: study.description ?? "DICOM görüntüleme",
+          modality: study.modality,
+          patientName: patient ? `${patient.first_name} ${patient.last_name}` : "",
+          patientNumber: patient?.patient_number ?? "",
+          studyAt: study.study_at,
+        }}
         instances={(instances ?? []).map((instance) => ({
           id: instance.id,
           seriesId: instance.series_id,

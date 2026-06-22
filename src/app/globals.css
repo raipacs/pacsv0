@@ -694,26 +694,6 @@ p {
   opacity: 0.45;
 }
 
-.rai-dicom-overlay {
-  position: absolute;
-  inset: auto 14px 14px 14px;
-  z-index: 2;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  pointer-events: none;
-}
-
-.rai-dicom-overlay span {
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 6px;
-  padding: 5px 8px;
-  color: #cbd5e1;
-  font-size: 12px;
-  font-weight: 800;
-  background: rgba(15, 23, 42, 0.74);
-}
-
 .rai-dicom-ruler {
   position: absolute;
   inset: 26% 14px auto auto;
@@ -757,6 +737,78 @@ p {
   bottom: -20px;
   font-size: 11px;
   font-weight: 800;
+}
+
+.dicom-corner-overlays {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.dicom-corner {
+  position: absolute;
+  display: grid;
+  gap: 3px;
+  max-width: min(34vw, 360px);
+  margin: 0;
+  color: #f8fafc;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.22;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+}
+
+.dicom-corner div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px;
+}
+
+.dicom-corner dt {
+  color: #94a3b8;
+  font-weight: 800;
+}
+
+.dicom-corner dd {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.corner-top-left {
+  inset: 82px auto auto 14px;
+}
+
+.corner-top-right {
+  inset: 82px 14px auto auto;
+  text-align: right;
+}
+
+.corner-top-right div,
+.corner-bottom-right div {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.corner-top-right dt,
+.corner-bottom-right dt {
+  order: 2;
+}
+
+.corner-top-right dd,
+.corner-bottom-right dd {
+  order: 1;
+}
+
+.corner-bottom-left {
+  inset: auto auto 96px 14px;
+}
+
+.corner-bottom-right {
+  inset: auto 14px 96px auto;
+  text-align: right;
 }
 
 .rai-dicom-canvas {
@@ -1745,6 +1797,16 @@ td span {
     display: none;
   }
 
+  .dicom-corner {
+    max-width: 42vw;
+    font-size: 11px;
+  }
+
+  .corner-top-left,
+  .corner-top-right {
+    top: 88px;
+  }
+
   .rai-dicom-scrubber {
     inset: auto 10px 10px 10px;
     grid-template-columns: 32px minmax(0, 1fr) 32px;
@@ -1765,5 +1827,9 @@ td span {
 
   .series-list {
     grid-template-columns: 1fr;
+  }
+
+  .dicom-corner {
+    display: none;
   }
 }
