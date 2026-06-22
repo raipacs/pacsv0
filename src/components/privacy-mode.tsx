@@ -3,8 +3,9 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
-  useSyncExternalStore,
+  useState,
   type ReactNode,
 } from "react"
 
@@ -17,14 +18,16 @@ type PrivacyModeContextValue = {
 
 const PrivacyModeContext = createContext<PrivacyModeContextValue | null>(null)
 const STORAGE_KEY = "rai-pacs-privacy-mode"
-const PRIVACY_MODE_EVENT = "rai-pacs-privacy-mode-change"
 
 export function PrivacyModeProvider({ children }: { children: ReactNode }) {
-  const enabled = useSyncExternalStore(
-    subscribeToPrivacyMode,
-    getPrivacyModeSnapshot,
-    getServerPrivacyModeSnapshot
-  )
+  const [enabled, setEnabled] = useState(() => getStoredPrivacyMode())
+
+  useEffect(() => {
+    const syncPrivacyMode = () => setEnabled(getStoredPrivacyMode())
+    window.addEventListener("storage", syncPrivacyMode)
+
+    return () => window.removeEventListener("storage", syncPrivacyMode)
+  }, [])
 
   const value = useMemo<PrivacyModeContextValue>(
     () => ({
@@ -32,8 +35,11 @@ export function PrivacyModeProvider({ children }: { children: ReactNode }) {
       maskId,
       maskName,
       toggle: () => {
-        window.localStorage.setItem(STORAGE_KEY, enabled ? "off" : "on")
-        window.dispatchEvent(new Event(PRIVACY_MODE_EVENT))
+        setEnabled((current) => {
+          const next = !current
+          window.localStorage.setItem(STORAGE_KEY, next ? "on" : "off")
+          return next
+        })
       },
     }),
     [enabled]
@@ -103,20 +109,7 @@ function maskToken(value: string, visibleEdge: number) {
   return `${first}${"*".repeat(maskedLength)}${last}`
 }
 
-function getPrivacyModeSnapshot() {
+function getStoredPrivacyMode() {
+  if (typeof window === "undefined") return false
   return window.localStorage.getItem(STORAGE_KEY) === "on"
-}
-
-function getServerPrivacyModeSnapshot() {
-  return false
-}
-
-function subscribeToPrivacyMode(callback: () => void) {
-  window.addEventListener("storage", callback)
-  window.addEventListener(PRIVACY_MODE_EVENT, callback)
-
-  return () => {
-    window.removeEventListener("storage", callback)
-    window.removeEventListener(PRIVACY_MODE_EVENT, callback)
-  }
 }
