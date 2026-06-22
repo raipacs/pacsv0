@@ -104,6 +104,8 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
   const [isCinePlaying, setIsCinePlaying] = useState(false)
   const [cineFps, setCineFps] = useState(12)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isSeriesPanelOpen, setIsSeriesPanelOpen] = useState(true)
+  const [isToolsPanelOpen, setIsToolsPanelOpen] = useState(true)
   const [cacheStats, setCacheStats] = useState({ ready: 0, loading: 0 })
   const [isPending, startTransition] = useTransition()
   const viewerRef = useRef<HTMLDivElement | null>(null)
@@ -566,48 +568,84 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
   }
 
   return (
-    <div ref={viewerRef} className="rai-dicom-viewer">
-      <aside className="rai-dicom-series" aria-label="Seri listesi">
-        <div className="series-panel-header">
-          <div>
-            <strong>Seriler</strong>
-            <span>{seriesGroups.length} seri</span>
-          </div>
-          <span>{allOrderedInstances.length} görüntü</span>
-        </div>
-        <div className="series-list">
-          {seriesGroups.map((series) => {
-            const thumbnail = seriesThumbnails[series.id]
-            const isActive = series.id === activeSeries?.id
-
-            return (
+    <div
+      ref={viewerRef}
+      className={`rai-dicom-viewer${isSeriesPanelOpen ? "" : " series-collapsed"}${
+        isToolsPanelOpen ? "" : " tools-collapsed"
+      }`}
+    >
+      {isSeriesPanelOpen ? (
+        <aside className="rai-dicom-series" aria-label="Seri listesi">
+          <div className="series-panel-header">
+            <div>
+              <strong>Seriler</strong>
+              <span>{seriesGroups.length} seri</span>
+            </div>
+            <div className="panel-header-actions">
+              <span>{allOrderedInstances.length} görüntü</span>
               <button
-                key={series.id}
-                className={`series-card${isActive ? " active" : ""}`}
                 type="button"
-                onClick={() => selectSeries(series.id)}
+                aria-label="Seriler panelini kapat"
+                onClick={() => setIsSeriesPanelOpen(false)}
               >
-                <span className="series-thumb" aria-hidden="true">
-                  {thumbnail ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img alt="" src={thumbnail} />
-                  ) : (
-                    <span>{series.modality}</span>
-                  )}
-                </span>
-                <span className="series-card-body">
-                  <span className="series-title">{series.description}</span>
-                  <span className="series-meta">
-                    {series.number === null ? "Seri" : `${series.number}. seri`} ·{" "}
-                    {series.modality} · {series.instances.length} görüntü
-                  </span>
-                </span>
+                Kapat
               </button>
-            )
-          })}
-        </div>
-      </aside>
+            </div>
+          </div>
+          <div className="series-list">
+            {seriesGroups.map((series) => {
+              const thumbnail = seriesThumbnails[series.id]
+              const isActive = series.id === activeSeries?.id
+
+              return (
+                <button
+                  key={series.id}
+                  className={`series-card${isActive ? " active" : ""}`}
+                  type="button"
+                  onClick={() => selectSeries(series.id)}
+                >
+                  <span className="series-thumb" aria-hidden="true">
+                    {thumbnail ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img alt="" src={thumbnail} />
+                    ) : (
+                      <span>{series.modality}</span>
+                    )}
+                  </span>
+                  <span className="series-card-body">
+                    <span className="series-title">{series.description}</span>
+                    <span className="series-meta">
+                      {series.number === null ? "Seri" : `${series.number}. seri`} ·{" "}
+                      {series.modality} · {series.instances.length} görüntü
+                    </span>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </aside>
+      ) : null}
       <div className="rai-dicom-stage" onWheel={handleWheel}>
+        <div className="viewer-panel-toggles" aria-label="Viewer panel kontrolleri">
+          {!isSeriesPanelOpen ? (
+            <button
+              type="button"
+              aria-expanded={isSeriesPanelOpen}
+              onClick={() => setIsSeriesPanelOpen(true)}
+            >
+              Seriler
+            </button>
+          ) : null}
+          {!isToolsPanelOpen ? (
+            <button
+              type="button"
+              aria-expanded={isToolsPanelOpen}
+              onClick={() => setIsToolsPanelOpen(true)}
+            >
+              Araçlar
+            </button>
+          ) : null}
+        </div>
         <div className="rai-dicom-toolbar" aria-label="Viewer araçları">
           <div className="segmented viewer-mode">
             <button
@@ -784,7 +822,21 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
         </div>
       </div>
 
+      {isToolsPanelOpen ? (
       <aside className="rai-dicom-side">
+        <div className="side-panel-header">
+          <div>
+            <strong>Araçlar</strong>
+            <span>Viewer kontrolleri</span>
+          </div>
+          <button
+            type="button"
+            aria-label="Araçlar panelini kapat"
+            onClick={() => setIsToolsPanelOpen(false)}
+          >
+            Kapat
+          </button>
+        </div>
         <div className="viewer-counter frame-navigator" aria-label="Görüntü sırası">
           <button
             type="button"
@@ -950,6 +1002,7 @@ export function RaiDicomViewer({ instances }: { instances: ViewerInstance[] }) {
         </dl>
         {isPending ? <p className="muted">Yükleniyor...</p> : null}
       </aside>
+      ) : null}
     </div>
   )
 }

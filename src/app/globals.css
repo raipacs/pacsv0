@@ -502,6 +502,18 @@ p {
   background: #020617;
 }
 
+.rai-dicom-viewer.series-collapsed {
+  grid-template-columns: minmax(0, 1fr) 300px;
+}
+
+.rai-dicom-viewer.tools-collapsed {
+  grid-template-columns: 280px minmax(0, 1fr);
+}
+
+.rai-dicom-viewer.series-collapsed.tools-collapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .rai-dicom-series {
   display: grid;
   align-content: start;
@@ -521,6 +533,47 @@ p {
   color: #94a3b8;
   font-size: 12px;
   font-weight: 800;
+}
+
+.panel-header-actions,
+.side-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.panel-header-actions {
+  align-items: flex-end;
+  flex-direction: column;
+}
+
+.panel-header-actions button,
+.side-panel-header button,
+.viewer-panel-toggles button {
+  border: 1px solid #334155;
+  border-radius: 7px;
+  padding: 7px 9px;
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 900;
+  background: #111827;
+  cursor: pointer;
+}
+
+.panel-header-actions button:hover,
+.side-panel-header button:hover,
+.viewer-panel-toggles button:hover {
+  border-color: #14b8a6;
+  color: #ccfbf1;
+}
+
+.viewer-panel-toggles {
+  position: absolute;
+  inset: 14px 14px auto auto;
+  z-index: 4;
+  display: flex;
+  gap: 8px;
 }
 
 .series-panel-header div {
@@ -795,6 +848,22 @@ p {
   padding: 16px;
   color: #e2e8f0;
   background: #0f172a;
+}
+
+.side-panel-header {
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.side-panel-header div {
+  display: grid;
+  gap: 3px;
+}
+
+.side-panel-header strong {
+  color: #e2e8f0;
+  font-size: 15px;
 }
 
 .rai-dicom-side label {
@@ -1549,6 +1618,12 @@ td span {
     grid-template-columns: 1fr;
   }
 
+  .rai-dicom-viewer.series-collapsed,
+  .rai-dicom-viewer.tools-collapsed,
+  .rai-dicom-viewer.series-collapsed.tools-collapsed {
+    grid-template-columns: 1fr;
+  }
+
   .rai-dicom-series {
     max-height: 240px;
     border-right: 0;
@@ -1658,7 +1733,12 @@ td span {
   }
 
   .rai-dicom-toolbar {
-    inset: 10px;
+    inset: 10px 10px auto 10px;
+    padding-right: 132px;
+  }
+
+  .viewer-panel-toggles {
+    inset: 10px 10px auto auto;
   }
 
   .rai-dicom-ruler {
