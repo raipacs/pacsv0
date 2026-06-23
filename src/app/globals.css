@@ -323,62 +323,25 @@ p {
 }
 
 .privacy-toggle {
-  position: relative;
   display: inline-flex;
-  height: 42px;
+  min-height: 34px;
   flex: 0 0 auto;
   align-items: center;
-  gap: 8px;
-  border: 1px solid rgba(15, 118, 110, 0.16);
-  border-radius: 999px;
-  padding: 0 8px 0 12px;
-  color: #123b33;
-  background: #f3f7f5;
+  gap: 7px;
+  border: 0;
+  padding: 0;
+  color: #475467;
+  background: transparent;
   cursor: pointer;
-  transition:
-    border-color 160ms ease,
-    background 160ms ease,
-    color 160ms ease,
-    transform 160ms ease;
+  transition: color 160ms ease;
 }
 
 .privacy-toggle:hover {
-  border-color: rgba(15, 118, 110, 0.38);
-  transform: translateY(-1px);
+  color: var(--text);
 }
 
 .privacy-toggle.active {
-  color: white;
-  background: var(--primary);
-}
-
-.privacy-eye {
-  position: relative;
-  width: 18px;
-  height: 13px;
-  flex: 0 0 auto;
-}
-
-.privacy-eye::before {
-  position: absolute;
-  inset: 1px 0 0;
-  border-bottom: 3px solid currentColor;
-  border-radius: 0 0 18px 18px;
-  content: "";
-}
-
-.privacy-eye::after {
-  position: absolute;
-  top: 7px;
-  left: 2px;
-  width: 3px;
-  height: 7px;
-  border-radius: 999px;
-  background: currentColor;
-  box-shadow:
-    7px 2px 0 currentColor,
-    14px 0 0 currentColor;
-  content: "";
+  color: var(--primary-dark);
 }
 
 .privacy-toggle-label {
@@ -410,7 +373,7 @@ p {
 }
 
 .privacy-toggle.active .privacy-switch {
-  background: rgba(255, 255, 255, 0.38);
+  background: var(--primary);
 }
 
 .privacy-toggle.active .privacy-switch span {
@@ -639,19 +602,19 @@ body:has(.rai-viewer-page) .app-header {
 }
 
 .rai-viewer-bar .privacy-toggle {
-  height: 34px;
-  border-color: #24446f;
-  color: #dbeafe;
-  background: #0b2148;
+  color: #93c5fd;
 }
 
 .rai-viewer-bar .privacy-toggle.active {
-  color: #061a3f;
-  background: #67e8f9;
+  color: #67e8f9;
 }
 
 .rai-viewer-bar .privacy-toggle-label {
   font-size: 12px;
+}
+
+.rai-viewer-bar .privacy-toggle.active .privacy-switch {
+  background: #0891b2;
 }
 
 .viewer-error-panel {

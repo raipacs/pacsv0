@@ -49,7 +49,6 @@ export function PrivacyToggle() {
       title={enabled ? "Hasta bilgilerini göster" : "Hasta bilgilerini gizle"}
       onClick={toggle}
     >
-      <span className="privacy-eye" aria-hidden="true" />
       <span className="privacy-toggle-label">Privacy</span>
       <span className="privacy-switch" aria-hidden="true">
         <span />
