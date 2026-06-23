@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 import { z } from "zod"
 
 import { isSupabaseConfigured } from "@/lib/config"
+import { verifyLoginCaptcha } from "@/lib/login-captcha"
 import { createClient } from "@/lib/supabase/server"
 
 export type LoginState = {
@@ -20,6 +21,10 @@ export async function signIn(
   formData: FormData
 ): Promise<LoginState> {
   if (!isSupabaseConfigured) redirect("/worklist")
+
+  if (!verifyLoginCaptcha(formData)) {
+    return { error: "Güvenlik kontrolü tamamlanamadı. Sayfayı yenileyip tekrar deneyin." }
+  }
 
   const parsed = loginSchema.safeParse({
     email: formData.get("email"),

@@ -3,12 +3,14 @@ import { redirect } from "next/navigation"
 import { LoginForm } from "@/app/login/login-form"
 import { getCurrentUser } from "@/lib/auth"
 import { isSupabaseConfigured } from "@/lib/config"
+import { createLoginCaptchaChallenge } from "@/lib/login-captcha"
 
 export const metadata = { title: "Giriş" }
 
 export default async function LoginPage() {
   const user = await getCurrentUser()
   if (user && !user.demo) redirect("/worklist")
+  const captcha = createLoginCaptchaChallenge()
 
   return (
     <main className="login-page">
@@ -31,7 +33,7 @@ export default async function LoginPage() {
               : "Supabase bağlanana kadar demo modu aktiftir."}
           </p>
         </div>
-        <LoginForm demoMode={!isSupabaseConfigured} />
+        <LoginForm captcha={captcha} demoMode={!isSupabaseConfigured} />
         <p className="security-note">
           Hasta verileri ve DICOM nesneleri kurum bazlı erişim kurallarıyla
           korunur.
