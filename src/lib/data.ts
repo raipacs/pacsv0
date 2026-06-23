@@ -31,24 +31,36 @@ type PatientExtensionRow = {
   external_data: PatientExternalData | null
 }
 
-export async function getPatients(organizationId: string): Promise<Patient[]> {
+export async function getPatients(
+  organizationId: string,
+  branchId?: string | null
+): Promise<Patient[]> {
   if (!isSupabaseConfigured) return demoPatients
 
   const supabase = await createClient()
+  const patientQuery = supabase
+    .from("patients")
+    .select(
+      "id, patient_number, first_name, last_name, birth_date, sex, phone, email"
+    )
+    .eq("organization_id", organizationId)
+    .is("archived_at", null)
+    .order("last_name")
+
+  const studyQuery = supabase
+    .from("studies")
+    .select("patient_id, study_at")
+    .eq("organization_id", organizationId)
+    .order("study_at", { ascending: false })
+
+  if (branchId) {
+    patientQuery.eq("branch_id", branchId)
+    studyQuery.eq("branch_id", branchId)
+  }
+
   const [{ data: patients, error }, { data: studies }] = await Promise.all([
-    supabase
-      .from("patients")
-      .select(
-        "id, patient_number, first_name, last_name, birth_date, sex, phone, email"
-      )
-      .eq("organization_id", organizationId)
-      .is("archived_at", null)
-      .order("last_name"),
-    supabase
-      .from("studies")
-      .select("patient_id, study_at")
-      .eq("organization_id", organizationId)
-      .order("study_at", { ascending: false }),
+    patientQuery,
+    studyQuery,
   ])
 
   if (error) throw new Error(`Hasta listesi alınamadı: ${error.message}`)
@@ -85,18 +97,23 @@ export async function getPatient(
 }
 
 export async function getWorklist(
-  organizationId: string
+  organizationId: string,
+  branchId?: string | null
 ): Promise<WorklistStudy[]> {
   if (!isSupabaseConfigured) return demoStudies
 
   const supabase = await createClient()
-  const { data, error } = await supabase
+  const query = supabase
     .from("studies")
     .select(
       "id, accession_number, modality, body_part, description, study_at, priority, status, patients(patient_number, first_name, last_name)"
     )
     .eq("organization_id", organizationId)
     .order("study_at", { ascending: false })
+
+  if (branchId) query.eq("branch_id", branchId)
+
+  const { data, error } = await query
 
   if (error) throw new Error(`Worklist alınamadı: ${error.message}`)
 

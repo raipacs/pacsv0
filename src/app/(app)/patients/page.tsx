@@ -1,15 +1,26 @@
 import Link from "next/link"
 
 import { DeletePatientButton } from "@/components/admin-delete-button"
+import { BranchFilter } from "@/components/branch-filter"
 import { MaskedPatientId, MaskedPatientName } from "@/components/privacy-mode"
 import { canManagePatients, requireUser } from "@/lib/auth"
+import { resolveSelectedBranch } from "@/lib/branches"
 import { getPatients } from "@/lib/data"
 
 export const metadata = { title: "Hastalar" }
 
-export default async function PatientsPage() {
+type PatientsPageProps = {
+  searchParams?: Promise<{ branch?: string }>
+}
+
+export default async function PatientsPage({ searchParams }: PatientsPageProps) {
   const user = await requireUser()
-  const patients = await getPatients(user.organizationId)
+  const params = (await searchParams) ?? {}
+  const { branches, selectedBranch } = await resolveSelectedBranch(
+    user.organizationId,
+    params.branch
+  )
+  const patients = await getPatients(user.organizationId, selectedBranch?.id)
   const canCreatePatient = await canManagePatients(user, "insert")
   const canDeletePatients = user.role === "admin"
 
@@ -27,6 +38,11 @@ export default async function PatientsPage() {
           </Link>
         ) : null}
       </header>
+      <BranchFilter
+        basePath="/patients"
+        branches={branches}
+        selectedBranch={selectedBranch}
+      />
       <section className="data-panel">
         <div className="responsive-table">
           <table>

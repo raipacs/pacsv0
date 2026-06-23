@@ -14,6 +14,14 @@ export type BranchSummary = {
   lastStudyAt: string | null
 }
 
+export type BranchOption = {
+  id: string
+  name: string
+  slug: string
+  code: string | null
+  isMain: boolean
+}
+
 type BranchRow = {
   id: string
   name: string
@@ -110,4 +118,53 @@ export async function getBranchSummaries(
       lastStudyAt,
     }
   })
+}
+
+export async function getBranchOptions(organizationId: string): Promise<BranchOption[]> {
+  if (!isSupabaseConfigured) {
+    return [
+      {
+        id: "demo-branch",
+        name: "Merkez",
+        slug: "merkez",
+        code: "MERKEZ",
+        isMain: true,
+      },
+    ]
+  }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("branches")
+    .select("id, name, slug, code, is_main")
+    .eq("organization_id", organizationId)
+    .eq("is_active", true)
+    .order("is_main", { ascending: false })
+    .order("name")
+
+  if (error || !data?.length) return []
+
+  return ((data ?? []) as BranchRow[]).map((branch) => ({
+    id: branch.id,
+    name: branch.name,
+    slug: branch.slug,
+    code: branch.code,
+    isMain: branch.is_main,
+  }))
+}
+
+export async function resolveSelectedBranch(
+  organizationId: string,
+  requestedSlug?: string
+) {
+  const branches = await getBranchOptions(organizationId)
+  const normalizedSlug = requestedSlug?.trim().toLowerCase()
+  const selectedBranch =
+    branches.find((branch) => branch.slug === normalizedSlug) ??
+    branches.find((branch) => branch.isMain) ??
+    branches.find((branch) => branch.slug === "merkez") ??
+    branches[0] ??
+    null
+
+  return { branches, selectedBranch }
 }

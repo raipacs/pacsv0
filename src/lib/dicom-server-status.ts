@@ -157,7 +157,8 @@ const DEFAULT_GCP_STATIC_IP = "34.7.217.58"
 const DEFAULT_GCP_FIREWALL_SCOPE = "0.0.0.0/0"
 
 export async function getDicomServerDashboard(
-  organizationId: string
+  organizationId: string,
+  branchId?: string | null
 ): Promise<DicomServerDashboard> {
   const endpoint = {
     host: process.env.RAI_PACS_DICOM_HOST || DEFAULT_DICOM_HOST,
@@ -184,9 +185,9 @@ export async function getDicomServerDashboard(
     checkDatabase(organizationId),
     checkStorage(),
     getCloudInfrastructure(endpoint),
-    getModalityConnections(organizationId),
-    getImportJobs(organizationId),
-    getRecentStudies(organizationId),
+    getModalityConnections(organizationId, branchId),
+    getImportJobs(organizationId, branchId),
+    getRecentStudies(organizationId, branchId),
   ])
 
   return {
@@ -474,7 +475,7 @@ async function resolveDnsToIp(hostname: string) {
   }
 }
 
-async function getModalityConnections(organizationId: string) {
+async function getModalityConnections(organizationId: string, branchId?: string | null) {
   if (!isSupabaseConfigured) {
     return {
       lastImportAt: null,
@@ -494,13 +495,17 @@ async function getModalityConnections(organizationId: string) {
   }
 
   const supabase = await createClient()
-  const { data: registryRows, error: registryError } = await supabase
+  const registryQuery = supabase
     .from("dicom_modalities")
     .select(
       "id, ae_title, modality, description, last_seen_at, last_store_at, last_accession_number, received_study_count, received_instance_count"
     )
     .eq("organization_id", organizationId)
     .order("last_seen_at", { ascending: false, nullsFirst: false })
+
+  if (branchId) registryQuery.eq("branch_id", branchId)
+
+  const { data: registryRows, error: registryError } = await registryQuery
 
   if (!registryError && registryRows?.length) {
     const modalities = ((registryRows ?? []) as ModalityRegistryRow[]).map((row) => ({
@@ -521,12 +526,16 @@ async function getModalityConnections(organizationId: string) {
     }
   }
 
-  const { data: studies, error } = await supabase
+  const studiesQuery = supabase
     .from("studies")
     .select("id, modality, source_ae_title, description, received_at")
     .eq("organization_id", organizationId)
     .order("received_at", { ascending: false })
     .limit(200)
+
+  if (branchId) studiesQuery.eq("branch_id", branchId)
+
+  const { data: studies, error } = await studiesQuery
 
   if (error) throw new Error(`Modalite listesi alınamadı: ${error.message}`)
 
@@ -585,7 +594,10 @@ async function getModalityConnections(organizationId: string) {
   }
 }
 
-async function getImportJobs(organizationId: string): Promise<ImportJobSummary[]> {
+async function getImportJobs(
+  organizationId: string,
+  branchId?: string | null
+): Promise<ImportJobSummary[]> {
   if (!isSupabaseConfigured) {
     return [
       {
@@ -609,7 +621,7 @@ async function getImportJobs(organizationId: string): Promise<ImportJobSummary[]
   }
 
   const supabase = await createClient()
-  const { data, error } = await supabase
+  const query = supabase
     .from("dicom_import_jobs")
     .select(
       "id, job_key, status, source, source_ae_title, modality, patient_dicom_id, accession_number, expected_instances, imported_instances, failed_instances, started_at, completed_at, last_seen_at, error_message"
@@ -617,6 +629,10 @@ async function getImportJobs(organizationId: string): Promise<ImportJobSummary[]
     .eq("organization_id", organizationId)
     .order("last_seen_at", { ascending: false })
     .limit(12)
+
+  if (branchId) query.eq("branch_id", branchId)
+
+  const { data, error } = await query
 
   if (error) return []
 
@@ -639,7 +655,10 @@ async function getImportJobs(organizationId: string): Promise<ImportJobSummary[]
   }))
 }
 
-async function getRecentStudies(organizationId: string): Promise<RecentDicomStudy[]> {
+async function getRecentStudies(
+  organizationId: string,
+  branchId?: string | null
+): Promise<RecentDicomStudy[]> {
   if (!isSupabaseConfigured) {
     return [
       {
@@ -658,7 +677,7 @@ async function getRecentStudies(organizationId: string): Promise<RecentDicomStud
   }
 
   const supabase = await createClient()
-  const { data, error } = await supabase
+  const query = supabase
     .from("studies")
     .select(
       "id, accession_number, modality, source_ae_title, description, received_at, study_at, status, patients(patient_number, first_name, last_name)"
@@ -666,6 +685,10 @@ async function getRecentStudies(organizationId: string): Promise<RecentDicomStud
     .eq("organization_id", organizationId)
     .order("received_at", { ascending: false })
     .limit(12)
+
+  if (branchId) query.eq("branch_id", branchId)
+
+  const { data, error } = await query
 
   if (error) return []
 

@@ -1,6 +1,8 @@
 import Link from "next/link"
 
+import { BranchFilter } from "@/components/branch-filter"
 import { requireAdmin } from "@/lib/auth"
+import { resolveSelectedBranch } from "@/lib/branches"
 import {
   formatDateTime,
   getDicomServerDashboard,
@@ -16,9 +18,23 @@ import {
 export const dynamic = "force-dynamic"
 export const metadata = { title: "DICOM Server" }
 
-export default async function DicomServerAdminPage() {
+type DicomServerAdminPageProps = {
+  searchParams?: Promise<{ branch?: string }>
+}
+
+export default async function DicomServerAdminPage({
+  searchParams,
+}: DicomServerAdminPageProps) {
   const user = await requireAdmin()
-  const dashboard = await getDicomServerDashboard(user.organizationId)
+  const params = (await searchParams) ?? {}
+  const { branches, selectedBranch } = await resolveSelectedBranch(
+    user.organizationId,
+    params.branch
+  )
+  const dashboard = await getDicomServerDashboard(
+    user.organizationId,
+    selectedBranch?.id
+  )
   const healthyServices = [...dashboard.services, ...dashboard.apis].filter(
     (item) => item.state === "ok"
   ).length
@@ -51,6 +67,12 @@ export default async function DicomServerAdminPage() {
           </Link>
         </div>
       </header>
+
+      <BranchFilter
+        basePath="/admin/dicom-server"
+        branches={branches}
+        selectedBranch={selectedBranch}
+      />
 
       <section className="metric-row">
         <article>

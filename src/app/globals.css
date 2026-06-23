@@ -440,6 +440,61 @@ p {
   margin-bottom: 18px;
 }
 
+.branch-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+
+.branch-filter span,
+.branch-filter strong {
+  display: block;
+}
+
+.branch-filter span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.branch-filter strong {
+  margin-top: 3px;
+  font-size: 18px;
+}
+
+.branch-filter nav {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.branch-filter a {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 14px;
+  color: var(--muted);
+  font-weight: 800;
+  text-decoration: none;
+  background: var(--surface-soft);
+}
+
+.branch-filter a.active {
+  border-color: var(--primary);
+  color: white;
+  background: var(--primary);
+}
+
 .metric-row article,
 .data-panel,
 .info-panel {
@@ -2170,6 +2225,15 @@ td span {
 
   .metric-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .branch-filter {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .branch-filter nav {
+    justify-content: flex-start;
   }
 
   .operation-summary-grid {
