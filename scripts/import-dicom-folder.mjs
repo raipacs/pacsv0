@@ -40,6 +40,7 @@ const sourceAeTitle =
   process.env.RAI_PACS_ORTHANC_SOURCE_AE_TITLE ??
   process.env.RAI_PACS_IMPORT_SOURCE_AE_TITLE ??
   "IMPORTER"
+const importBranchSlug = process.env.RAI_PACS_BRANCH_SLUG ?? "merkez"
 
 const LONG_VR = new Set(["OB", "OD", "OF", "OL", "OW", "SQ", "UC", "UR", "UT", "UN"])
 const NUMERIC_TAGS = new Set(["0020,0011", "0020,0013"])
@@ -90,6 +91,7 @@ if (membership.role !== "admin") {
   )
 }
 
+const branchId = await resolveImportBranchId()
 const filenames = (await fs.readdir(sourceDir))
   .filter((filename) => !filename.startsWith("."))
   .sort()
@@ -138,6 +140,7 @@ for (const filename of filenames) {
       .upsert(
         {
           organization_id: membership.organization_id,
+          ...(branchId ? { branch_id: branchId } : {}),
           patient_number: patientNumber,
           first_name: patientName.firstName,
           last_name: patientName.lastName,
@@ -183,6 +186,7 @@ for (const filename of filenames) {
       .upsert(
         {
           organization_id: membership.organization_id,
+          ...(branchId ? { branch_id: branchId } : {}),
           patient_id: patient.id,
           study_instance_uid: metadata.studyInstanceUid,
           accession_number: accessionNumber,
@@ -309,6 +313,7 @@ async function startImportJob({ expectedInstances }) {
     .upsert(
       {
         organization_id: membership.organization_id,
+        ...(branchId ? { branch_id: branchId } : {}),
         job_key: importJobKey,
         status: "importing",
         source: importSource,
@@ -385,6 +390,7 @@ async function syncModalityRegistry({ modality, studyInstanceUid, accessionNumbe
   const { error } = await supabase.from("dicom_modalities").upsert(
     {
       organization_id: membership.organization_id,
+      ...(branchId ? { branch_id: branchId } : {}),
       ae_title: sourceAeTitle,
       modality,
       status: "observed",
@@ -406,6 +412,19 @@ async function syncModalityRegistry({ modality, studyInstanceUid, accessionNumbe
   if (error) throw new Error(`Modality registry update failed: ${error.message}`)
 }
 
+async function resolveImportBranchId() {
+  const { data, error } = await supabase
+    .from("branches")
+    .select("id")
+    .eq("organization_id", membership.organization_id)
+    .eq("slug", importBranchSlug)
+    .maybeSingle()
+
+  if (isOptionalBranchError(error)) return null
+  if (error) throw new Error(`Import branch lookup failed: ${error.message}`)
+  return data?.id ?? null
+}
+
 function countResults(status) {
   return results.filter((result) => result.status === status).length
 }
@@ -413,6 +432,13 @@ function countResults(status) {
 function isOptionalDicomOpsError(error) {
   if (!error) return false
   return /dicom_import_jobs|dicom_modalities|schema cache|does not exist|relation/i.test(
+    error.message ?? ""
+  )
+}
+
+function isOptionalBranchError(error) {
+  if (!error) return false
+  return /branches|branch_id|schema cache|does not exist|relation/i.test(
     error.message ?? ""
   )
 }

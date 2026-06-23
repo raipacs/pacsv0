@@ -49,6 +49,9 @@ export default async function UsersPage() {
           <p>Kullanıcı, grup ve kurum yönetimi ekranlarını buradan yönetin.</p>
         </div>
         <div className="page-actions">
+          <Link className="button subtle" href="/admin/branches">
+            Şubeler
+          </Link>
           <Link className="button subtle" href="/admin/dicom-server">
             DICOM Server
           </Link>
