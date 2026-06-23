@@ -398,6 +398,8 @@ p {
 
 .app-content:has(.rai-viewer-page) {
   width: 100%;
+  height: 100dvh;
+  overflow: hidden;
   padding: 0;
 }
 
@@ -544,9 +546,17 @@ p {
 
 .rai-viewer-page {
   display: grid;
-  min-height: 100dvh;
+  height: 100dvh;
+  overflow: hidden;
   grid-template-rows: auto minmax(0, 1fr);
   background: #030712;
+}
+
+html:has(.rai-viewer-page),
+body:has(.rai-viewer-page) {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body:has(.rai-viewer-page) .app-header {
@@ -555,6 +565,7 @@ body:has(.rai-viewer-page) .app-header {
 
 .rai-viewer-bar {
   display: flex;
+  min-width: 0;
   align-items: center;
   justify-content: space-between;
   min-height: 54px;
@@ -581,6 +592,7 @@ body:has(.rai-viewer-page) .app-header {
 
 .rai-viewer-bar nav {
   display: flex;
+  min-width: 0;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
@@ -623,7 +635,9 @@ body:has(.rai-viewer-page) .app-header {
 
 .rai-dicom-viewer {
   display: grid;
+  height: 100%;
   min-height: 0;
+  overflow: hidden;
   grid-template-columns: 286px minmax(0, 1fr) 280px;
   background: #030712;
 }
@@ -642,6 +656,8 @@ body:has(.rai-viewer-page) .app-header {
 
 .rai-dicom-series {
   display: grid;
+  min-width: 0;
+  min-height: 0;
   align-content: start;
   gap: 8px;
   overflow: auto;
@@ -910,7 +926,9 @@ body:has(.rai-viewer-page) .app-header {
 
 .rai-dicom-stage {
   position: relative;
-  min-height: calc(100dvh - 54px);
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
   overflow: hidden;
   border-right: 1px solid #123366;
   background: #000;
@@ -1111,7 +1129,7 @@ body:has(.rai-viewer-page) .app-header {
   display: block;
   width: 100%;
   height: 100%;
-  min-height: calc(100dvh - 54px);
+  min-height: 0;
   cursor: ns-resize;
 }
 
@@ -1190,6 +1208,8 @@ body:has(.rai-viewer-page) .app-header {
 
 .rai-dicom-side {
   display: grid;
+  min-width: 0;
+  min-height: 0;
   align-content: start;
   gap: 14px;
   overflow: auto;
@@ -2087,6 +2107,7 @@ td span {
 
   .rai-dicom-series {
     max-height: 240px;
+    min-height: 0;
     border-right: 0;
     border-bottom: 1px solid #1e293b;
   }
@@ -2097,7 +2118,7 @@ td span {
 
   .rai-dicom-stage,
   .rai-dicom-canvas {
-    min-height: min(68dvh, 680px);
+    min-height: 0;
   }
 
   .rai-dicom-stage {
@@ -2108,6 +2129,7 @@ td span {
   .rai-dicom-side {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     max-height: 320px;
+    min-height: 0;
   }
 
   .rai-dicom-side dl {
@@ -2195,7 +2217,7 @@ td span {
 
   .rai-dicom-stage,
   .rai-dicom-canvas {
-    min-height: 56dvh;
+    min-height: 0;
   }
 
   .rai-dicom-toolbar {
