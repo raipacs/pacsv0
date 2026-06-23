@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from "@/lib/config"
 import { createLoginCaptchaChallenge } from "@/lib/login-captcha"
 
 export const metadata = { title: "Giriş" }
+export const dynamic = "force-dynamic"
 
 export default async function LoginPage() {
   const user = await getCurrentUser()
