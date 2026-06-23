@@ -8,6 +8,7 @@
     "start": "next start -p 4174",
     "import:dicom-folder": "node scripts/import-dicom-folder.mjs",
     "import:orthanc-study": "node scripts/import-orthanc-study.mjs",
+    "import:orthanc-pending": "node scripts/import-orthanc-pending-studies.mjs",
     "lint": "eslint"
   },
   "dependencies": {
