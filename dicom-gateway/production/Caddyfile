@@ -1,0 +1,10 @@
+{$RAI_DICOMWEB_HOSTNAME} {
+  encode zstd gzip
+
+  header {
+    X-Content-Type-Options nosniff
+    Referrer-Policy no-referrer
+  }
+
+  reverse_proxy orthanc:8042
+}

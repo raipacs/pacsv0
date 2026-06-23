@@ -1,0 +1,42 @@
+services:
+  orthanc:
+    image: jodogne/orthanc-plugins:1.12.11
+    container_name: rai-pacs-orthanc
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      RAI_ORTHANC_PASSWORD: ${RAI_ORTHANC_PASSWORD:?set RAI_ORTHANC_PASSWORD}
+    ports:
+      - "4242:4242"
+    volumes:
+      - orthanc-db:/var/lib/orthanc/db
+      - ../orthanc/orthanc.json:/etc/orthanc/orthanc.json:ro
+    networks:
+      - gateway
+
+  caddy:
+    image: caddy:2.8.4
+    container_name: rai-pacs-dicomweb-proxy
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - orthanc
+    networks:
+      - gateway
+
+networks:
+  gateway:
+
+volumes:
+  orthanc-db:
+  caddy-data:
+  caddy-config:

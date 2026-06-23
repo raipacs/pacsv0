@@ -13,7 +13,7 @@
   "RemoteAccessAllowed": true,
   "AuthenticationEnabled": true,
   "RegisteredUsers": {
-    "rai-admin": "change-this-password"
+    "rai-admin": "${RAI_ORTHANC_PASSWORD}"
   },
 
   "Plugins": [
