@@ -39,16 +39,18 @@ const failed = []
 const skipped = []
 
 for (const studyId of studyIds) {
-  if (state.imported?.[studyId]) {
-    skipped.push({ studyId, reason: "already-imported" })
-    continue
-  }
-
   try {
     const study = await orthancJson(`/studies/${encodeURIComponent(studyId)}`)
     const studyUid = study.MainDicomTags?.StudyInstanceUID
+    const instanceCount = Array.isArray(study.Instances) ? study.Instances.length : 0
     if (!studyUid) {
       skipped.push({ studyId, reason: "missing-study-instance-uid" })
+      continue
+    }
+
+    const previousImport = state.imported?.[studyId]
+    if (previousImport?.instanceCount === instanceCount) {
+      skipped.push({ studyId, reason: "already-imported", instanceCount })
       continue
     }
 
@@ -56,10 +58,11 @@ for (const studyId of studyIds) {
     state.imported ??= {}
     state.imported[studyId] = {
       studyInstanceUid: studyUid,
+      instanceCount,
       importedAt: new Date().toISOString(),
     }
     await writeState(state)
-    imported.push({ studyId, studyInstanceUid: studyUid })
+    imported.push({ studyId, studyInstanceUid: studyUid, instanceCount })
   } catch (error) {
     failed.push({
       studyId,
