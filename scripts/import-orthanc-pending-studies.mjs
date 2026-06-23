@@ -42,7 +42,7 @@ for (const studyId of studyIds) {
   try {
     const study = await orthancJson(`/studies/${encodeURIComponent(studyId)}`)
     const studyUid = study.MainDicomTags?.StudyInstanceUID
-    const instanceCount = Array.isArray(study.Instances) ? study.Instances.length : 0
+    const instanceCount = await getStudyInstanceCount(studyId)
     if (!studyUid) {
       skipped.push({ studyId, reason: "missing-study-instance-uid" })
       continue
@@ -97,6 +97,11 @@ async function orthancJson(route) {
     throw new Error(`Orthanc ${route} failed: ${response.status} ${response.statusText}`)
   }
   return response.json()
+}
+
+async function getStudyInstanceCount(studyId) {
+  const instances = await orthancJson(`/studies/${encodeURIComponent(studyId)}/instances`)
+  return Array.isArray(instances) ? instances.length : 0
 }
 
 function runStudyImport(studyUid) {
