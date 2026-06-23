@@ -55,6 +55,9 @@ export default async function UsersPage() {
           <Link className="button subtle" href="/admin/dicom-server">
             DICOM Server
           </Link>
+          <Link className="button subtle" href="/admin/his-integration">
+            HIS Entegrasyonu
+          </Link>
           <button className="button primary" type="button">
             Kullanıcı davet et
           </button>

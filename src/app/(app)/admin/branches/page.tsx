@@ -35,6 +35,9 @@ export default async function BranchesPage() {
           <Link className="button subtle" href="/admin/dicom-server">
             DICOM Server
           </Link>
+          <Link className="button subtle" href="/admin/his-integration">
+            HIS Entegrasyonu
+          </Link>
           <button className="button primary" type="button">
             Şube ekle
           </button>
