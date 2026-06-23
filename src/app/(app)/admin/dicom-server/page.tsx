@@ -9,6 +9,8 @@ import {
   type HealthState,
   type ImportJobStatus,
   type ImportJobSummary,
+  type ModalityConnection,
+  type RecentDicomStudy,
 } from "@/lib/dicom-server-status"
 
 export const dynamic = "force-dynamic"
@@ -24,6 +26,13 @@ export default async function DicomServerAdminPage() {
   const activeJobs = dashboard.importJobs.filter((job) =>
     ["received", "importing", "retrying"].includes(job.status)
   ).length
+  const failedJobs = dashboard.importJobs.filter(
+    (job) => job.status === "failed" || job.failedInstances > 0
+  )
+  const totalInstances = dashboard.modalities.reduce(
+    (sum, modality) => sum + modality.instances,
+    0
+  )
 
   return (
     <>
@@ -62,6 +71,40 @@ export default async function DicomServerAdminPage() {
           <span>Aktif import</span>
           <strong>{activeJobs}</strong>
         </article>
+      </section>
+
+      <section className="data-panel admin-section">
+        <div className="panel-heading">
+          <h2>Operasyon özeti</h2>
+        </div>
+        <div className="operation-summary-grid">
+          <SummaryTile
+            label="Son tetkik"
+            value={formatDateTime(dashboard.recentStudies[0]?.receivedAt ?? null)}
+            detail={dashboard.recentStudies[0]?.description ?? "Henüz tetkik yok"}
+          />
+          <SummaryTile
+            label="Toplam instance"
+            value={String(totalInstances)}
+            detail="Modalite registry üzerinden"
+          />
+          <SummaryTile
+            label="Başarısız import"
+            value={String(failedJobs.length)}
+            detail={failedJobs[0]?.errorMessage ?? "Açık hata yok"}
+            tone={failedJobs.length ? "error" : "ok"}
+          />
+          <SummaryTile
+            label="Sessiz modalite"
+            value={String(dashboard.modalities.filter((item) => item.status === "Sessiz").length)}
+            detail="72 saatten uzun süredir sinyal yok"
+            tone={
+              dashboard.modalities.some((item) => item.status === "Sessiz")
+                ? "warning"
+                : "ok"
+            }
+          />
+        </div>
       </section>
 
       <section className="dicom-admin-grid">
@@ -193,6 +236,78 @@ export default async function DicomServerAdminPage() {
 
       <section className="data-panel admin-section">
         <div className="panel-heading">
+          <h2>Cihaz aktivitesi</h2>
+        </div>
+        {dashboard.modalities.length ? (
+          <div className="modality-activity-list">
+            {dashboard.modalities.map((modality) => (
+              <ModalityActivity item={modality} key={modality.key} />
+            ))}
+          </div>
+        ) : (
+          <p className="empty-state">Henüz cihaz aktivitesi yok.</p>
+        )}
+      </section>
+
+      <section className="data-panel admin-section">
+        <div className="panel-heading">
+          <h2>Son gelen tetkikler</h2>
+        </div>
+        {dashboard.recentStudies.length ? (
+          <div className="responsive-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Hasta</th>
+                  <th>Tetkik</th>
+                  <th>Kaynak AE</th>
+                  <th>Instance</th>
+                  <th>Geliş</th>
+                  <th>Durum</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dashboard.recentStudies.map((study) => (
+                  <RecentStudyRow study={study} key={study.id} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="empty-state">Son gelen tetkik görünmüyor.</p>
+        )}
+      </section>
+
+      <section className="data-panel admin-section">
+        <div className="panel-heading">
+          <h2>Başarısız importlar</h2>
+        </div>
+        {failedJobs.length ? (
+          <div className="responsive-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Kaynak</th>
+                  <th>Hasta / Accession</th>
+                  <th>Instance</th>
+                  <th>Son hareket</th>
+                  <th>Hata</th>
+                </tr>
+              </thead>
+              <tbody>
+                {failedJobs.map((job) => (
+                  <FailedJobRow job={job} key={job.id} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="empty-state">Açık başarısız import kaydı yok.</p>
+        )}
+      </section>
+
+      <section className="data-panel admin-section">
+        <div className="panel-heading">
           <h2>Import kuyruğu</h2>
         </div>
         {dashboard.importJobs.length ? (
@@ -222,6 +337,93 @@ export default async function DicomServerAdminPage() {
         )}
       </section>
     </>
+  )
+}
+
+function SummaryTile({
+  label,
+  value,
+  detail,
+  tone = "neutral",
+}: {
+  label: string
+  value: string
+  detail: string
+  tone?: "neutral" | "ok" | "warning" | "error"
+}) {
+  return (
+    <article className={`operation-summary-tile ${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+    </article>
+  )
+}
+
+function ModalityActivity({ item }: { item: ModalityConnection }) {
+  const percent = Math.min(100, Math.max(8, item.instances ? item.instances / 2 : 8))
+
+  return (
+    <article className="modality-activity">
+      <div>
+        <strong>{item.aeTitle}</strong>
+        <span>
+          {item.modality} / {item.studies} study / {item.instances} instance
+        </span>
+      </div>
+      <div className="modality-activity-meter" aria-hidden="true">
+        <span style={{ width: `${percent}%` }} />
+      </div>
+      <div className="health-row-status">
+        <small>{formatDateTime(item.lastReceivedAt)}</small>
+        <span className={`health-badge ${statusClass(item.status)}`}>{item.status}</span>
+      </div>
+    </article>
+  )
+}
+
+function RecentStudyRow({ study }: { study: RecentDicomStudy }) {
+  return (
+    <tr>
+      <td>
+        <strong>{study.patientName}</strong>
+        <span>{study.patientNumber}</span>
+      </td>
+      <td>
+        <strong>{study.description}</strong>
+        <span>
+          {study.modality} / {study.accessionNumber}
+        </span>
+      </td>
+      <td>{study.sourceAeTitle}</td>
+      <td>{study.instanceCount}</td>
+      <td>{formatDateTime(study.receivedAt)}</td>
+      <td>
+        <span className="health-badge unknown">{study.status}</span>
+      </td>
+    </tr>
+  )
+}
+
+function FailedJobRow({ job }: { job: ImportJobSummary }) {
+  return (
+    <tr>
+      <td>
+        <strong>{job.sourceAeTitle || job.source}</strong>
+        <span>{job.modality || job.source}</span>
+      </td>
+      <td>
+        <strong>{job.patientDicomId || "-"}</strong>
+        <span>{job.accessionNumber || job.jobKey}</span>
+      </td>
+      <td>
+        {job.importedInstances}/{job.expectedInstances || "-"}
+      </td>
+      <td>{formatDateTime(job.lastSeenAt)}</td>
+      <td>
+        <span className="table-note">{job.errorMessage || "Import hata aldı"}</span>
+      </td>
+    </tr>
   )
 }
 

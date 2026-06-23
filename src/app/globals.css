@@ -1585,11 +1585,103 @@ td span {
   margin-top: 16px;
 }
 
+.operation-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--border);
+}
+
+.operation-summary-tile {
+  min-height: 124px;
+  padding: 18px;
+  background: var(--surface);
+}
+
+.operation-summary-tile span,
+.operation-summary-tile small {
+  display: block;
+}
+
+.operation-summary-tile span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.operation-summary-tile strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.operation-summary-tile small {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.operation-summary-tile.ok strong {
+  color: var(--success);
+}
+
+.operation-summary-tile.warning strong {
+  color: var(--warning);
+}
+
+.operation-summary-tile.error strong {
+  color: var(--danger);
+}
+
 .dicom-admin-grid {
   display: grid;
   grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
   gap: 16px;
   margin-bottom: 16px;
+}
+
+.modality-activity-list {
+  display: grid;
+}
+
+.modality-activity {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(180px, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  border-bottom: 1px solid var(--border);
+  padding: 14px 16px;
+}
+
+.modality-activity:last-child {
+  border-bottom: 0;
+}
+
+.modality-activity strong,
+.modality-activity span {
+  display: block;
+}
+
+.modality-activity span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.modality-activity-meter {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eaecf0;
+}
+
+.modality-activity-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
 }
 
 .health-list {
@@ -2080,7 +2172,15 @@ td span {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .operation-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .dicom-admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modality-activity {
     grid-template-columns: 1fr;
   }
 

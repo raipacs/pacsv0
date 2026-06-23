@@ -52,6 +52,19 @@ export type CloudInfrastructureItem = {
   latencyMs?: number
 }
 
+export type RecentDicomStudy = {
+  id: string
+  patientName: string
+  patientNumber: string
+  accessionNumber: string
+  modality: string
+  sourceAeTitle: string
+  description: string
+  receivedAt: string | null
+  status: string
+  instanceCount: number
+}
+
 export type DicomServerDashboard = {
   endpoint: {
     host: string
@@ -65,6 +78,7 @@ export type DicomServerDashboard = {
   cloudInfrastructure: CloudInfrastructureItem[]
   modalities: ModalityConnection[]
   importJobs: ImportJobSummary[]
+  recentStudies: RecentDicomStudy[]
   lastImportAt: string | null
 }
 
@@ -110,6 +124,29 @@ type ImportJobRow = {
   error_message: string | null
 }
 
+type RecentStudyRow = {
+  id: string
+  accession_number: string | null
+  modality: string | null
+  source_ae_title: string | null
+  description: string | null
+  received_at: string | null
+  study_at: string | null
+  status: string | null
+  patients:
+    | {
+        patient_number: string | null
+        first_name: string | null
+        last_name: string | null
+      }
+    | Array<{
+        patient_number: string | null
+        first_name: string | null
+        last_name: string | null
+      }>
+    | null
+}
+
 const DEFAULT_DICOM_HOST = "dicom.raipacs.com"
 const DEFAULT_DICOM_PORT = "4242"
 const DEFAULT_DICOM_AE_TITLE = "RAIPACS"
@@ -139,6 +176,7 @@ export async function getDicomServerDashboard(
     cloudInfrastructure,
     modalityData,
     importJobs,
+    recentStudies,
   ] = await Promise.all([
     checkGatewayReachability(),
     checkOrthancRest(),
@@ -148,6 +186,7 @@ export async function getDicomServerDashboard(
     getCloudInfrastructure(endpoint),
     getModalityConnections(organizationId),
     getImportJobs(organizationId),
+    getRecentStudies(organizationId),
   ])
 
   return {
@@ -172,6 +211,7 @@ export async function getDicomServerDashboard(
     cloudInfrastructure,
     modalities: modalityData.modalities,
     importJobs,
+    recentStudies,
     lastImportAt: modalityData.lastImportAt,
   }
 }
@@ -597,6 +637,74 @@ async function getImportJobs(organizationId: string): Promise<ImportJobSummary[]
     lastSeenAt: row.last_seen_at,
     errorMessage: row.error_message,
   }))
+}
+
+async function getRecentStudies(organizationId: string): Promise<RecentDicomStudy[]> {
+  if (!isSupabaseConfigured) {
+    return [
+      {
+        id: "demo-study",
+        patientName: "Demo Hasta",
+        patientNumber: "DEMO-001",
+        accessionNumber: "DEMO-ACC",
+        modality: "DX",
+        sourceAeTitle: "Demo AE",
+        description: "Demo DICOM akışı",
+        receivedAt: null,
+        status: "received",
+        instanceCount: 1,
+      },
+    ]
+  }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("studies")
+    .select(
+      "id, accession_number, modality, source_ae_title, description, received_at, study_at, status, patients(patient_number, first_name, last_name)"
+    )
+    .eq("organization_id", organizationId)
+    .order("received_at", { ascending: false })
+    .limit(12)
+
+  if (error) return []
+
+  const rows = (data ?? []) as RecentStudyRow[]
+  const studyIds = rows.map((study) => study.id)
+  const { data: instances } = studyIds.length
+    ? await supabase.from("instances").select("study_id").in("study_id", studyIds)
+    : { data: [] }
+
+  const instancesByStudy = new Map<string, number>()
+  for (const instance of ((instances ?? []) as InstanceRow[])) {
+    instancesByStudy.set(
+      instance.study_id,
+      (instancesByStudy.get(instance.study_id) ?? 0) + 1
+    )
+  }
+
+  return rows.map((study) => {
+    const patient = Array.isArray(study.patients)
+      ? study.patients[0]
+      : study.patients
+    const patientName = [patient?.first_name, patient?.last_name]
+      .filter(Boolean)
+      .join(" ")
+      .trim()
+
+    return {
+      id: study.id,
+      patientName: patientName || "Bilinmeyen hasta",
+      patientNumber: patient?.patient_number || "-",
+      accessionNumber: study.accession_number || "-",
+      modality: study.modality?.toUpperCase() || "DICOM",
+      sourceAeTitle: study.source_ae_title || "AE bilinmiyor",
+      description: study.description || "Açıklama yok",
+      receivedAt: study.received_at ?? study.study_at,
+      status: study.status || "received",
+      instanceCount: instancesByStudy.get(study.id) ?? 0,
+    }
+  })
 }
 
 function classifyModalityStatus(receivedAt: string | null): ModalityConnection["status"] {
