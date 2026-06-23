@@ -40,6 +40,12 @@ const sourceAeTitle =
   process.env.RAI_PACS_ORTHANC_SOURCE_AE_TITLE ??
   process.env.RAI_PACS_IMPORT_SOURCE_AE_TITLE ??
   "IMPORTER"
+const sourceIp =
+  process.env.RAI_PACS_SOURCE_IP ??
+  process.env.RAI_PACS_ORTHANC_SOURCE_IP ??
+  process.env.RAI_PACS_IMPORT_SOURCE_IP ??
+  null
+const calledAeTitle = process.env.RAI_PACS_DICOM_AE_TITLE ?? "RAIPACS"
 const importBranchSlug = process.env.RAI_PACS_BRANCH_SLUG ?? "merkez"
 
 const LONG_VR = new Set(["OB", "OD", "OF", "OL", "OW", "SQ", "UC", "UR", "UT", "UN"])
@@ -96,8 +102,14 @@ const filenames = (await fs.readdir(sourceDir))
   .filter((filename) => !filename.startsWith("."))
   .sort()
 const results = []
+const loggedStudyEvents = new Set()
 let importJob = await startImportJob({
   expectedInstances: filenames.length,
+})
+await recordConnectionEvent({
+  eventType: "import_started",
+  status: "observed",
+  message: `${filenames.length} dosyalık DICOM import başladı`,
 })
 
 for (const filename of filenames) {
@@ -134,6 +146,18 @@ for (const filename of filenames) {
       patientDicomId: patientNumber,
       modality: metadata.modality.toUpperCase(),
     })
+    if (!loggedStudyEvents.has(metadata.studyInstanceUid)) {
+      loggedStudyEvents.add(metadata.studyInstanceUid)
+      await recordConnectionEvent({
+        eventType: "store",
+        status: "received",
+        message: `${metadata.modality.toUpperCase()} study alındı ve import kuyruğuna girdi`,
+        studyInstanceUid: metadata.studyInstanceUid,
+        accessionNumber: metadata.accessionNumber,
+        patientDicomId: patientNumber,
+        modality: metadata.modality.toUpperCase(),
+      })
+    }
 
     const { data: patient, error: patientError } = await supabase
       .from("patients")
@@ -274,6 +298,11 @@ for (const filename of filenames) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     results.push({ file: filename, status: "failed", reason: message })
+    await recordConnectionEvent({
+      eventType: "import_failed",
+      status: "failed",
+      message,
+    })
     await touchImportJob({
       status: "retrying",
       failedInstances: countResults("failed"),
@@ -290,6 +319,13 @@ await touchImportJob({
   failedInstances,
   completedAt: new Date().toISOString(),
   errorMessage: failedInstances ? `${failedInstances} instance import edilemedi` : null,
+})
+await recordConnectionEvent({
+  eventType: failedInstances ? "import_failed" : "import_completed",
+  status: failedInstances ? "failed" : "success",
+  message: failedInstances
+    ? `${failedInstances} instance import edilemedi`
+    : `${countResults("uploaded") + countResults("metadata-updated-existing-object")} instance import tamamlandı`,
 })
 
 console.log(
@@ -412,6 +448,40 @@ async function syncModalityRegistry({ modality, studyInstanceUid, accessionNumbe
   if (error) throw new Error(`Modality registry update failed: ${error.message}`)
 }
 
+async function recordConnectionEvent({
+  eventType,
+  status,
+  message,
+  studyInstanceUid = null,
+  accessionNumber = null,
+  patientDicomId = null,
+  modality = null,
+}) {
+  const { error } = await supabase.from("dicom_connection_events").insert({
+    organization_id: membership.organization_id,
+    ...(branchId ? { branch_id: branchId } : {}),
+    event_type: eventType,
+    source: importSource,
+    source_ip: sourceIp,
+    source_ae_title: sourceAeTitle,
+    called_ae_title: calledAeTitle,
+    modality,
+    study_instance_uid: studyInstanceUid,
+    accession_number: accessionNumber,
+    patient_dicom_id: patientDicomId,
+    orthanc_id: process.env.RAI_PACS_ORTHANC_STUDY_ID || null,
+    message,
+    status,
+    metadata: {
+      jobKey: importJobKey,
+      sourceDir,
+    },
+  })
+
+  if (isOptionalDicomOpsError(error)) return
+  if (error) throw new Error(`Connection event insert failed: ${error.message}`)
+}
+
 async function resolveImportBranchId() {
   const { data, error } = await supabase
     .from("branches")
@@ -431,7 +501,7 @@ function countResults(status) {
 
 function isOptionalDicomOpsError(error) {
   if (!error) return false
-  return /dicom_import_jobs|dicom_modalities|schema cache|does not exist|relation/i.test(
+  return /dicom_import_jobs|dicom_modalities|dicom_connection_events|schema cache|does not exist|relation/i.test(
     error.message ?? ""
   )
 }

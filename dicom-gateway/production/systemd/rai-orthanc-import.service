@@ -10,4 +10,6 @@ Group=support
 WorkingDirectory=/opt/rai-pacs
 Environment=RAI_PACS_GATEWAY_ENV_FILE=/opt/rai-pacs/dicom-gateway/production/.env
 Environment=RAI_PACS_ORTHANC_IMPORT_STATE_FILE=/opt/rai-pacs/dicom-gateway/production/.orthanc-import-state.json
+Environment=RAI_PACS_ORTHANC_EVENT_STATE_FILE=/opt/rai-pacs/dicom-gateway/production/.orthanc-event-state.json
+ExecStartPre=/usr/bin/npm run sync:orthanc-events
 ExecStart=/usr/bin/npm run import:orthanc-pending

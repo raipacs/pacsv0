@@ -68,11 +68,17 @@ Port: 4242
 Orthanc icinde study geldikten sonra repo kokunden:
 
 ```bash
+npm run sync:orthanc-events
 npm run import:orthanc-study
 ```
 
 Bu komut Orthanc'tan study dosyalarini indirir ve mevcut RAI DICOM import
 akisiyle Supabase Storage/Postgres'e aktarir.
+
+Gateway uzerinde timer kuruluysa `rai-orthanc-import.service` once Orthanc
+`/changes` olaylarini `dicom_connection_events` tablosuna yazar, sonra bekleyen
+study importlarini calistirir. Admin > DICOM Server ekranindaki
+`Son baglanti/log olaylari` paneli bu kayitlari gosterir.
 
 ## Guvenlik
 

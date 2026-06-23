@@ -7,6 +7,8 @@ import {
   formatDateTime,
   getDicomServerDashboard,
   type CloudInfrastructureItem,
+  type DicomConnectionEvent,
+  type DicomConnectionEventType,
   type HealthItem,
   type HealthState,
   type ImportJobStatus,
@@ -273,6 +275,42 @@ export default async function DicomServerAdminPage({
 
       <section className="data-panel admin-section">
         <div className="panel-heading">
+          <h2>Son bağlantı/log olayları</h2>
+        </div>
+        {dashboard.connectionEvents.length ? (
+          <div className="responsive-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Olay</th>
+                  <th>Kaynak</th>
+                  <th>Hedef</th>
+                  <th>Tetkik</th>
+                  <th>Zaman</th>
+                  <th>Durum</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dashboard.connectionEvents.map((event) => (
+                  <ConnectionEventRow event={event} key={event.id} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="empty-state">
+            Henüz bağlantı/log olayı yok. Yeni DICOM gateway denemeleri, import
+            başlangıcı ve hata kayıtları burada görünecek.
+          </p>
+        )}
+        <p className="panel-note">
+          C-ECHO/Verify ve C-STORE olayları ayrı izlenir. Gateway log forwarder
+          bağlandığında kaynak IP ve cihaz AE Title bilgisi test anında bu alana düşer.
+        </p>
+      </section>
+
+      <section className="data-panel admin-section">
+        <div className="panel-heading">
           <h2>Son gelen tetkikler</h2>
         </div>
         {dashboard.recentStudies.length ? (
@@ -427,6 +465,35 @@ function RecentStudyRow({ study }: { study: RecentDicomStudy }) {
   )
 }
 
+function ConnectionEventRow({ event }: { event: DicomConnectionEvent }) {
+  return (
+    <tr>
+      <td>
+        <strong>{connectionEventLabel(event.eventType)}</strong>
+        <span>{event.message}</span>
+      </td>
+      <td>
+        <strong>{event.sourceAeTitle || "AE bilinmiyor"}</strong>
+        <span>{event.sourceIp || event.source}</span>
+      </td>
+      <td>
+        <strong>{event.calledAeTitle || "RAIPACS"}</strong>
+        <span>{event.modality || "DICOM"}</span>
+      </td>
+      <td>
+        <strong>{event.patientDicomId || "-"}</strong>
+        <span>{event.accessionNumber || shortStudyUid(event.studyInstanceUid)}</span>
+      </td>
+      <td>{formatDateTime(event.occurredAt)}</td>
+      <td>
+        <span className={`health-badge ${eventStatusClass(event.status)}`}>
+          {eventStatusLabel(event.status)}
+        </span>
+      </td>
+    </tr>
+  )
+}
+
 function FailedJobRow({ job }: { job: ImportJobSummary }) {
   return (
     <tr>
@@ -531,6 +598,38 @@ function statusClass(status: string) {
   if (status === "Yeni") return "ok"
   if (status === "Aktif") return "warning"
   return "unknown"
+}
+
+function connectionEventLabel(type: DicomConnectionEventType) {
+  if (type === "association") return "Association"
+  if (type === "echo") return "C-ECHO"
+  if (type === "store") return "C-STORE"
+  if (type === "stable_study") return "Stable Study"
+  if (type === "import_started") return "Import başladı"
+  if (type === "import_completed") return "Import tamamlandı"
+  if (type === "import_failed") return "Import hata"
+  return "Uyarı"
+}
+
+function eventStatusLabel(status: string) {
+  if (status === "success") return "Başarılı"
+  if (status === "failed") return "Hata"
+  if (status === "warning") return "Uyarı"
+  if (status === "received") return "Alındı"
+  return "Gözlendi"
+}
+
+function eventStatusClass(status: string) {
+  if (status === "success" || status === "received" || status === "observed") return "ok"
+  if (status === "warning") return "warning"
+  if (status === "failed") return "error"
+  return "unknown"
+}
+
+function shortStudyUid(value: string | null) {
+  if (!value) return "-"
+  if (value.length <= 18) return value
+  return `${value.slice(0, 8)}...${value.slice(-8)}`
 }
 
 function jobStatusLabel(status: ImportJobStatus) {

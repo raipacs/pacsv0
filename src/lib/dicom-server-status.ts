@@ -25,6 +25,32 @@ export type ModalityConnection = {
 
 export type ImportJobStatus = "received" | "importing" | "completed" | "failed" | "retrying"
 
+export type DicomConnectionEventType =
+  | "association"
+  | "echo"
+  | "store"
+  | "stable_study"
+  | "import_started"
+  | "import_completed"
+  | "import_failed"
+  | "warning"
+
+export type DicomConnectionEvent = {
+  id: string
+  eventType: DicomConnectionEventType
+  source: string
+  sourceIp: string | null
+  sourceAeTitle: string | null
+  calledAeTitle: string | null
+  modality: string | null
+  studyInstanceUid: string | null
+  accessionNumber: string | null
+  patientDicomId: string | null
+  message: string
+  status: string
+  occurredAt: string | null
+}
+
 export type ImportJobSummary = {
   id: string
   jobKey: string
@@ -77,6 +103,7 @@ export type DicomServerDashboard = {
   apis: HealthItem[]
   cloudInfrastructure: CloudInfrastructureItem[]
   modalities: ModalityConnection[]
+  connectionEvents: DicomConnectionEvent[]
   importJobs: ImportJobSummary[]
   recentStudies: RecentDicomStudy[]
   lastImportAt: string | null
@@ -122,6 +149,22 @@ type ImportJobRow = {
   completed_at: string | null
   last_seen_at: string | null
   error_message: string | null
+}
+
+type DicomConnectionEventRow = {
+  id: string
+  event_type: DicomConnectionEventType
+  source: string
+  source_ip: string | null
+  source_ae_title: string | null
+  called_ae_title: string | null
+  modality: string | null
+  study_instance_uid: string | null
+  accession_number: string | null
+  patient_dicom_id: string | null
+  message: string
+  status: string
+  occurred_at: string | null
 }
 
 type RecentStudyRow = {
@@ -176,6 +219,7 @@ export async function getDicomServerDashboard(
     storageStatus,
     cloudInfrastructure,
     modalityData,
+    connectionEvents,
     importJobs,
     recentStudies,
   ] = await Promise.all([
@@ -186,6 +230,7 @@ export async function getDicomServerDashboard(
     checkStorage(),
     getCloudInfrastructure(endpoint),
     getModalityConnections(organizationId, branchId),
+    getConnectionEvents(organizationId, branchId),
     getImportJobs(organizationId, branchId),
     getRecentStudies(organizationId, branchId),
   ])
@@ -211,6 +256,7 @@ export async function getDicomServerDashboard(
     apis: [dbStatus, storageStatus, dicomweb],
     cloudInfrastructure,
     modalities: modalityData.modalities,
+    connectionEvents,
     importJobs,
     recentStudies,
     lastImportAt: modalityData.lastImportAt,
@@ -652,6 +698,63 @@ async function getImportJobs(
     completedAt: row.completed_at,
     lastSeenAt: row.last_seen_at,
     errorMessage: row.error_message,
+  }))
+}
+
+async function getConnectionEvents(
+  organizationId: string,
+  branchId?: string | null
+): Promise<DicomConnectionEvent[]> {
+  if (!isSupabaseConfigured) {
+    return [
+      {
+        id: "demo-event",
+        eventType: "echo",
+        source: "demo",
+        sourceIp: "10.0.0.10",
+        sourceAeTitle: "DEMOUS",
+        calledAeTitle: "RAIPACS",
+        modality: "US",
+        studyInstanceUid: null,
+        accessionNumber: null,
+        patientDicomId: null,
+        message: "Demo C-ECHO başarılı",
+        status: "success",
+        occurredAt: null,
+      },
+    ]
+  }
+
+  const supabase = await createClient()
+  const query = supabase
+    .from("dicom_connection_events")
+    .select(
+      "id, event_type, source, source_ip, source_ae_title, called_ae_title, modality, study_instance_uid, accession_number, patient_dicom_id, message, status, occurred_at"
+    )
+    .eq("organization_id", organizationId)
+    .order("occurred_at", { ascending: false })
+    .limit(20)
+
+  if (branchId) query.eq("branch_id", branchId)
+
+  const { data, error } = await query
+
+  if (error) return []
+
+  return ((data ?? []) as DicomConnectionEventRow[]).map((row) => ({
+    id: row.id,
+    eventType: row.event_type,
+    source: row.source,
+    sourceIp: row.source_ip,
+    sourceAeTitle: row.source_ae_title,
+    calledAeTitle: row.called_ae_title,
+    modality: row.modality,
+    studyInstanceUid: row.study_instance_uid,
+    accessionNumber: row.accession_number,
+    patientDicomId: row.patient_dicom_id,
+    message: row.message,
+    status: row.status,
+    occurredAt: row.occurred_at,
   }))
 }
 
