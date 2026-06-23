@@ -1,12 +1,17 @@
-create type public.dicom_import_job_status as enum (
-  'received',
-  'importing',
-  'completed',
-  'failed',
-  'retrying'
-);
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'dicom_import_job_status') then
+    create type public.dicom_import_job_status as enum (
+      'received',
+      'importing',
+      'completed',
+      'failed',
+      'retrying'
+    );
+  end if;
+end $$;
 
-create table public.dicom_modalities (
+create table if not exists public.dicom_modalities (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   ae_title text not null,
@@ -30,7 +35,7 @@ create table public.dicom_modalities (
   unique (organization_id, ae_title)
 );
 
-create table public.dicom_import_jobs (
+create table if not exists public.dicom_import_jobs (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   job_key text not null,
@@ -56,19 +61,21 @@ create table public.dicom_import_jobs (
   unique (organization_id, job_key)
 );
 
-create index dicom_modalities_org_last_seen_idx
+create index if not exists dicom_modalities_org_last_seen_idx
   on public.dicom_modalities (organization_id, last_seen_at desc nulls last);
 
-create index dicom_import_jobs_org_status_seen_idx
+create index if not exists dicom_import_jobs_org_status_seen_idx
   on public.dicom_import_jobs (organization_id, status, last_seen_at desc);
 
-create index dicom_import_jobs_org_study_uid_idx
+create index if not exists dicom_import_jobs_org_study_uid_idx
   on public.dicom_import_jobs (organization_id, study_instance_uid);
 
+drop trigger if exists dicom_modalities_set_updated_at on public.dicom_modalities;
 create trigger dicom_modalities_set_updated_at
 before update on public.dicom_modalities
 for each row execute function public.set_updated_at();
 
+drop trigger if exists dicom_import_jobs_set_updated_at on public.dicom_import_jobs;
 create trigger dicom_import_jobs_set_updated_at
 before update on public.dicom_import_jobs
 for each row execute function public.set_updated_at();
@@ -76,19 +83,23 @@ for each row execute function public.set_updated_at();
 alter table public.dicom_modalities enable row level security;
 alter table public.dicom_import_jobs enable row level security;
 
+drop policy if exists "Admins view DICOM modalities" on public.dicom_modalities;
 create policy "Admins view DICOM modalities"
 on public.dicom_modalities for select to authenticated
 using (public.has_organization_role(organization_id, array['admin']::public.app_role[]));
 
+drop policy if exists "Admins manage DICOM modalities" on public.dicom_modalities;
 create policy "Admins manage DICOM modalities"
 on public.dicom_modalities for all to authenticated
 using (public.has_organization_role(organization_id, array['admin']::public.app_role[]))
 with check (public.has_organization_role(organization_id, array['admin']::public.app_role[]));
 
+drop policy if exists "Admins view DICOM import jobs" on public.dicom_import_jobs;
 create policy "Admins view DICOM import jobs"
 on public.dicom_import_jobs for select to authenticated
 using (public.has_organization_role(organization_id, array['admin']::public.app_role[]));
 
+drop policy if exists "Admins manage DICOM import jobs" on public.dicom_import_jobs;
 create policy "Admins manage DICOM import jobs"
 on public.dicom_import_jobs for all to authenticated
 using (public.has_organization_role(organization_id, array['admin']::public.app_role[]))
