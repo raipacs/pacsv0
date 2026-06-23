@@ -6,6 +6,8 @@ import {
   getDicomServerDashboard,
   type HealthItem,
   type HealthState,
+  type ImportJobStatus,
+  type ImportJobSummary,
 } from "@/lib/dicom-server-status"
 
 export const dynamic = "force-dynamic"
@@ -18,6 +20,9 @@ export default async function DicomServerAdminPage() {
     (item) => item.state === "ok"
   ).length
   const totalChecks = dashboard.services.length + dashboard.apis.length
+  const activeJobs = dashboard.importJobs.filter((job) =>
+    ["received", "importing", "retrying"].includes(job.status)
+  ).length
 
   return (
     <>
@@ -53,8 +58,8 @@ export default async function DicomServerAdminPage() {
           <strong>{dashboard.modalities.length}</strong>
         </article>
         <article>
-          <span>Son import</span>
-          <strong className="metric-small">{formatDateTime(dashboard.lastImportAt)}</strong>
+          <span>Aktif import</span>
+          <strong>{activeJobs}</strong>
         </article>
       </section>
 
@@ -155,7 +160,66 @@ export default async function DicomServerAdminPage() {
           </p>
         )}
       </section>
+
+      <section className="data-panel admin-section">
+        <div className="panel-heading">
+          <h2>Import kuyruğu</h2>
+        </div>
+        {dashboard.importJobs.length ? (
+          <div className="responsive-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Kaynak</th>
+                  <th>Hasta / Accession</th>
+                  <th>Instance</th>
+                  <th>Son hareket</th>
+                  <th>Durum</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dashboard.importJobs.map((job) => (
+                  <ImportJobRow job={job} key={job.id} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="empty-state">
+            Import job kaydı yok. Migration uygulandıktan sonra Orthanc ve upload
+            importları burada izlenir.
+          </p>
+        )}
+      </section>
     </>
+  )
+}
+
+function ImportJobRow({ job }: { job: ImportJobSummary }) {
+  return (
+    <tr>
+      <td>
+        <strong>{job.sourceAeTitle || job.source}</strong>
+        <span>{job.modality || job.source}</span>
+      </td>
+      <td>
+        <strong>{job.patientDicomId || "-"}</strong>
+        <span>{job.accessionNumber || job.jobKey}</span>
+      </td>
+      <td>
+        <strong>
+          {job.importedInstances}/{job.expectedInstances || "-"}
+        </strong>
+        {job.failedInstances ? <span>{job.failedInstances} hata</span> : null}
+      </td>
+      <td>{formatDateTime(job.lastSeenAt)}</td>
+      <td>
+        <span className={`health-badge ${jobStatusClass(job.status)}`}>
+          {jobStatusLabel(job.status)}
+        </span>
+        {job.errorMessage ? <span className="table-note">{job.errorMessage}</span> : null}
+      </td>
+    </tr>
   )
 }
 
@@ -193,5 +257,20 @@ function healthClass(state: HealthState) {
 function statusClass(status: string) {
   if (status === "Yeni") return "ok"
   if (status === "Aktif") return "warning"
+  return "unknown"
+}
+
+function jobStatusLabel(status: ImportJobStatus) {
+  if (status === "received") return "Alındı"
+  if (status === "importing") return "İşleniyor"
+  if (status === "completed") return "Tamamlandı"
+  if (status === "failed") return "Hata"
+  return "Tekrar"
+}
+
+function jobStatusClass(status: ImportJobStatus) {
+  if (status === "completed") return "ok"
+  if (status === "failed") return "error"
+  if (status === "retrying") return "warning"
   return "unknown"
 }

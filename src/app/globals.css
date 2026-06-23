@@ -1668,6 +1668,16 @@ td span {
   background: #eaecf0;
 }
 
+.table-note {
+  display: block;
+  max-width: 320px;
+  margin-top: 6px;
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .inline-error {
   color: var(--danger);
   font-size: 12px;

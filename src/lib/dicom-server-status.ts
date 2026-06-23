@@ -21,6 +21,26 @@ export type ModalityConnection = {
   status: "Aktif" | "Sessiz" | "Yeni"
 }
 
+export type ImportJobStatus = "received" | "importing" | "completed" | "failed" | "retrying"
+
+export type ImportJobSummary = {
+  id: string
+  jobKey: string
+  status: ImportJobStatus
+  source: string
+  sourceAeTitle: string | null
+  modality: string | null
+  patientDicomId: string | null
+  accessionNumber: string | null
+  expectedInstances: number
+  importedInstances: number
+  failedInstances: number
+  startedAt: string | null
+  completedAt: string | null
+  lastSeenAt: string | null
+  errorMessage: string | null
+}
+
 export type DicomServerDashboard = {
   endpoint: {
     host: string
@@ -32,6 +52,7 @@ export type DicomServerDashboard = {
   services: HealthItem[]
   apis: HealthItem[]
   modalities: ModalityConnection[]
+  importJobs: ImportJobSummary[]
   lastImportAt: string | null
 }
 
@@ -45,6 +66,36 @@ type StudyRow = {
 
 type InstanceRow = {
   study_id: string
+}
+
+type ModalityRegistryRow = {
+  id: string
+  ae_title: string
+  modality: string | null
+  description: string | null
+  last_seen_at: string | null
+  last_store_at: string | null
+  last_accession_number: string | null
+  received_study_count: number | null
+  received_instance_count: number | null
+}
+
+type ImportJobRow = {
+  id: string
+  job_key: string
+  status: ImportJobStatus
+  source: string
+  source_ae_title: string | null
+  modality: string | null
+  patient_dicom_id: string | null
+  accession_number: string | null
+  expected_instances: number | null
+  imported_instances: number | null
+  failed_instances: number | null
+  started_at: string | null
+  completed_at: string | null
+  last_seen_at: string | null
+  error_message: string | null
 }
 
 const DEFAULT_DICOM_HOST = "dicom.raipacs.com"
@@ -62,7 +113,7 @@ export async function getDicomServerDashboard(
     tls: "Kapalı",
   }
 
-  const [gateway, orthancRest, dicomweb, dbStatus, storageStatus, modalityData] =
+  const [gateway, orthancRest, dicomweb, dbStatus, storageStatus, modalityData, importJobs] =
     await Promise.all([
       checkGatewayReachability(),
       checkOrthancRest(),
@@ -70,6 +121,7 @@ export async function getDicomServerDashboard(
       checkDatabase(organizationId),
       checkStorage(),
       getModalityConnections(organizationId),
+      getImportJobs(organizationId),
     ])
 
   return {
@@ -92,6 +144,7 @@ export async function getDicomServerDashboard(
     ],
     apis: [dbStatus, storageStatus, dicomweb],
     modalities: modalityData.modalities,
+    importJobs,
     lastImportAt: modalityData.lastImportAt,
   }
 }
@@ -252,6 +305,33 @@ async function getModalityConnections(organizationId: string) {
   }
 
   const supabase = await createClient()
+  const { data: registryRows, error: registryError } = await supabase
+    .from("dicom_modalities")
+    .select(
+      "id, ae_title, modality, description, last_seen_at, last_store_at, last_accession_number, received_study_count, received_instance_count"
+    )
+    .eq("organization_id", organizationId)
+    .order("last_seen_at", { ascending: false, nullsFirst: false })
+
+  if (!registryError && registryRows?.length) {
+    const modalities = ((registryRows ?? []) as ModalityRegistryRow[]).map((row) => ({
+      key: row.id,
+      aeTitle: row.ae_title,
+      modality: row.modality?.trim().toUpperCase() || "DICOM",
+      studies: row.received_study_count ?? 0,
+      instances: row.received_instance_count ?? 0,
+      lastReceivedAt: row.last_store_at ?? row.last_seen_at,
+      lastDescription:
+        row.description || row.last_accession_number || "Kayıtlı DICOM modalitesi",
+      status: classifyModalityStatus(row.last_store_at ?? row.last_seen_at),
+    }))
+
+    return {
+      lastImportAt: modalities[0]?.lastReceivedAt ?? null,
+      modalities,
+    }
+  }
+
   const { data: studies, error } = await supabase
     .from("studies")
     .select("id, modality, source_ae_title, description, received_at")
@@ -314,6 +394,60 @@ async function getModalityConnections(organizationId: string) {
       (right.lastReceivedAt ?? "").localeCompare(left.lastReceivedAt ?? "")
     ),
   }
+}
+
+async function getImportJobs(organizationId: string): Promise<ImportJobSummary[]> {
+  if (!isSupabaseConfigured) {
+    return [
+      {
+        id: "demo-job",
+        jobKey: "demo",
+        status: "completed",
+        source: "demo",
+        sourceAeTitle: "Demo AE",
+        modality: "DX",
+        patientDicomId: "DEMO-001",
+        accessionNumber: "DEMO-ACC",
+        expectedInstances: 1,
+        importedInstances: 1,
+        failedInstances: 0,
+        startedAt: null,
+        completedAt: null,
+        lastSeenAt: null,
+        errorMessage: null,
+      },
+    ]
+  }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("dicom_import_jobs")
+    .select(
+      "id, job_key, status, source, source_ae_title, modality, patient_dicom_id, accession_number, expected_instances, imported_instances, failed_instances, started_at, completed_at, last_seen_at, error_message"
+    )
+    .eq("organization_id", organizationId)
+    .order("last_seen_at", { ascending: false })
+    .limit(12)
+
+  if (error) return []
+
+  return ((data ?? []) as ImportJobRow[]).map((row) => ({
+    id: row.id,
+    jobKey: row.job_key,
+    status: row.status,
+    source: row.source,
+    sourceAeTitle: row.source_ae_title,
+    modality: row.modality,
+    patientDicomId: row.patient_dicom_id,
+    accessionNumber: row.accession_number,
+    expectedInstances: row.expected_instances ?? 0,
+    importedInstances: row.imported_instances ?? 0,
+    failedInstances: row.failed_instances ?? 0,
+    startedAt: row.started_at,
+    completedAt: row.completed_at,
+    lastSeenAt: row.last_seen_at,
+    errorMessage: row.error_message,
+  }))
 }
 
 function classifyModalityStatus(receivedAt: string | null): ModalityConnection["status"] {

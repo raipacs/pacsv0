@@ -41,7 +41,10 @@ try {
     await fs.writeFile(path.join(workDir, filename), buffer)
   }
 
-  await runFolderImport(workDir)
+  await runFolderImport(workDir, {
+    instanceCount: instanceIds.length,
+    studyInstanceUid: await getStudyInstanceUid(studyId),
+  })
 
   if (process.env.RAI_PACS_ORTHANC_DELETE_AFTER_IMPORT === "true") {
     await orthancJson(`/studies/${encodeURIComponent(studyId)}`, { method: "DELETE" })
@@ -104,6 +107,11 @@ async function listStudyInstanceIds(id) {
   return instanceIds
 }
 
+async function getStudyInstanceUid(id) {
+  const study = await orthancJson(`/studies/${encodeURIComponent(id)}`)
+  return study.MainDicomTags?.StudyInstanceUID || process.env.RAI_PACS_ORTHANC_STUDY_UID || id
+}
+
 async function orthancJson(route, init = {}) {
   const response = await fetch(`${orthancUrl}${route}`, {
     ...init,
@@ -146,11 +154,21 @@ function createOrthancAuthHeader() {
   return `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`
 }
 
-function runFolderImport(dicomDir) {
+function runFolderImport(dicomDir, { instanceCount, studyInstanceUid }) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ["scripts/import-dicom-folder.mjs"], {
       cwd: process.cwd(),
-      env: { ...process.env, RAI_PACS_DICOM_DIR: dicomDir },
+      env: {
+        ...process.env,
+        RAI_PACS_DICOM_DIR: dicomDir,
+        RAI_PACS_IMPORT_SOURCE: "orthanc",
+        RAI_PACS_IMPORT_JOB_KEY: `orthanc:${studyId}:${studyInstanceUid}`,
+        RAI_PACS_ORTHANC_STUDY_ID: studyId,
+        RAI_PACS_ORTHANC_STUDY_UID: studyInstanceUid,
+        RAI_PACS_IMPORT_SOURCE_AE_TITLE:
+          process.env.RAI_PACS_ORTHANC_SOURCE_AE_TITLE || "ORTHANC",
+        RAI_PACS_EXPECTED_INSTANCES: String(instanceCount),
+      },
       stdio: "inherit",
     })
 

@@ -29,6 +29,17 @@ const supabase = createClient(
 
 const bucket = process.env.RAI_PACS_STORAGE_BUCKET ?? "dicom-originals"
 const sourceDir = process.env.RAI_PACS_DICOM_DIR
+const importSource = process.env.RAI_PACS_IMPORT_SOURCE ?? "folder"
+const importJobKey =
+  process.env.RAI_PACS_IMPORT_JOB_KEY ??
+  process.env.RAI_PACS_ORTHANC_STUDY_ID ??
+  process.env.RAI_PACS_ORTHANC_STUDY_UID ??
+  `folder:${sourceDir}`
+const sourceAeTitle =
+  process.env.RAI_PACS_SOURCE_AE_TITLE ??
+  process.env.RAI_PACS_ORTHANC_SOURCE_AE_TITLE ??
+  process.env.RAI_PACS_IMPORT_SOURCE_AE_TITLE ??
+  "IMPORTER"
 
 const LONG_VR = new Set(["OB", "OD", "OF", "OL", "OW", "SQ", "UC", "UR", "UT", "UN"])
 const NUMERIC_TAGS = new Set(["0020,0011", "0020,0013"])
@@ -83,151 +94,199 @@ const filenames = (await fs.readdir(sourceDir))
   .filter((filename) => !filename.startsWith("."))
   .sort()
 const results = []
+let importJob = await startImportJob({
+  expectedInstances: filenames.length,
+})
 
 for (const filename of filenames) {
-  const filePath = path.join(sourceDir, filename)
-  const stat = await fs.stat(filePath)
-  if (!stat.isFile()) continue
+  try {
+    const filePath = path.join(sourceDir, filename)
+    const stat = await fs.stat(filePath)
+    if (!stat.isFile()) continue
 
-  const buffer = await fs.readFile(filePath)
-  const metadata = parseDicom(buffer)
+    const buffer = await fs.readFile(filePath)
+    const metadata = parseDicom(buffer)
 
-  if (
-    !metadata.studyInstanceUid ||
-    !metadata.seriesInstanceUid ||
-    !metadata.sopInstanceUid ||
-    !metadata.modality
-  ) {
-    results.push({ file: filename, status: "skipped", reason: "missing DICOM UID metadata" })
-    continue
-  }
+    if (
+      !metadata.studyInstanceUid ||
+      !metadata.seriesInstanceUid ||
+      !metadata.sopInstanceUid ||
+      !metadata.modality
+    ) {
+      results.push({ file: filename, status: "skipped", reason: "missing DICOM UID metadata" })
+      await touchImportJob({
+        status: "importing",
+        skippedInstances: countResults("skipped"),
+      })
+      continue
+    }
 
-  const patientName = splitDicomPatientName(metadata.patientName)
-  const patientNumber =
-    metadata.patientDicomId?.trim() || `DICOM-${shortUid(metadata.studyInstanceUid)}`
+    const patientName = splitDicomPatientName(metadata.patientName)
+    const patientNumber =
+      metadata.patientDicomId?.trim() || `DICOM-${shortUid(metadata.studyInstanceUid)}`
 
-  const { data: patient, error: patientError } = await supabase
-    .from("patients")
-    .upsert(
-      {
-        organization_id: membership.organization_id,
-        patient_number: patientNumber,
-        first_name: patientName.firstName,
-        last_name: patientName.lastName,
-        birth_date: normalizeDicomDate(metadata.patientBirthDate),
-        sex: normalizePatientSex(metadata.patientSex),
-        created_by: authData.user.id,
-      },
-      { onConflict: "organization_id,patient_number" }
+    await touchImportJob({
+      status: "importing",
+      studyInstanceUid: metadata.studyInstanceUid,
+      accessionNumber: metadata.accessionNumber,
+      patientDicomId: patientNumber,
+      modality: metadata.modality.toUpperCase(),
+    })
+
+    const { data: patient, error: patientError } = await supabase
+      .from("patients")
+      .upsert(
+        {
+          organization_id: membership.organization_id,
+          patient_number: patientNumber,
+          first_name: patientName.firstName,
+          last_name: patientName.lastName,
+          birth_date: normalizeDicomDate(metadata.patientBirthDate),
+          sex: normalizePatientSex(metadata.patientSex),
+          created_by: authData.user.id,
+        },
+        { onConflict: "organization_id,patient_number" }
+      )
+      .select("id,patient_number")
+      .single()
+
+    if (patientError) throw new Error(`${filename} patient upsert failed: ${patientError.message}`)
+
+    const storageKey = [
+      membership.organization_id,
+      normalizeStorageSegment(metadata.studyInstanceUid),
+      normalizeStorageSegment(metadata.seriesInstanceUid),
+      `${normalizeStorageSegment(metadata.sopInstanceUid)}.dcm`,
+    ].join("/")
+    const sha256 = createHash("sha256").update(buffer).digest("hex")
+
+    const upload = await supabase.storage.from(bucket).upload(storageKey, buffer, {
+      contentType: "application/dicom",
+      cacheControl: "31536000",
+      upsert: false,
+    })
+
+    if (upload.error && !/already exists|Duplicate/i.test(upload.error.message)) {
+      throw new Error(`${filename} storage upload failed: ${upload.error.message}`)
+    }
+
+    const accessionNumber = await resolveAccessionNumber(
+      metadata.accessionNumber,
+      metadata.studyInstanceUid,
+      membership.organization_id
     )
-    .select("id,patient_number")
-    .single()
+    const description =
+      metadata.studyDescription || metadata.seriesDescription || `${metadata.modality} import`
 
-  if (patientError) throw new Error(`${filename} patient upsert failed: ${patientError.message}`)
+    const { data: study, error: studyError } = await supabase
+      .from("studies")
+      .upsert(
+        {
+          organization_id: membership.organization_id,
+          patient_id: patient.id,
+          study_instance_uid: metadata.studyInstanceUid,
+          accession_number: accessionNumber,
+          modality: metadata.modality.toUpperCase(),
+          body_part: metadata.bodyPart || null,
+          description,
+          study_at: normalizeDicomDateTime(metadata.studyDate, metadata.studyTime),
+          priority: "routine",
+          status: "received",
+          source_ae_title: sourceAeTitle,
+        },
+        { onConflict: "organization_id,study_instance_uid" }
+      )
+      .select("id")
+      .single()
 
-  const storageKey = [
-    membership.organization_id,
-    normalizeStorageSegment(metadata.studyInstanceUid),
-    normalizeStorageSegment(metadata.seriesInstanceUid),
-    `${normalizeStorageSegment(metadata.sopInstanceUid)}.dcm`,
-  ].join("/")
-  const sha256 = createHash("sha256").update(buffer).digest("hex")
+    if (studyError) throw new Error(`${filename} study upsert failed: ${studyError.message}`)
 
-  const upload = await supabase.storage.from(bucket).upload(storageKey, buffer, {
-    contentType: "application/dicom",
-    cacheControl: "31536000",
-    upsert: false,
-  })
+    const { data: series, error: seriesError } = await supabase
+      .from("series")
+      .upsert(
+        {
+          organization_id: membership.organization_id,
+          study_id: study.id,
+          series_instance_uid: metadata.seriesInstanceUid,
+          series_number: toNullableInteger(metadata.seriesNumber),
+          modality: metadata.modality.toUpperCase(),
+          description,
+        },
+        { onConflict: "organization_id,series_instance_uid" }
+      )
+      .select("id")
+      .single()
 
-  if (upload.error && !/already exists|Duplicate/i.test(upload.error.message)) {
-    throw new Error(`${filename} storage upload failed: ${upload.error.message}`)
-  }
+    if (seriesError) throw new Error(`${filename} series upsert failed: ${seriesError.message}`)
 
-  const accessionNumber = await resolveAccessionNumber(
-    metadata.accessionNumber,
-    metadata.studyInstanceUid,
-    membership.organization_id
-  )
-  const description =
-    metadata.studyDescription || metadata.seriesDescription || `${metadata.modality} import`
-
-  const { data: study, error: studyError } = await supabase
-    .from("studies")
-    .upsert(
-      {
-        organization_id: membership.organization_id,
-        patient_id: patient.id,
-        study_instance_uid: metadata.studyInstanceUid,
-        accession_number: accessionNumber,
-        modality: metadata.modality.toUpperCase(),
-        body_part: metadata.bodyPart || null,
-        description,
-        study_at: normalizeDicomDateTime(metadata.studyDate, metadata.studyTime),
-        priority: "routine",
-        status: "received",
-      },
-      { onConflict: "organization_id,study_instance_uid" }
-    )
-    .select("id")
-    .single()
-
-  if (studyError) throw new Error(`${filename} study upsert failed: ${studyError.message}`)
-
-  const { data: series, error: seriesError } = await supabase
-    .from("series")
-    .upsert(
+    const { error: instanceError } = await supabase.from("instances").upsert(
       {
         organization_id: membership.organization_id,
         study_id: study.id,
-        series_instance_uid: metadata.seriesInstanceUid,
-        series_number: toNullableInteger(metadata.seriesNumber),
-        modality: metadata.modality.toUpperCase(),
-        description,
+        series_id: series.id,
+        sop_instance_uid: metadata.sopInstanceUid,
+        sop_class_uid: metadata.sopClassUid || null,
+        transfer_syntax_uid: metadata.transferSyntaxUid || null,
+        instance_number: toNullableInteger(metadata.instanceNumber),
+        storage_bucket: bucket,
+        storage_key: storageKey,
+        size_bytes: buffer.length,
+        sha256,
       },
-      { onConflict: "organization_id,series_instance_uid" }
+      { onConflict: "organization_id,sop_instance_uid" }
     )
-    .select("id")
-    .single()
 
-  if (seriesError) throw new Error(`${filename} series upsert failed: ${seriesError.message}`)
+    if (instanceError) throw new Error(`${filename} instance upsert failed: ${instanceError.message}`)
 
-  const { error: instanceError } = await supabase.from("instances").upsert(
-    {
-      organization_id: membership.organization_id,
-      study_id: study.id,
-      series_id: series.id,
-      sop_instance_uid: metadata.sopInstanceUid,
-      sop_class_uid: metadata.sopClassUid || null,
-      transfer_syntax_uid: metadata.transferSyntaxUid || null,
-      instance_number: toNullableInteger(metadata.instanceNumber),
-      storage_bucket: bucket,
-      storage_key: storageKey,
-      size_bytes: buffer.length,
-      sha256,
-    },
-    { onConflict: "organization_id,sop_instance_uid" }
-  )
+    const { count } = await supabase
+      .from("instances")
+      .select("id", { count: "exact", head: true })
+      .eq("series_id", series.id)
 
-  if (instanceError) throw new Error(`${filename} instance upsert failed: ${instanceError.message}`)
+    if (typeof count === "number") {
+      await supabase.from("series").update({ instance_count: count }).eq("id", series.id)
+    }
 
-  const { count } = await supabase
-    .from("instances")
-    .select("id", { count: "exact", head: true })
-    .eq("series_id", series.id)
+    results.push({
+      file: filename,
+      status: upload.error ? "metadata-updated-existing-object" : "uploaded",
+      modality: metadata.modality,
+      patientNumber,
+      storageKey,
+      sizeBytes: buffer.length,
+    })
 
-  if (typeof count === "number") {
-    await supabase.from("series").update({ instance_count: count }).eq("id", series.id)
+    await syncModalityRegistry({
+      modality: metadata.modality.toUpperCase(),
+      studyInstanceUid: metadata.studyInstanceUid,
+      accessionNumber,
+    })
+    await touchImportJob({
+      status: "importing",
+      importedInstances: countResults("uploaded") + countResults("metadata-updated-existing-object"),
+      skippedInstances: countResults("skipped"),
+      failedInstances: countResults("failed"),
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    results.push({ file: filename, status: "failed", reason: message })
+    await touchImportJob({
+      status: "retrying",
+      failedInstances: countResults("failed"),
+      errorMessage: message,
+    })
   }
-
-  results.push({
-    file: filename,
-    status: upload.error ? "metadata-updated-existing-object" : "uploaded",
-    modality: metadata.modality,
-    patientNumber,
-    storageKey,
-    sizeBytes: buffer.length,
-  })
 }
+
+const failedInstances = countResults("failed")
+await touchImportJob({
+  status: failedInstances ? "failed" : "completed",
+  importedInstances: countResults("uploaded") + countResults("metadata-updated-existing-object"),
+  skippedInstances: countResults("skipped"),
+  failedInstances,
+  completedAt: new Date().toISOString(),
+  errorMessage: failedInstances ? `${failedInstances} instance import edilemedi` : null,
+})
 
 console.log(
   JSON.stringify(
@@ -241,6 +300,122 @@ console.log(
     2
   )
 )
+
+if (failedInstances) process.exitCode = 1
+
+async function startImportJob({ expectedInstances }) {
+  const { data, error } = await supabase
+    .from("dicom_import_jobs")
+    .upsert(
+      {
+        organization_id: membership.organization_id,
+        job_key: importJobKey,
+        status: "importing",
+        source: importSource,
+        source_ae_title: sourceAeTitle,
+        expected_instances: expectedInstances,
+        metadata: {
+          sourceDir,
+          bucket,
+          importer: authData.user.email,
+        },
+        started_at: new Date().toISOString(),
+        last_seen_at: new Date().toISOString(),
+      },
+      { onConflict: "organization_id,job_key" }
+    )
+    .select("id")
+    .single()
+
+  if (isOptionalDicomOpsError(error)) return null
+  if (error) throw new Error(`Import job start failed: ${error.message}`)
+  return data
+}
+
+async function touchImportJob(fields) {
+  if (!importJob) return
+  const payload = {
+    status: fields.status,
+    last_seen_at: new Date().toISOString(),
+  }
+  if (fields.studyInstanceUid) payload.study_instance_uid = fields.studyInstanceUid
+  if (fields.accessionNumber) payload.accession_number = fields.accessionNumber
+  if (fields.patientDicomId) payload.patient_dicom_id = fields.patientDicomId
+  if (fields.modality) payload.modality = fields.modality
+  if (typeof fields.importedInstances === "number") payload.imported_instances = fields.importedInstances
+  if (typeof fields.skippedInstances === "number") payload.skipped_instances = fields.skippedInstances
+  if (typeof fields.failedInstances === "number") payload.failed_instances = fields.failedInstances
+  if (fields.completedAt) payload.completed_at = fields.completedAt
+  if ("errorMessage" in fields) payload.error_message = fields.errorMessage
+
+  const { error } = await supabase
+    .from("dicom_import_jobs")
+    .update(payload)
+    .eq("id", importJob.id)
+
+  if (isOptionalDicomOpsError(error)) {
+    importJob = null
+    return
+  }
+  if (error) throw new Error(`Import job update failed: ${error.message}`)
+}
+
+async function syncModalityRegistry({ modality, studyInstanceUid, accessionNumber }) {
+  const { count: studyCount } = await supabase
+    .from("studies")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", membership.organization_id)
+    .eq("source_ae_title", sourceAeTitle)
+
+  const { data: studyRows } = await supabase
+    .from("studies")
+    .select("id")
+    .eq("organization_id", membership.organization_id)
+    .eq("source_ae_title", sourceAeTitle)
+    .limit(1000)
+
+  const studyIds = (studyRows ?? []).map((study) => study.id)
+  const { count: instanceCount } = studyIds.length
+    ? await supabase
+        .from("instances")
+        .select("id", { count: "exact", head: true })
+        .in("study_id", studyIds)
+    : { count: 0 }
+
+  const { error } = await supabase.from("dicom_modalities").upsert(
+    {
+      organization_id: membership.organization_id,
+      ae_title: sourceAeTitle,
+      modality,
+      status: "observed",
+      last_seen_at: new Date().toISOString(),
+      last_store_at: new Date().toISOString(),
+      last_study_instance_uid: studyInstanceUid,
+      last_accession_number: accessionNumber,
+      received_study_count: studyCount ?? 0,
+      received_instance_count: instanceCount ?? 0,
+      metadata: {
+        source: importSource,
+        jobKey: importJobKey,
+      },
+    },
+    { onConflict: "organization_id,ae_title" }
+  )
+
+  if (isOptionalDicomOpsError(error)) return
+  if (error) throw new Error(`Modality registry update failed: ${error.message}`)
+}
+
+function countResults(status) {
+  return results.filter((result) => result.status === status).length
+}
+
+function isOptionalDicomOpsError(error) {
+  if (!error) return false
+  return /dicom_import_jobs|dicom_modalities|schema cache|does not exist|relation/i.test(
+    error.message ?? ""
+  )
+}
 
 async function resolveAccessionNumber(baseAccessionNumber, studyInstanceUid, organizationId) {
   const candidate = baseAccessionNumber?.trim() || `DCM-${shortUid(studyInstanceUid)}`
