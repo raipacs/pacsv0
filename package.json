@@ -7,6 +7,7 @@
     "build": "next build --webpack",
     "start": "next start -p 4174",
     "import:dicom-folder": "node scripts/import-dicom-folder.mjs",
+    "import:orthanc-study": "node scripts/import-orthanc-study.mjs",
     "lint": "eslint"
   },
   "dependencies": {

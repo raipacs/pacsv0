@@ -49,7 +49,7 @@ Port: 4242
 
 ## RAI Entegrasyon Hedefi
 
-PoC'nin sonraki adimi bir bridge servisidir:
+PoC'nin sonraki adimi bridge komutudur:
 
 1. Orthanc yeni instance aldiginda olayi yakalar.
 2. Instance metadata'sini Orthanc REST API'den okur.
@@ -59,3 +59,39 @@ PoC'nin sonraki adimi bir bridge servisidir:
 
 Bu PoC'de Orthanc kalici ana arsiv degil, DICOM protokol kapisi olarak
 konumlandirilmistir. Ana hasta/tetkik is akisi RAI uygulamasinda kalir.
+
+## Orthanc Study Import Bridge
+
+Repo kokunden calistirilir. Komut, Orthanc'taki tek bir study'nin instance
+dosyalarini gecici klasore indirir ve mevcut `import:dicom-folder` akisini
+calistirir.
+
+Gerekli RAI import env degiskenleri:
+
+```text
+RAI_PACS_SUPABASE_URL=
+RAI_PACS_SUPABASE_PUBLISHABLE_KEY=
+RAI_PACS_IMPORT_EMAIL=
+RAI_PACS_IMPORT_PASSWORD=
+```
+
+Orthanc env degiskenleri icin `dicom-gateway/.env.example` dosyasini baz alin:
+
+```bash
+RAI_PACS_ORTHANC_URL=http://127.0.0.1:8042
+RAI_PACS_ORTHANC_USERNAME=rai-admin
+RAI_PACS_ORTHANC_PASSWORD=change-this-password
+RAI_PACS_ORTHANC_STUDY_ID=<orthanc-study-id>
+npm run import:orthanc-study
+```
+
+Study internal ID bilinmiyorsa `StudyInstanceUID` ile de arama yapilabilir:
+
+```bash
+RAI_PACS_ORTHANC_STUDY_UID=1.2.840....
+npm run import:orthanc-study
+```
+
+PoC sirasinda `RAI_PACS_ORTHANC_DELETE_AFTER_IMPORT=false` kalsin. Import
+sonrasi otomatik silme, ancak Storage ve Postgres dogrulamasi otomatiklestikten
+sonra acilmali.

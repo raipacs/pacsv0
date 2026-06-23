@@ -61,6 +61,25 @@ server gerekir:
 1. Orthanc'i lokal veya kucuk bir cloud VM'de calistir.
 2. DICOM export klasorunden `storescu` veya Orthanc REST ile test instance
    gonder.
-3. Bridge servis taslagini ekle.
-4. Bridge ile RAI Storage'a kopyalama ve Postgres upsert yap.
-5. RAI Viewer'in ayni tetkiki Storage'dan actigini dogrula.
+3. `npm run import:orthanc-study` ile Orthanc study'sini RAI Storage ve
+   Postgres'e aktar.
+4. RAI Viewer'in ayni tetkiki Storage'dan actigini dogrula.
+5. Daha sonra bridge'i manuel komuttan worker/webhook servis haline getir.
+
+## Bridge Komutu
+
+`scripts/import-orthanc-study.mjs` ilk bridge adimidir. Bu komut:
+
+- Orthanc REST API'ye Basic Auth ile baglanir.
+- `RAI_PACS_ORTHANC_STUDY_ID` veya `RAI_PACS_ORTHANC_STUDY_UID` ile tek study
+  secer.
+- Study altindaki tum series ve instance ID'lerini toplar.
+- Her instance icin `/instances/{id}/file` endpoint'inden orijinal DICOM'u
+  indirir.
+- Gecici bir klasor olusturur.
+- Mevcut `scripts/import-dicom-folder.mjs` komutunu ayni import kimligi ile
+  calistirir.
+
+Bu tasarim mevcut ve test edilmis klasor import mantigini tekrar kullanir.
+Ileride webhook/worker servis yazarken ayni cekirdek import mantigi ayrica
+modul haline getirilebilir.
