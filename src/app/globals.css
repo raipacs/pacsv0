@@ -491,6 +491,11 @@ p {
   font-size: 28px;
 }
 
+.metric-row .metric-small {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
 .data-panel {
   overflow: hidden;
 }
@@ -1583,6 +1588,93 @@ td span {
   gap: 8px;
 }
 
+.admin-section {
+  margin-top: 16px;
+}
+
+.dicom-admin-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.health-list {
+  display: grid;
+}
+
+.health-row {
+  display: flex;
+  min-height: 74px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+  padding: 14px 16px;
+}
+
+.health-row:last-child {
+  border-bottom: 0;
+}
+
+.health-row strong,
+.health-row span {
+  display: block;
+}
+
+.health-row span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.health-row-status {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.health-row-status small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.health-badge {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 9px;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.health-badge.ok {
+  color: var(--success);
+  background: #d1fadf;
+}
+
+.health-badge.warning {
+  color: var(--warning);
+  background: #fef0c7;
+}
+
+.health-badge.error {
+  color: var(--danger);
+  background: #fee4e2;
+}
+
+.health-badge.unknown {
+  color: #475467;
+  background: #eaecf0;
+}
+
 .inline-error {
   color: var(--danger);
   font-size: 12px;
@@ -1975,6 +2067,10 @@ td span {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .dicom-admin-grid {
+    grid-template-columns: 1fr;
+  }
+
   .import-progress-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2176,5 +2272,15 @@ td span {
 
   .dicom-corner {
     display: none;
+  }
+
+  .health-row,
+  .health-row-status {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .health-row-status {
+    gap: 6px;
   }
 }

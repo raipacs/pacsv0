@@ -1,3 +1,5 @@
+import Link from "next/link"
+
 import { requireAdmin } from "@/lib/auth"
 
 export const metadata = { title: "Admin" }
@@ -46,9 +48,14 @@ export default async function UsersPage() {
           <h1>Admin</h1>
           <p>Kullanıcı, grup ve kurum yönetimi ekranlarını buradan yönetin.</p>
         </div>
-        <button className="button primary" type="button">
-          Kullanıcı davet et
-        </button>
+        <div className="page-actions">
+          <Link className="button subtle" href="/admin/dicom-server">
+            DICOM Server
+          </Link>
+          <button className="button primary" type="button">
+            Kullanıcı davet et
+          </button>
+        </div>
       </header>
       <section className="data-panel">
         <div className="panel-heading">
