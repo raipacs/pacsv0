@@ -1678,6 +1678,16 @@ td span {
   overflow-wrap: anywhere;
 }
 
+.panel-note {
+  margin: 0;
+  border-top: 1px solid var(--border);
+  padding: 12px 16px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .inline-error {
   color: var(--danger);
   font-size: 12px;

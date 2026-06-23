@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth"
 import {
   formatDateTime,
   getDicomServerDashboard,
+  type CloudInfrastructureItem,
   type HealthItem,
   type HealthState,
   type ImportJobStatus,
@@ -115,6 +116,35 @@ export default async function DicomServerAdminPage() {
 
       <section className="data-panel admin-section">
         <div className="panel-heading">
+          <h2>Google Cloud altyapısı</h2>
+        </div>
+        <div className="responsive-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Obje</th>
+                <th>Tip</th>
+                <th>Detay</th>
+                <th>Sinyal</th>
+                <th>Durum</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dashboard.cloudInfrastructure.map((item) => (
+                <CloudInfrastructureRow item={item} key={`${item.kind}-${item.name}`} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="panel-note">
+          Firewall ve VM satırları mevcut RAI konfigürasyonu ve dış erişim sinyaliyle
+          izlenir. GCP Service Account bağlandığında gerçek firewall kuralı, VM
+          state ve systemd timer durumu doğrudan okunabilir.
+        </p>
+      </section>
+
+      <section className="data-panel admin-section">
+        <div className="panel-heading">
           <h2>Modalite bağlantıları</h2>
         </div>
         {dashboard.modalities.length ? (
@@ -192,6 +222,25 @@ export default async function DicomServerAdminPage() {
         )}
       </section>
     </>
+  )
+}
+
+function CloudInfrastructureRow({ item }: { item: CloudInfrastructureItem }) {
+  return (
+    <tr>
+      <td>
+        <strong>{item.name}</strong>
+        {typeof item.latencyMs === "number" ? <span>{item.latencyMs} ms</span> : null}
+      </td>
+      <td>{item.kind}</td>
+      <td>{item.detail}</td>
+      <td>{item.signal}</td>
+      <td>
+        <span className={`health-badge ${healthClass(item.state)}`}>
+          {healthLabel(item.state)}
+        </span>
+      </td>
+    </tr>
   )
 }
 

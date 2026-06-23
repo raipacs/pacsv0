@@ -1,3 +1,5 @@
+import { resolve4 } from "node:dns/promises"
+
 import { isSupabaseConfigured } from "@/lib/config"
 import { createClient } from "@/lib/supabase/server"
 
@@ -41,6 +43,15 @@ export type ImportJobSummary = {
   errorMessage: string | null
 }
 
+export type CloudInfrastructureItem = {
+  name: string
+  kind: string
+  detail: string
+  state: HealthState
+  signal: string
+  latencyMs?: number
+}
+
 export type DicomServerDashboard = {
   endpoint: {
     host: string
@@ -51,6 +62,7 @@ export type DicomServerDashboard = {
   }
   services: HealthItem[]
   apis: HealthItem[]
+  cloudInfrastructure: CloudInfrastructureItem[]
   modalities: ModalityConnection[]
   importJobs: ImportJobSummary[]
   lastImportAt: string | null
@@ -101,6 +113,11 @@ type ImportJobRow = {
 const DEFAULT_DICOM_HOST = "dicom.raipacs.com"
 const DEFAULT_DICOM_PORT = "4242"
 const DEFAULT_DICOM_AE_TITLE = "RAIPACS"
+const DEFAULT_GCP_PROJECT_ID = "rai-pacs"
+const DEFAULT_GCP_ZONE = "europe-west4-c"
+const DEFAULT_GCP_VM_NAME = "rai-dicom-gateway"
+const DEFAULT_GCP_STATIC_IP = "34.7.217.58"
+const DEFAULT_GCP_FIREWALL_SCOPE = "0.0.0.0/0"
 
 export async function getDicomServerDashboard(
   organizationId: string
@@ -113,16 +130,25 @@ export async function getDicomServerDashboard(
     tls: "Kapalı",
   }
 
-  const [gateway, orthancRest, dicomweb, dbStatus, storageStatus, modalityData, importJobs] =
-    await Promise.all([
-      checkGatewayReachability(),
-      checkOrthancRest(),
-      checkDicomweb(),
-      checkDatabase(organizationId),
-      checkStorage(),
-      getModalityConnections(organizationId),
-      getImportJobs(organizationId),
-    ])
+  const [
+    gateway,
+    orthancRest,
+    dicomweb,
+    dbStatus,
+    storageStatus,
+    cloudInfrastructure,
+    modalityData,
+    importJobs,
+  ] = await Promise.all([
+    checkGatewayReachability(),
+    checkOrthancRest(),
+    checkDicomweb(),
+    checkDatabase(organizationId),
+    checkStorage(),
+    getCloudInfrastructure(endpoint),
+    getModalityConnections(organizationId),
+    getImportJobs(organizationId),
+  ])
 
   return {
     endpoint,
@@ -143,10 +169,115 @@ export async function getDicomServerDashboard(
       orthancRest,
     ],
     apis: [dbStatus, storageStatus, dicomweb],
+    cloudInfrastructure,
     modalities: modalityData.modalities,
     importJobs,
     lastImportAt: modalityData.lastImportAt,
   }
+}
+
+async function getCloudInfrastructure(
+  endpoint: DicomServerDashboard["endpoint"]
+): Promise<CloudInfrastructureItem[]> {
+  const projectId = process.env.RAI_PACS_GCP_PROJECT_ID || DEFAULT_GCP_PROJECT_ID
+  const zone = process.env.RAI_PACS_GCP_ZONE || DEFAULT_GCP_ZONE
+  const vmName = process.env.RAI_PACS_GCP_VM_NAME || DEFAULT_GCP_VM_NAME
+  const staticIp = process.env.RAI_PACS_GCP_STATIC_IP || DEFAULT_GCP_STATIC_IP
+  const firewallScope =
+    process.env.RAI_PACS_GCP_FIREWALL_SOURCE_RANGE || DEFAULT_GCP_FIREWALL_SCOPE
+  const firewallPort = process.env.RAI_PACS_GCP_FIREWALL_DICOM_PORT || endpoint.port
+
+  const [dnsCheck, gatewayCheck, orthancCheck] = await Promise.all([
+    resolveDnsToIp(endpoint.host),
+    timedFetch(`${getOrthancBaseUrl()}/system`, { method: "HEAD" }),
+    checkOrthancRest(),
+  ])
+
+  return [
+    {
+      name: "Google Cloud project",
+      kind: "GCP",
+      detail: `${projectId} / ${zone}`,
+      state: "ok",
+      signal: "Konfigürasyon",
+    },
+    {
+      name: "Compute Engine VM",
+      kind: "VM",
+      detail: vmName,
+      state: gatewayCheck.ok || gatewayCheck.status === 401 ? "ok" : "warning",
+      signal:
+        gatewayCheck.ok || gatewayCheck.status === 401
+          ? "Gateway HTTPS yanıt veriyor"
+          : gatewayCheck.error || `HTTP ${gatewayCheck.status}`,
+      latencyMs: gatewayCheck.latencyMs,
+    },
+    {
+      name: "Static external IP",
+      kind: "Network",
+      detail: staticIp,
+      state: dnsCheck.resolvedIp === staticIp ? "ok" : dnsCheck.resolvedIp ? "warning" : "unknown",
+      signal: dnsCheck.resolvedIp
+        ? `${endpoint.host} -> ${dnsCheck.resolvedIp}`
+        : "DNS resolver sonucu alınamadı",
+      latencyMs: dnsCheck.latencyMs,
+    },
+    {
+      name: "DNS A record",
+      kind: "DNS",
+      detail: endpoint.host,
+      state: dnsCheck.resolvedIp === staticIp ? "ok" : dnsCheck.resolvedIp ? "warning" : "unknown",
+      signal: dnsCheck.resolvedIp
+        ? `A kaydı ${dnsCheck.resolvedIp}`
+        : dnsCheck.error || "DNS kontrolü başarısız",
+      latencyMs: dnsCheck.latencyMs,
+    },
+    {
+      name: "Firewall DICOM",
+      kind: "Firewall",
+      detail: `TCP ${firewallPort} / ${firewallScope}`,
+      state: firewallScope === "0.0.0.0/0" ? "warning" : "ok",
+      signal:
+        firewallScope === "0.0.0.0/0"
+          ? "Geçici olarak tüm kaynaklara açık"
+          : "Kaynak aralığı kısıtlı",
+    },
+    {
+      name: "Caddy reverse proxy",
+      kind: "Container",
+      detail: "HTTPS / Basic Auth ön kapı",
+      state: gatewayCheck.ok || gatewayCheck.status === 401 ? "ok" : "error",
+      signal:
+        gatewayCheck.status === 401
+          ? "HTTPS erişilebilir, auth aktif"
+          : gatewayCheck.ok
+            ? "HTTPS erişilebilir"
+            : gatewayCheck.error || `HTTP ${gatewayCheck.status}`,
+      latencyMs: gatewayCheck.latencyMs,
+    },
+    {
+      name: "Orthanc container",
+      kind: "Container",
+      detail: "rai-pacs-orthanc",
+      state: orthancCheck.state,
+      signal: orthancCheck.detail,
+      latencyMs: orthancCheck.latencyMs,
+    },
+    {
+      name: "DICOMweb proxy",
+      kind: "Container",
+      detail: "rai-pacs-dicomweb-proxy",
+      state: orthancCheck.state === "ok" ? "ok" : "unknown",
+      signal: "Orthanc DICOMweb endpoint üzerinden izleniyor",
+    },
+    {
+      name: "Import timer",
+      kind: "systemd",
+      detail: "rai-orthanc-import.timer",
+      state: "unknown",
+      signal: "VM içi systemd durumu GCP/SSH API bağlanınca canlı okunacak",
+    },
+  ]
 }
 
 async function checkDatabase(organizationId: string): Promise<HealthItem> {
@@ -282,6 +413,24 @@ async function checkDicomweb(): Promise<HealthItem> {
     detail: result.ok ? "QIDO-RS studies endpoint çalışıyor" : result.error || `HTTP ${result.status}`,
     state: result.ok ? "ok" : "error",
     latencyMs: result.latencyMs,
+  }
+}
+
+async function resolveDnsToIp(hostname: string) {
+  const startedAt = Date.now()
+  try {
+    const addresses = await resolve4(hostname)
+    return {
+      resolvedIp: addresses[0] ?? null,
+      error: null,
+      latencyMs: Date.now() - startedAt,
+    }
+  } catch (error) {
+    return {
+      resolvedIp: null,
+      error: error instanceof Error ? error.message : "DNS kontrolü başarısız",
+      latencyMs: Date.now() - startedAt,
+    }
   }
 }
 
