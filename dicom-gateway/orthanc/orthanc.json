@@ -1,0 +1,40 @@
+{
+  "Name": "RAI PACS DICOM Gateway",
+  "StorageDirectory": "/var/lib/orthanc/db",
+  "IndexDirectory": "/var/lib/orthanc/db",
+
+  "DicomAet": "RAIPACS",
+  "DicomPort": 4242,
+  "DefaultEncoding": "Utf8",
+  "AcceptedTransferSyntaxes": [ "*" ],
+  "UnknownSopClassAccepted": true,
+
+  "HttpPort": 8042,
+  "RemoteAccessAllowed": true,
+  "AuthenticationEnabled": true,
+  "RegisteredUsers": {
+    "rai-admin": "change-this-password"
+  },
+
+  "Plugins": [
+    "/usr/share/orthanc/plugins"
+  ],
+
+  "DicomWeb": {
+    "Enable": true,
+    "Root": "/dicom-web/",
+    "EnableWado": true,
+    "WadoRoot": "/wado",
+    "Ssl": false,
+    "Servers": {}
+  },
+
+  "HttpServerEnabled": true,
+  "DicomServerEnabled": true,
+  "SaveJobs": true,
+  "JobsHistorySize": 128,
+  "LimitJobs": 16,
+  "StableAge": 5,
+  "LogExportedResources": true,
+  "KeepAlive": true
+}
