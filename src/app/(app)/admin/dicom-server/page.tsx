@@ -1,4 +1,5 @@
 import Link from "next/link"
+import type { ReactNode } from "react"
 
 import { BranchFilter } from "@/components/branch-filter"
 import { requireAdmin } from "@/lib/auth"
@@ -51,9 +52,22 @@ export default async function DicomServerAdminPage({
     (sum, modality) => sum + modality.instances,
     0
   )
+  const silentModalities = dashboard.modalities.filter(
+    (item) => item.status === "Sessiz"
+  ).length
+  const operationWarningCount = failedJobs.length + silentModalities
   const servicesWarningCount = countHealthWarnings(dashboard.services)
   const apiWarningCount = countHealthWarnings(dashboard.apis)
   const cloudWarningCount = countHealthWarnings(dashboard.cloudInfrastructure)
+  const modalityWarningCount = dashboard.modalities.filter(
+    (item) => statusClass(item.status) !== "ok"
+  ).length
+  const connectionEventWarningCount = dashboard.connectionEvents.filter(
+    (event) => eventStatusClass(event.status) !== "ok"
+  ).length
+  const importQueueWarningCount = dashboard.importJobs.filter(
+    (job) => jobStatusClass(job.status) !== "ok"
+  ).length
 
   return (
     <>
@@ -103,10 +117,16 @@ export default async function DicomServerAdminPage({
         </article>
       </section>
 
-      <section className="data-panel admin-section">
-        <div className="panel-heading">
-          <h2>Operasyon özeti</h2>
-        </div>
+      <CollapsiblePanel
+        detail={
+          operationWarningCount
+            ? `${operationWarningCount} operasyon uyarısı var`
+            : "Operasyon göstergeleri normal"
+        }
+        open={operationWarningCount > 0}
+        title="Operasyon özeti"
+        warningCount={operationWarningCount}
+      >
         <div className="operation-summary-grid">
           <SummaryTile
             label="Son tetkik"
@@ -135,12 +155,14 @@ export default async function DicomServerAdminPage({
             }
           />
         </div>
-      </section>
+      </CollapsiblePanel>
 
       <section className="dicom-admin-grid">
-        <article className="info-panel">
-          <h2>Bağlantı bilgileri</h2>
-          <dl>
+        <CollapsiblePanel
+          detail="Cihazlara girilecek DICOM endpoint bilgileri"
+          title="Bağlantı bilgileri"
+        >
+          <dl className="connection-info-list">
             <div>
               <dt>Host</dt>
               <dd>{dashboard.endpoint.host}</dd>
@@ -162,74 +184,53 @@ export default async function DicomServerAdminPage({
               <dd>{dashboard.endpoint.tls}</dd>
             </div>
           </dl>
-        </article>
+        </CollapsiblePanel>
 
-        <details
-          className="data-panel collapsible-panel"
+        <CollapsiblePanel
+          detail={
+            servicesWarningCount
+              ? `${servicesWarningCount} uyarı / müdahale gerektiriyor`
+              : "Tüm servis kontrolleri normal"
+          }
           open={servicesWarningCount > 0}
+          title="Servisler"
+          warningCount={servicesWarningCount}
         >
-          <summary className="panel-heading">
-            <div>
-              <h2>Servisler</h2>
-              <small>
-                {servicesWarningCount
-                  ? `${servicesWarningCount} uyarı / müdahale gerektiriyor`
-                  : "Tüm servis kontrolleri normal"}
-              </small>
-            </div>
-            <span className={`panel-toggle ${servicesWarningCount ? "warning" : ""}`}>
-              {formatWarningCount(servicesWarningCount)}
-            </span>
-          </summary>
           <div className="health-list">
             {dashboard.services.map((item) => (
               <HealthRow item={item} key={item.name} />
             ))}
           </div>
-        </details>
+        </CollapsiblePanel>
       </section>
 
-      <details
-        className="data-panel admin-section collapsible-panel"
+      <CollapsiblePanel
+        detail={
+          apiWarningCount
+            ? `${apiWarningCount} uyarı / müdahale gerektiriyor`
+            : "Tüm API kontrolleri normal"
+        }
         open={apiWarningCount > 0}
+        title="API durumu"
+        warningCount={apiWarningCount}
       >
-        <summary className="panel-heading">
-          <div>
-            <h2>API durumu</h2>
-            <small>
-              {apiWarningCount
-                ? `${apiWarningCount} uyarı / müdahale gerektiriyor`
-                : "Tüm API kontrolleri normal"}
-            </small>
-          </div>
-          <span className={`panel-toggle ${apiWarningCount ? "warning" : ""}`}>
-            {formatWarningCount(apiWarningCount)}
-          </span>
-        </summary>
         <div className="health-list">
           {dashboard.apis.map((item) => (
             <HealthRow item={item} key={item.name} />
           ))}
         </div>
-      </details>
+      </CollapsiblePanel>
 
-      <details
-        className="data-panel admin-section collapsible-panel"
+      <CollapsiblePanel
+        detail={
+          cloudWarningCount
+            ? `${cloudWarningCount} uyarı / müdahale gerektiriyor`
+            : "Tüm Google Cloud kontrolleri normal"
+        }
         open={cloudWarningCount > 0}
+        title="Google Cloud altyapısı"
+        warningCount={cloudWarningCount}
       >
-        <summary className="panel-heading">
-          <div>
-            <h2>Google Cloud altyapısı</h2>
-            <small>
-              {cloudWarningCount
-                ? `${cloudWarningCount} uyarı / müdahale gerektiriyor`
-                : "Tüm Google Cloud kontrolleri normal"}
-            </small>
-          </div>
-          <span className={`panel-toggle ${cloudWarningCount ? "warning" : ""}`}>
-            {formatWarningCount(cloudWarningCount)}
-          </span>
-        </summary>
         <div className="responsive-table">
           <table>
             <thead>
@@ -253,12 +254,14 @@ export default async function DicomServerAdminPage({
           izlenir. GCP Service Account bağlandığında gerçek firewall kuralı, VM
           state ve systemd timer durumu doğrudan okunabilir.
         </p>
-      </details>
+      </CollapsiblePanel>
 
-      <section className="data-panel admin-section">
-        <div className="panel-heading">
-          <h2>Modalite bağlantıları</h2>
-        </div>
+      <CollapsiblePanel
+        detail={`${dashboard.modalities.length} modalite bağlantısı izleniyor`}
+        open={modalityWarningCount > 0}
+        title="Modalite bağlantıları"
+        warningCount={modalityWarningCount}
+      >
         {dashboard.modalities.length ? (
           <div className="responsive-table">
             <table>
@@ -301,12 +304,14 @@ export default async function DicomServerAdminPage({
             olduğunda bu liste otomatik dolacak.
           </p>
         )}
-      </section>
+      </CollapsiblePanel>
 
-      <section className="data-panel admin-section">
-        <div className="panel-heading">
-          <h2>Cihaz aktivitesi</h2>
-        </div>
+      <CollapsiblePanel
+        detail={`${dashboard.modalities.length} cihaz aktivitesi`}
+        open={modalityWarningCount > 0}
+        title="Cihaz aktivitesi"
+        warningCount={modalityWarningCount}
+      >
         {dashboard.modalities.length ? (
           <div className="modality-activity-list">
             {dashboard.modalities.map((modality) => (
@@ -316,12 +321,14 @@ export default async function DicomServerAdminPage({
         ) : (
           <p className="empty-state">Henüz cihaz aktivitesi yok.</p>
         )}
-      </section>
+      </CollapsiblePanel>
 
-      <section className="data-panel admin-section">
-        <div className="panel-heading">
-          <h2>Son bağlantı/log olayları</h2>
-        </div>
+      <CollapsiblePanel
+        detail={`${dashboard.connectionEvents.length} bağlantı/log olayı`}
+        open={connectionEventWarningCount > 0}
+        title="Son bağlantı/log olayları"
+        warningCount={connectionEventWarningCount}
+      >
         {dashboard.connectionEvents.length ? (
           <div className="responsive-table">
             <table>
@@ -352,12 +359,12 @@ export default async function DicomServerAdminPage({
           C-ECHO/Verify ve C-STORE olayları ayrı izlenir. Gateway log forwarder
           bağlandığında kaynak IP ve cihaz AE Title bilgisi test anında bu alana düşer.
         </p>
-      </section>
+      </CollapsiblePanel>
 
-      <section className="data-panel admin-section">
-        <div className="panel-heading">
-          <h2>Son gelen tetkikler</h2>
-        </div>
+      <CollapsiblePanel
+        detail={`${dashboard.recentStudies.length} son tetkik`}
+        title="Son gelen tetkikler"
+      >
         {dashboard.recentStudies.length ? (
           <div className="responsive-table">
             <table>
@@ -381,12 +388,18 @@ export default async function DicomServerAdminPage({
         ) : (
           <p className="empty-state">Son gelen tetkik görünmüyor.</p>
         )}
-      </section>
+      </CollapsiblePanel>
 
-      <section className="data-panel admin-section">
-        <div className="panel-heading">
-          <h2>Başarısız importlar</h2>
-        </div>
+      <CollapsiblePanel
+        detail={
+          failedJobs.length
+            ? `${failedJobs.length} başarısız import var`
+            : "Açık başarısız import kaydı yok"
+        }
+        open={failedJobs.length > 0}
+        title="Başarısız importlar"
+        warningCount={failedJobs.length}
+      >
         {failedJobs.length ? (
           <div className="responsive-table">
             <table>
@@ -409,12 +422,14 @@ export default async function DicomServerAdminPage({
         ) : (
           <p className="empty-state">Açık başarısız import kaydı yok.</p>
         )}
-      </section>
+      </CollapsiblePanel>
 
-      <section className="data-panel admin-section">
-        <div className="panel-heading">
-          <h2>Import kuyruğu</h2>
-        </div>
+      <CollapsiblePanel
+        detail={`${dashboard.importJobs.length} import job kaydı`}
+        open={importQueueWarningCount > 0}
+        title="Import kuyruğu"
+        warningCount={importQueueWarningCount}
+      >
         {dashboard.importJobs.length ? (
           <div className="responsive-table">
             <table>
@@ -440,7 +455,7 @@ export default async function DicomServerAdminPage({
             importları burada izlenir.
           </p>
         )}
-      </section>
+      </CollapsiblePanel>
     </>
   )
 }
@@ -462,6 +477,38 @@ function SummaryTile({
       <strong>{value}</strong>
       <small>{detail}</small>
     </article>
+  )
+}
+
+function CollapsiblePanel({
+  children,
+  detail,
+  open = false,
+  title,
+  warningCount = 0,
+}: {
+  children: ReactNode
+  detail: string
+  open?: boolean
+  title: string
+  warningCount?: number
+}) {
+  return (
+    <details
+      className="data-panel admin-section collapsible-panel"
+      open={open}
+    >
+      <summary className="panel-heading">
+        <div>
+          <h2>{title}</h2>
+          <small>{detail}</small>
+        </div>
+        <span className={`panel-toggle ${warningCount ? "warning" : ""}`}>
+          {formatWarningCount(warningCount)}
+        </span>
+      </summary>
+      {children}
+    </details>
   )
 }
 
