@@ -91,10 +91,18 @@ export async function updateMemberAccess(formData: FormData) {
   if (!isSupabaseConfigured) redirect("/admin/users")
 
   const memberUserId = idSchema.parse(formData.get("memberUserId"))
+  const fullName = z.string().trim().min(2).max(120).parse(formData.get("fullName"))
   const role = memberRoleSchema.parse(formData.get("role"))
   const branchId = optionalUuidSchema.parse(formData.get("branchId"))
   const isActive = formData.get("isActive") === "on"
   const supabase = await createClient()
+
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({ full_name: fullName })
+    .eq("id", memberUserId)
+
+  if (profileError) throw new Error(`Kullanıcı profili güncellenemedi: ${profileError.message}`)
 
   const { error } = await supabase
     .from("organization_members")
@@ -114,7 +122,7 @@ export async function updateMemberAccess(formData: FormData) {
     action: "member.access_updated",
     resource_type: "organization_member",
     resource_id: memberUserId,
-    metadata: { role, branchId, isActive },
+    metadata: { fullName, role, branchId, isActive },
   })
 
   revalidatePath("/admin/users")

@@ -215,6 +215,15 @@ export default async function UsersPage() {
                       <form action={updateMemberAccess} className="compact-admin-form">
                         <input name="memberUserId" type="hidden" value={member.user_id} />
                         <label>
+                          Ad soyad
+                          <input
+                            name="fullName"
+                            defaultValue={memberName(member, admin)}
+                            placeholder="Ad soyad"
+                            required
+                          />
+                        </label>
+                        <label>
                           Rol
                           <select name="role" defaultValue={member.role === "admin" ? "admin" : "doctor"}>
                             <option value="admin">Admin</option>

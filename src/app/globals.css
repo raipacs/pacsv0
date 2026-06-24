@@ -1824,9 +1824,9 @@ td span {
 }
 
 .compact-admin-form {
-  grid-template-columns: minmax(120px, 1fr) minmax(130px, 1fr) auto auto;
+  grid-template-columns: minmax(160px, 1.2fr) minmax(120px, 0.8fr) minmax(130px, 0.9fr) auto auto;
   align-items: end;
-  min-width: 380px;
+  min-width: 560px;
 }
 
 .compact-admin-form label,
@@ -1839,6 +1839,7 @@ td span {
   font-weight: 800;
 }
 
+.compact-admin-form input,
 .compact-admin-form select,
 .stacked-admin-form select,
 .admin-create-group input,
