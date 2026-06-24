@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 
-import { createDicomSignedUrls } from "@/app/actions/storage"
+import {
+  createDicomSignedUrls,
+  createSharedDicomSignedUrls,
+} from "@/app/actions/storage"
 import { usePrivacyMode } from "@/components/privacy-mode"
 import {
   decodeDicomPreview,
@@ -61,10 +64,14 @@ const PREFETCH_CONCURRENCY = 2
 
 export function RaiDicomViewer({
   instances,
+  shareToken,
   study,
+  studyId,
 }: {
   instances: ViewerInstance[]
+  shareToken?: string
   study: ViewerStudyContext
+  studyId: string
 }) {
   const { enabled: privacyEnabled, maskId, maskName } = usePrivacyMode()
   const allOrderedInstances = useMemo(
@@ -217,7 +224,13 @@ export function RaiDicomViewer({
 
       if (missingIds.length) {
         const result = await withTimeout(
-          createDicomSignedUrls(missingIds),
+          shareToken
+            ? createSharedDicomSignedUrls({
+                instanceIds: missingIds,
+                shareToken,
+                studyId,
+              })
+            : createDicomSignedUrls(missingIds),
           SIGNED_URL_TIMEOUT_MS,
           "DICOM signed URL üretimi zaman aşımına uğradı."
         )
@@ -235,7 +248,7 @@ export function RaiDicomViewer({
           .filter((entry): entry is readonly [string, string] => Boolean(entry[1]))
       )
     },
-    []
+    [shareToken, studyId]
   )
 
   const decodeBuffer = useCallback(async (buffer: ArrayBuffer) => {

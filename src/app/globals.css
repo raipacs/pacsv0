@@ -608,7 +608,9 @@ p {
 }
 
 html:has(.rai-viewer-page),
-body:has(.rai-viewer-page) {
+html:has(.external-share-page),
+body:has(.rai-viewer-page),
+body:has(.external-share-page) {
   height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
@@ -682,6 +684,68 @@ body:has(.rai-viewer-page) .app-header {
 
 .rai-viewer-bar .privacy-toggle.active .privacy-switch {
   background: #0891b2;
+}
+
+.external-share-page {
+  display: grid;
+  height: 100dvh;
+  overflow: hidden;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: #030712;
+}
+
+.external-share-bar .external-share-expiry {
+  margin-top: 2px;
+  color: #bae6fd;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.external-share-control {
+  display: grid;
+  min-width: min(480px, 45vw);
+  gap: 6px;
+}
+
+.external-share-row,
+.external-share-result {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.external-share-control select,
+.external-share-result input {
+  min-height: 34px;
+  min-width: 0;
+  border: 1px solid #24446f;
+  border-radius: 7px;
+  color: #e2e8f0;
+  background: #0b2148;
+}
+
+.external-share-control select {
+  padding: 0 10px;
+  font-weight: 800;
+}
+
+.external-share-result input {
+  flex: 1 1 220px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.external-share-result span {
+  color: #93c5fd;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.external-share-error-page {
+  place-items: center;
 }
 
 .viewer-error-panel {

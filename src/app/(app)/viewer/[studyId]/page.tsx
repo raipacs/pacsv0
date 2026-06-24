@@ -7,6 +7,7 @@ import {
   MaskedPatientName,
   PrivacyToggle,
 } from "@/components/privacy-mode"
+import { ExternalShareButton } from "@/components/external-share-button"
 import { RaiDicomViewer } from "@/components/rai-dicom-viewer"
 import { requireUser } from "@/lib/auth"
 import { isSupabaseConfigured } from "@/lib/config"
@@ -115,6 +116,7 @@ export default async function RaiViewerPage({
         </div>
         <nav aria-label="Viewer navigasyonu">
           <PrivacyToggle />
+          <ExternalShareButton studyId={studyId} />
           <Link className="button subtle" href="/worklist">
             Worklist
           </Link>
@@ -134,6 +136,7 @@ export default async function RaiViewerPage({
         </nav>
       </header>
       <RaiDicomViewer
+        studyId={studyId}
         study={{
           accessionNumber: study.accession_number,
           description: study.description ?? "DICOM görüntüleme",
