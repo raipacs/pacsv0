@@ -33,6 +33,7 @@ const permissionTableSchema = z
   .min(2)
   .max(80)
   .regex(/^[a-z0-9_]+$/)
+const aiProviderTypeSchema = z.enum(["mock", "openai", "anthropic", "google", "custom"])
 
 const hisIntegrationSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -84,6 +85,132 @@ type HisIntegrationTestRow = {
 type StorageObjectRef = {
   storage_bucket: string
   storage_key: string
+}
+
+export async function updateAiProvider(formData: FormData) {
+  const user = await requireAdmin()
+  if (!isSupabaseConfigured) redirect("/admin/ai-services")
+
+  const providerId = idSchema.parse(formData.get("providerId"))
+  const name = z.string().trim().min(2).max(120).parse(formData.get("name"))
+  const defaultModel = z
+    .string()
+    .trim()
+    .max(120)
+    .optional()
+    .parse(String(formData.get("defaultModel") ?? "").trim() || undefined)
+  const credentialReference = z
+    .string()
+    .trim()
+    .max(160)
+    .optional()
+    .parse(String(formData.get("credentialReference") ?? "").trim() || undefined)
+  const isActive = formData.get("isActive") === "on"
+  const isDefault = formData.get("isDefault") === "on"
+  const supabase = await createClient()
+
+  if (isDefault) {
+    const { error: defaultError } = await supabase
+      .from("ai_service_providers")
+      .update({ is_default: false })
+      .eq("organization_id", user.organizationId)
+
+    if (defaultError) {
+      throw new Error(`Varsayılan AI servisi güncellenemedi: ${defaultError.message}`)
+    }
+  }
+
+  const { data: provider, error } = await supabase
+    .from("ai_service_providers")
+    .update({
+      credential_reference: credentialReference ?? null,
+      default_model: defaultModel ?? null,
+      is_active: isActive,
+      is_default: isDefault,
+      name,
+    })
+    .eq("id", providerId)
+    .eq("organization_id", user.organizationId)
+    .select("id, slug, provider_type")
+    .single()
+
+  if (error) throw new Error(`AI servisi güncellenemedi: ${error.message}`)
+
+  await supabase.from("audit_logs").insert({
+    organization_id: user.organizationId,
+    actor_id: user.id,
+    action: "ai_provider.updated",
+    resource_type: "ai_service_provider",
+    resource_id: provider.id,
+    metadata: {
+      credentialReference,
+      defaultModel,
+      isActive,
+      isDefault,
+      providerType: provider.provider_type,
+      slug: provider.slug,
+    },
+  })
+
+  revalidatePath("/admin/ai-services")
+  revalidatePath("/admin/users")
+  redirect("/admin/ai-services")
+}
+
+export async function createAiProvider(formData: FormData) {
+  const user = await requireAdmin()
+  if (!isSupabaseConfigured) redirect("/admin/ai-services")
+
+  const name = z.string().trim().min(2).max(120).parse(formData.get("name"))
+  const slug = slugifyGroupName(name)
+  const providerType = aiProviderTypeSchema.parse(formData.get("providerType"))
+  const defaultModel = z
+    .string()
+    .trim()
+    .max(120)
+    .optional()
+    .parse(String(formData.get("defaultModel") ?? "").trim() || undefined)
+  const credentialReference = z
+    .string()
+    .trim()
+    .max(160)
+    .optional()
+    .parse(String(formData.get("credentialReference") ?? "").trim() || undefined)
+  const supabase = await createClient()
+
+  const { data: provider, error } = await supabase
+    .from("ai_service_providers")
+    .insert({
+      organization_id: user.organizationId,
+      created_by: user.id,
+      credential_reference: credentialReference ?? null,
+      default_model: defaultModel ?? null,
+      is_active: false,
+      is_default: false,
+      name,
+      provider_type: providerType,
+      requires_credentials: providerType !== "mock",
+      slug,
+      settings: {
+        createdFrom: "admin-ui",
+      },
+    })
+    .select("id, slug")
+    .single()
+
+  if (error) throw new Error(`AI servisi oluşturulamadı: ${error.message}`)
+
+  await supabase.from("audit_logs").insert({
+    organization_id: user.organizationId,
+    actor_id: user.id,
+    action: "ai_provider.created",
+    resource_type: "ai_service_provider",
+    resource_id: provider.id,
+    metadata: { defaultModel, providerType, slug: provider.slug },
+  })
+
+  revalidatePath("/admin/ai-services")
+  redirect("/admin/ai-services")
 }
 
 export async function updateMemberAccess(formData: FormData) {

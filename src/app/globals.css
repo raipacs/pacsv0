@@ -1983,6 +1983,66 @@ td span {
   margin-top: 16px;
 }
 
+.ai-admin-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr);
+  gap: 16px;
+  align-items: start;
+  margin-top: 16px;
+}
+
+.ai-provider-list {
+  display: grid;
+}
+
+.ai-provider-card {
+  display: grid;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ai-provider-card:last-child {
+  border-bottom: 0;
+}
+
+.ai-provider-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 16px 0;
+}
+
+.ai-provider-card-header strong,
+.ai-provider-card-header span {
+  display: block;
+}
+
+.ai-provider-card-header span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.compact-ai-provider-form {
+  padding-top: 12px;
+}
+
+.ai-provider-switches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.form-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .compact-admin-form,
 .stacked-admin-form,
 .admin-create-group {
@@ -2922,6 +2982,7 @@ td span {
   }
 
   .admin-user-grid,
+  .ai-admin-grid,
   .his-admin-grid,
   .dicom-admin-grid {
     grid-template-columns: 1fr;
@@ -2972,9 +3033,15 @@ td span {
 
   .admin-user-metrics,
   .compact-admin-form,
+  .ai-provider-card-header,
   .group-card,
   .responsibility-grid {
     grid-template-columns: 1fr;
+  }
+
+  .ai-provider-card-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .upload-panel,

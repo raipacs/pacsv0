@@ -84,6 +84,9 @@ export default async function HisIntegrationPage() {
           <Link className="button subtle" href="/admin/dicom-server">
             DICOM Server
           </Link>
+          <Link className="button subtle" href="/admin/ai-services">
+            AI Servisleri
+          </Link>
         </div>
       </header>
 

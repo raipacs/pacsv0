@@ -38,6 +38,9 @@ export default async function BranchesPage() {
           <Link className="button subtle" href="/admin/his-integration">
             HIS Entegrasyonu
           </Link>
+          <Link className="button subtle" href="/admin/ai-services">
+            AI Servisleri
+          </Link>
           <button className="button primary" type="button">
             Şube ekle
           </button>

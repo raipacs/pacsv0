@@ -84,6 +84,9 @@ export default async function DicomServerAdminPage({
           <Link className="button subtle" href="/admin/his-integration">
             HIS Entegrasyonu
           </Link>
+          <Link className="button subtle" href="/admin/ai-services">
+            AI Servisleri
+          </Link>
           <Link className="button primary" href="/worklist/upload">
             DICOM yükle
           </Link>

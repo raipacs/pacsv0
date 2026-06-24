@@ -160,6 +160,9 @@ export default async function UsersPage() {
           <Link className="button subtle" href="/admin/his-integration">
             HIS Entegrasyonu
           </Link>
+          <Link className="button subtle" href="/admin/ai-services">
+            AI Servisleri
+          </Link>
         </div>
       </header>
 
