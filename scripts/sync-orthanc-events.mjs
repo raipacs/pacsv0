@@ -35,6 +35,7 @@ const orthancAuthHeader = `Basic ${Buffer.from(
 ).toString("base64")}`
 const calledAeTitle = process.env.RAI_PACS_DICOM_AE_TITLE ?? "RAIPACS"
 const branchSlug = process.env.RAI_PACS_BRANCH_SLUG ?? "merkez"
+const configuredSourceAeTitle = process.env.RAI_PACS_ORTHANC_SOURCE_AE_TITLE || null
 
 const supabase = createClient(
   process.env.RAI_PACS_SUPABASE_URL,
@@ -111,6 +112,12 @@ async function buildEventFromChange(change) {
   let instance = null
   if (resourceType === "Study") {
     study = await orthancJson(`/studies/${encodeURIComponent(orthancId)}`).catch(() => null)
+    const firstInstanceId = await getFirstStudyInstanceId(study)
+    if (firstInstanceId) {
+      instance = await orthancJson(`/instances/${encodeURIComponent(firstInstanceId)}`).catch(
+        () => null
+      )
+    }
   }
   if (resourceType === "Instance") {
     instance = await orthancJson(`/instances/${encodeURIComponent(orthancId)}`).catch(() => null)
@@ -123,6 +130,11 @@ async function buildEventFromChange(change) {
   const studyTags = study?.MainDicomTags ?? {}
   const patientTags = study?.PatientMainDicomTags ?? {}
   const instanceTags = instance?.MainDicomTags ?? {}
+  const detailTags = instance
+    ? await orthancJson(`/instances/${encodeURIComponent(instance.ID || orthancId)}/tags?simplify`)
+        .catch(() => ({}))
+    : {}
+  const sourceIdentity = resolveDicomSourceIdentity({ ...studyTags, ...instanceTags, ...detailTags })
   const modality = instanceTags.Modality || studyTags.Modality || null
   const studyInstanceUid = studyTags.StudyInstanceUID || null
   const accessionNumber = studyTags.AccessionNumber || null
@@ -139,7 +151,8 @@ async function buildEventFromChange(change) {
       accessionNumber,
       patientDicomId,
       occurredAt: change.Date,
-      metadata: { change },
+      sourceIdentity,
+      metadata: { change, device: sourceIdentity },
     }
   }
 
@@ -156,7 +169,8 @@ async function buildEventFromChange(change) {
     accessionNumber,
     patientDicomId,
     occurredAt: change.Date,
-    metadata: { change },
+    sourceIdentity,
+    metadata: { change, device: sourceIdentity },
   }
 }
 
@@ -170,6 +184,7 @@ async function recordConnectionEvent({
   accessionNumber,
   patientDicomId,
   occurredAt,
+  sourceIdentity,
   metadata,
 }) {
   const { error } = await supabase.from("dicom_connection_events").insert({
@@ -177,7 +192,7 @@ async function recordConnectionEvent({
     ...(branchId ? { branch_id: branchId } : {}),
     event_type: eventType,
     source: "orthanc",
-    source_ae_title: process.env.RAI_PACS_ORTHANC_SOURCE_AE_TITLE || "ORTHANC",
+    source_ae_title: sourceIdentity?.aeTitle || configuredSourceAeTitle || "ORTHANC",
     called_ae_title: calledAeTitle,
     modality,
     study_instance_uid: studyInstanceUid,
@@ -205,6 +220,58 @@ async function resolveBranchId() {
   if (isOptionalBranchError(error)) return null
   if (error) throw new Error(`Branch lookup failed: ${error.message}`)
   return data?.id ?? null
+}
+
+async function getFirstStudyInstanceId(study) {
+  const seriesIds = Array.isArray(study?.Series) ? study.Series : []
+  for (const seriesId of seriesIds) {
+    const series = await orthancJson(`/series/${encodeURIComponent(seriesId)}`).catch(() => null)
+    const instanceId = Array.isArray(series?.Instances) ? series.Instances[0] : null
+    if (instanceId) return instanceId
+  }
+
+  return null
+}
+
+function resolveDicomSourceIdentity(tags = {}) {
+  const candidates = [
+    configuredSourceAeTitle,
+    tags.SourceApplicationEntityTitle,
+    tags.StationName,
+    tags.InstitutionName,
+    tags.ManufacturerModelName,
+    tags.DeviceSerialNumber,
+    tags.Manufacturer,
+  ]
+    .map(normalizeIdentityValue)
+    .filter(Boolean)
+
+  const nonGateway = candidates.find((candidate) => !isGatewayIdentity(candidate))
+  const aeTitle = nonGateway || candidates[0] || "ORTHANC"
+
+  return {
+    aeTitle,
+    sourceApplicationEntityTitle: normalizeIdentityValue(tags.SourceApplicationEntityTitle),
+    stationName: normalizeIdentityValue(tags.StationName),
+    manufacturer: normalizeIdentityValue(tags.Manufacturer),
+    manufacturerModelName: normalizeIdentityValue(tags.ManufacturerModelName),
+    deviceSerialNumber: normalizeIdentityValue(tags.DeviceSerialNumber),
+    institutionName: normalizeIdentityValue(tags.InstitutionName),
+    gateway: "orthanc",
+  }
+}
+
+function normalizeIdentityValue(value) {
+  const normalized = String(value ?? "")
+    .replace(/\0/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+  if (!normalized || normalized === "-") return null
+  return normalized.slice(0, 80)
+}
+
+function isGatewayIdentity(value) {
+  return /^(orthanc|rai-pacs-orthanc|rai-pacs|raipacs)$/i.test(value.trim())
 }
 
 async function orthancJson(route) {

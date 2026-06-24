@@ -35,11 +35,11 @@ const importJobKey =
   process.env.RAI_PACS_ORTHANC_STUDY_ID ??
   process.env.RAI_PACS_ORTHANC_STUDY_UID ??
   `folder:${sourceDir}`
-const sourceAeTitle =
+const configuredSourceAeTitle =
   process.env.RAI_PACS_SOURCE_AE_TITLE ??
   process.env.RAI_PACS_ORTHANC_SOURCE_AE_TITLE ??
   process.env.RAI_PACS_IMPORT_SOURCE_AE_TITLE ??
-  "IMPORTER"
+  null
 const sourceIp =
   process.env.RAI_PACS_SOURCE_IP ??
   process.env.RAI_PACS_ORTHANC_SOURCE_IP ??
@@ -52,19 +52,25 @@ const LONG_VR = new Set(["OB", "OD", "OF", "OL", "OW", "SQ", "UC", "UR", "UT", "
 const NUMERIC_TAGS = new Set(["0020,0011", "0020,0013"])
 const WANTED_TAGS = new Map([
   ["0002,0010", "transferSyntaxUid"],
+  ["0002,0016", "sourceApplicationEntityTitle"],
   ["0008,0016", "sopClassUid"],
   ["0008,0018", "sopInstanceUid"],
   ["0008,0020", "studyDate"],
   ["0008,0030", "studyTime"],
   ["0008,0050", "accessionNumber"],
   ["0008,0060", "modality"],
+  ["0008,0070", "manufacturer"],
+  ["0008,0080", "institutionName"],
+  ["0008,1010", "stationName"],
   ["0008,1030", "studyDescription"],
   ["0008,103e", "seriesDescription"],
+  ["0008,1090", "manufacturerModelName"],
   ["0010,0010", "patientName"],
   ["0010,0020", "patientDicomId"],
   ["0010,0030", "patientBirthDate"],
   ["0010,0040", "patientSex"],
   ["0018,0015", "bodyPart"],
+  ["0018,1000", "deviceSerialNumber"],
   ["0020,000d", "studyInstanceUid"],
   ["0020,000e", "seriesInstanceUid"],
   ["0020,0011", "seriesNumber"],
@@ -101,6 +107,12 @@ const branchId = await resolveImportBranchId()
 const filenames = (await fs.readdir(sourceDir))
   .filter((filename) => !filename.startsWith("."))
   .sort()
+const firstDicomMetadata = await readFirstDicomMetadata(filenames)
+const sourceIdentity = resolveDicomSourceIdentity(firstDicomMetadata, {
+  fallbackAeTitle: configuredSourceAeTitle,
+  fallbackSource: importSource,
+})
+const sourceAeTitle = sourceIdentity.aeTitle
 const results = []
 const loggedStudyEvents = new Set()
 let importJob = await startImportJob({
@@ -221,6 +233,7 @@ for (const filename of filenames) {
           priority: "routine",
           status: "received",
           source_ae_title: sourceAeTitle,
+          metadata: buildStudySourceMetadata(metadata),
         },
         { onConflict: "organization_id,study_instance_uid" }
       )
@@ -359,6 +372,7 @@ async function startImportJob({ expectedInstances }) {
           sourceDir,
           bucket,
           importer: authData.user.email,
+          device: sourceIdentity,
         },
         started_at: new Date().toISOString(),
         last_seen_at: new Date().toISOString(),
@@ -439,6 +453,7 @@ async function syncModalityRegistry({ modality, studyInstanceUid, accessionNumbe
       metadata: {
         source: importSource,
         jobKey: importJobKey,
+        device: sourceIdentity,
       },
     },
     { onConflict: "organization_id,ae_title" }
@@ -475,6 +490,7 @@ async function recordConnectionEvent({
     metadata: {
       jobKey: importJobKey,
       sourceDir,
+      device: sourceIdentity,
     },
   })
 
@@ -493,6 +509,76 @@ async function resolveImportBranchId() {
   if (isOptionalBranchError(error)) return null
   if (error) throw new Error(`Import branch lookup failed: ${error.message}`)
   return data?.id ?? null
+}
+
+async function readFirstDicomMetadata(candidateFilenames) {
+  for (const filename of candidateFilenames) {
+    try {
+      const filePath = path.join(sourceDir, filename)
+      const stat = await fs.stat(filePath)
+      if (!stat.isFile()) continue
+      return parseDicom(await fs.readFile(filePath))
+    } catch {
+      continue
+    }
+  }
+
+  return {}
+}
+
+function resolveDicomSourceIdentity(metadata = {}, { fallbackAeTitle, fallbackSource }) {
+  const candidates = [
+    fallbackAeTitle,
+    metadata.sourceApplicationEntityTitle,
+    metadata.stationName,
+    metadata.institutionName,
+    metadata.manufacturerModelName,
+    metadata.deviceSerialNumber,
+    metadata.manufacturer,
+  ]
+    .map(normalizeIdentityValue)
+    .filter(Boolean)
+
+  const nonGateway = candidates.find((candidate) => !isGatewayIdentity(candidate))
+  const aeTitle =
+    nonGateway || candidates[0] || normalizeIdentityValue(fallbackSource) || "DICOM_DEVICE"
+
+  return {
+    aeTitle,
+    sourceApplicationEntityTitle: normalizeIdentityValue(metadata.sourceApplicationEntityTitle),
+    stationName: normalizeIdentityValue(metadata.stationName),
+    manufacturer: normalizeIdentityValue(metadata.manufacturer),
+    manufacturerModelName: normalizeIdentityValue(metadata.manufacturerModelName),
+    deviceSerialNumber: normalizeIdentityValue(metadata.deviceSerialNumber),
+    institutionName: normalizeIdentityValue(metadata.institutionName),
+    gateway: importSource,
+  }
+}
+
+function buildStudySourceMetadata(metadata) {
+  return {
+    dicomSource: sourceIdentity,
+    device: {
+      stationName: normalizeIdentityValue(metadata.stationName),
+      manufacturer: normalizeIdentityValue(metadata.manufacturer),
+      manufacturerModelName: normalizeIdentityValue(metadata.manufacturerModelName),
+      deviceSerialNumber: normalizeIdentityValue(metadata.deviceSerialNumber),
+      institutionName: normalizeIdentityValue(metadata.institutionName),
+    },
+  }
+}
+
+function normalizeIdentityValue(value) {
+  const normalized = String(value ?? "")
+    .replace(/\0/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+  if (!normalized || normalized === "-") return null
+  return normalized.slice(0, 80)
+}
+
+function isGatewayIdentity(value) {
+  return /^(orthanc|rai-pacs-orthanc|rai-pacs|raipacs)$/i.test(value.trim())
 }
 
 function countResults(status) {
