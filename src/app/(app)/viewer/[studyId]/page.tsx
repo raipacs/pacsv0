@@ -2,6 +2,7 @@ import Link from "next/link"
 import { headers } from "next/headers"
 import { notFound } from "next/navigation"
 
+import { finalizeReport, saveReportDraft } from "@/app/actions/reports"
 import {
   MaskedPatientId,
   MaskedPatientName,
@@ -57,6 +58,7 @@ export default async function RaiViewerPage({
     { data: series, error: seriesError },
     { data: instances, error: instancesError },
     aiViewerState,
+    { data: latestReport, error: latestReportError },
   ] = await Promise.all([
       supabase
         .from("series")
@@ -71,6 +73,14 @@ export default async function RaiViewerPage({
         .eq("organization_id", user.organizationId)
         .order("instance_number", { ascending: true }),
       loadAiViewerState(supabase, user.organizationId, study.id),
+      supabase
+        .from("reports")
+        .select("id, status, findings, impression, version, finalized_at, updated_at")
+        .eq("organization_id", user.organizationId)
+        .eq("study_id", study.id)
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ])
 
   if (seriesError) {
@@ -79,6 +89,10 @@ export default async function RaiViewerPage({
 
   if (instancesError) {
     throw new Error(`Viewer instance listesi alınamadı: ${instancesError.message}`)
+  }
+
+  if (latestReportError) {
+    throw new Error(`Rapor bilgisi alınamadı: ${latestReportError.message}`)
   }
 
   const patient = Array.isArray(study.patients) ? study.patients[0] : study.patients
@@ -175,6 +189,12 @@ export default async function RaiViewerPage({
           <p>AI ön değerlendirmedir. Nihai rapor yetkili hekim düzenlemesi ve onayıyla oluşur.</p>
         </section>
       ) : null}
+      <ReportEditorPanel
+        latestDraft={aiViewerState.latestDraft}
+        report={latestReport}
+        returnTo={returnTo}
+        studyId={studyId}
+      />
       <RaiDicomViewer
         studyId={studyId}
         study={{
@@ -196,6 +216,97 @@ export default async function RaiViewerPage({
         }))}
       />
     </section>
+  )
+}
+
+type ReportRow = {
+  finalized_at: string | null
+  findings: string | null
+  id: string
+  impression: string | null
+  status: string
+  updated_at: string
+  version: number
+} | null
+
+function ReportEditorPanel({
+  latestDraft,
+  report,
+  returnTo,
+  studyId,
+}: {
+  latestDraft: AiDraftView | null
+  report: ReportRow
+  returnTo: string
+  studyId: string
+}) {
+  const defaultFindings = report?.findings || latestDraft?.findings || ""
+  const defaultImpression = report?.impression || latestDraft?.impression || ""
+  const isFinal = report?.status === "final"
+
+  return (
+    <details className="report-editor-strip" open={Boolean(latestDraft || report)}>
+      <summary>
+        <span>Rapor</span>
+        <strong>
+          {report
+            ? `${report.status === "final" ? "Nihai rapor" : "Taslak rapor"} v${report.version}`
+            : latestDraft
+              ? "AI ön rapordan taslak"
+              : "Manuel rapor"}
+        </strong>
+      </summary>
+      <form className="report-editor-form">
+        <input name="studyId" type="hidden" value={studyId} />
+        <input name="reportId" type="hidden" value={report?.id ?? ""} />
+        <input name="returnTo" type="hidden" value={returnTo} />
+        <label>
+          Bulgular
+          <textarea
+            defaultValue={defaultFindings}
+            name="findings"
+            placeholder="Bulgular..."
+            readOnly={isFinal}
+            rows={5}
+            required
+          />
+        </label>
+        <label>
+          İzlenim
+          <textarea
+            defaultValue={defaultImpression}
+            name="impression"
+            placeholder="İzlenim..."
+            readOnly={isFinal}
+            rows={3}
+            required
+          />
+        </label>
+        <div className="report-editor-actions">
+          <small>
+            {isFinal
+              ? `Onaylandı: ${formatDateTime(report.finalized_at)}`
+              : "AI taslağı hekim tarafından düzenlenip onaylanınca nihai rapora dönüşür."}
+          </small>
+          <button
+            className="button subtle"
+            disabled={isFinal}
+            formAction={saveReportDraft}
+            type="submit"
+          >
+            Taslak kaydet
+          </button>
+          <button
+            className="button primary"
+            disabled={isFinal}
+            formAction={finalizeReport}
+            type="submit"
+          >
+            Nihai rapor onayla
+          </button>
+        </div>
+      </form>
+    </details>
   )
 }
 
@@ -306,6 +417,14 @@ function mapAiProviders(rows: Array<Record<string, unknown>>): AiProviderOption[
 function formatConfidence(value: number | null) {
   if (typeof value !== "number") return "-"
   return `%${Math.round(value * 100)}`
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) return "-"
+  return new Intl.DateTimeFormat("tr-TR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value))
 }
 
 function ViewerError({ message }: { message: string }) {
