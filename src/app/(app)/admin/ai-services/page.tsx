@@ -50,11 +50,44 @@ type AiDraftRow = {
     | null
 }
 
-export default async function AiServicesPage() {
-  const user = await requireAdmin()
-  const supabase = await createClient()
+type AiUsageRow = {
+  id: string
+  provider_slug: string
+  model_name: string | null
+  usage_type: string
+  input_tokens: number
+  output_tokens: number
+  total_tokens: number
+  currency: string
+  input_cost: number
+  output_cost: number
+  total_cost: number
+  created_at: string
+  ai_jobs:
+    | { id: string; status: string | null }
+    | { id: string; status: string | null }[]
+    | null
+  reports:
+    | { id: string; status: string | null; version: number | null }
+    | { id: string; status: string | null; version: number | null }[]
+    | null
+  studies:
+    | { accession_number: string | null; modality: string | null; description: string | null }
+    | { accession_number: string | null; modality: string | null; description: string | null }[]
+    | null
+}
 
-  const [providersResult, jobsResult, draftsResult] = await Promise.all([
+type AiServicesPageProps = {
+  searchParams: Promise<{ from?: string; to?: string }>
+}
+
+export default async function AiServicesPage({ searchParams }: AiServicesPageProps) {
+  const user = await requireAdmin()
+  const query = await searchParams
+  const supabase = await createClient()
+  const range = parseUsageRange(query)
+
+  const [providersResult, jobsResult, draftsResult, usageResult] = await Promise.all([
     supabase
       .from("ai_service_providers")
       .select(
@@ -75,6 +108,16 @@ export default async function AiServicesPage() {
       .eq("organization_id", user.organizationId)
       .order("created_at", { ascending: false })
       .limit(12),
+    supabase
+      .from("ai_usage_events")
+      .select(
+        "id, provider_slug, model_name, usage_type, input_tokens, output_tokens, total_tokens, currency, input_cost, output_cost, total_cost, created_at, ai_jobs(id, status), reports(id, status, version), studies(accession_number, modality, description)"
+      )
+      .eq("organization_id", user.organizationId)
+      .gte("created_at", range.fromIso)
+      .lte("created_at", range.toIso)
+      .order("created_at", { ascending: false })
+      .limit(120),
   ])
 
   if (providersResult.error) {
@@ -86,15 +129,29 @@ export default async function AiServicesPage() {
   if (draftsResult.error) {
     throw new Error(`AI ön raporları alınamadı: ${draftsResult.error.message}`)
   }
+  if (usageResult.error) {
+    throw new Error(`AI token tüketimi alınamadı: ${usageResult.error.message}`)
+  }
 
   const providers = (providersResult.data ?? []) as AiProviderRow[]
   const jobs = (jobsResult.data ?? []) as AiJobRow[]
   const drafts = (draftsResult.data ?? []) as AiDraftRow[]
+  const usageRows = (usageResult.data ?? []) as AiUsageRow[]
   const activeProviders = providers.filter((provider) => provider.is_active)
   const credentialReady = providers.filter(
     (provider) => !provider.requires_credentials || provider.credential_reference
   )
   const readyDrafts = drafts.filter((draft) => draft.status === "ready")
+  const usageSummary = summarizeUsage(usageRows)
+  const totalUsage = usageSummary.reduce(
+    (acc, item) => ({
+      cost: acc.cost + item.totalCost,
+      inputTokens: acc.inputTokens + item.inputTokens,
+      outputTokens: acc.outputTokens + item.outputTokens,
+      totalTokens: acc.totalTokens + item.totalTokens,
+    }),
+    { cost: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0 }
+  )
 
   return (
     <>
@@ -134,6 +191,87 @@ export default async function AiServicesPage() {
           <span>Hazır ön rapor</span>
           <strong>{readyDrafts.length}</strong>
         </article>
+      </section>
+
+      <section className="data-panel admin-section">
+        <div className="panel-heading">
+          <h2>Token ve maliyet tüketimi</h2>
+        </div>
+        <form className="ai-usage-filter">
+          <label>
+            <span>Başlangıç</span>
+            <input name="from" type="date" defaultValue={range.fromDate} />
+          </label>
+          <label>
+            <span>Bitiş</span>
+            <input name="to" type="date" defaultValue={range.toDate} />
+          </label>
+          <button className="button subtle" type="submit">
+            Filtrele
+          </button>
+          <Link className="button subtle" href="/admin/ai-services">
+            Son 30 gün
+          </Link>
+        </form>
+        <div className="ai-usage-summary-grid">
+          <article>
+            <span>Toplam token</span>
+            <strong>{formatNumber(totalUsage.totalTokens)}</strong>
+            <small>
+              Input {formatNumber(totalUsage.inputTokens)} · Output{" "}
+              {formatNumber(totalUsage.outputTokens)}
+            </small>
+          </article>
+          <article>
+            <span>Toplam maliyet</span>
+            <strong>{formatMoney(totalUsage.cost)}</strong>
+            <small>USD bazlı kayıt</small>
+          </article>
+          <article>
+            <span>İşlem</span>
+            <strong>{usageRows.length}</strong>
+            <small>Seçilen tarih aralığı</small>
+          </article>
+          <article>
+            <span>Provider</span>
+            <strong>{usageSummary.length}</strong>
+            <small>Kullanım oluşan servis</small>
+          </article>
+        </div>
+        {usageSummary.length ? (
+          <div className="responsive-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>LLM / servis</th>
+                  <th>Model</th>
+                  <th>Input</th>
+                  <th>Output</th>
+                  <th>Toplam token</th>
+                  <th>Maliyet</th>
+                  <th>İşlem</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usageSummary.map((item) => (
+                  <tr key={`${item.providerSlug}-${item.modelName}`}>
+                    <td>
+                      <strong>{item.providerSlug}</strong>
+                    </td>
+                    <td>{item.modelName || "-"}</td>
+                    <td>{formatNumber(item.inputTokens)}</td>
+                    <td>{formatNumber(item.outputTokens)}</td>
+                    <td>{formatNumber(item.totalTokens)}</td>
+                    <td>{formatMoney(item.totalCost)}</td>
+                    <td>{item.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="empty-state">Bu tarih aralığında token tüketimi yok.</p>
+        )}
       </section>
 
       <section className="ai-admin-grid">
@@ -296,7 +434,68 @@ export default async function AiServicesPage() {
           )}
         </section>
       </section>
+
+      <section className="data-panel admin-section">
+        <div className="panel-heading">
+          <h2>Token tüketim detayı</h2>
+        </div>
+        {usageRows.length ? (
+          <div className="responsive-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tarih</th>
+                  <th>Tetkik / rapor</th>
+                  <th>Provider</th>
+                  <th>Kullanım</th>
+                  <th>Token</th>
+                  <th>Maliyet</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usageRows.map((usage) => (
+                  <AiUsageTableRow key={usage.id} usage={usage} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="empty-state">Detay satırı yok.</p>
+        )}
+      </section>
     </>
+  )
+}
+
+function AiUsageTableRow({ usage }: { usage: AiUsageRow }) {
+  const study = firstRelation(usage.studies)
+  const report = firstRelation(usage.reports)
+  const job = firstRelation(usage.ai_jobs)
+
+  return (
+    <tr>
+      <td>{formatDateTime(usage.created_at)}</td>
+      <td>
+        <strong>{study?.description ?? "AI kullanımı"}</strong>
+        <span>
+          {study?.modality ?? "-"} · {study?.accession_number ?? "-"}
+          {report ? ` · Rapor v${report.version ?? "-"}` : ""}
+          {job ? ` · Job ${job.id.slice(0, 8)}` : ""}
+        </span>
+      </td>
+      <td>
+        <strong>{usage.provider_slug}</strong>
+        <span>{usage.model_name ?? "-"}</span>
+      </td>
+      <td>{usageTypeLabel(usage.usage_type)}</td>
+      <td>
+        <strong>{formatNumber(usage.total_tokens)}</strong>
+        <span>
+          {formatNumber(usage.input_tokens)} in · {formatNumber(usage.output_tokens)} out
+        </span>
+      </td>
+      <td>{formatMoney(Number(usage.total_cost))}</td>
+    </tr>
   )
 }
 
@@ -353,6 +552,71 @@ function AiDraftTableRow({ draft }: { draft: AiDraftRow }) {
 
 function firstRelation<T>(value: T | T[] | null) {
   return Array.isArray(value) ? value[0] : value
+}
+
+function parseUsageRange(query: { from?: string; to?: string }) {
+  const today = new Date()
+  const defaultFrom = new Date(today)
+  defaultFrom.setDate(today.getDate() - 29)
+
+  const fromDate = isDateInput(query.from) ? query.from : toDateInput(defaultFrom)
+  const toDate = isDateInput(query.to) ? query.to : toDateInput(today)
+  const from = new Date(`${fromDate}T00:00:00.000Z`)
+  const to = new Date(`${toDate}T23:59:59.999Z`)
+
+  return {
+    fromDate,
+    fromIso: from.toISOString(),
+    toDate,
+    toIso: to.toISOString(),
+  }
+}
+
+function isDateInput(value: string | undefined) {
+  return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value))
+}
+
+function toDateInput(value: Date) {
+  return value.toISOString().slice(0, 10)
+}
+
+function summarizeUsage(rows: AiUsageRow[]) {
+  const byProvider = new Map<
+    string,
+    {
+      count: number
+      inputTokens: number
+      modelName: string | null
+      outputTokens: number
+      providerSlug: string
+      totalCost: number
+      totalTokens: number
+    }
+  >()
+
+  for (const row of rows) {
+    const key = `${row.provider_slug}:${row.model_name ?? ""}`
+    const current =
+      byProvider.get(key) ??
+      {
+        count: 0,
+        inputTokens: 0,
+        modelName: row.model_name,
+        outputTokens: 0,
+        providerSlug: row.provider_slug,
+        totalCost: 0,
+        totalTokens: 0,
+      }
+
+    current.count += 1
+    current.inputTokens += Number(row.input_tokens)
+    current.outputTokens += Number(row.output_tokens)
+    current.totalTokens += Number(row.total_tokens)
+    current.totalCost += Number(row.total_cost)
+    byProvider.set(key, current)
+  }
+
+  return Array.from(byProvider.values()).sort((a, b) => b.totalTokens - a.totalTokens)
 }
 
 function providerLabel(value: string) {
@@ -423,6 +687,34 @@ function draftStatusLabel(status: string) {
 function formatConfidence(value: number | null) {
   if (typeof value !== "number") return "-"
   return `%${Math.round(value * 100)}`
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("tr-TR").format(value)
+}
+
+function formatMoney(value: number) {
+  return new Intl.NumberFormat("tr-TR", {
+    currency: "USD",
+    maximumFractionDigits: 6,
+    minimumFractionDigits: value > 0 && value < 0.01 ? 6 : 2,
+    style: "currency",
+  }).format(value)
+}
+
+function usageTypeLabel(value: string) {
+  switch (value) {
+    case "pre_report":
+      return "Ön rapor"
+    case "report_edit":
+      return "Rapor düzenleme"
+    case "final_report":
+      return "Nihai rapor"
+    case "admin_test":
+      return "Admin test"
+    default:
+      return value
+  }
 }
 
 function formatDateTime(value: string) {

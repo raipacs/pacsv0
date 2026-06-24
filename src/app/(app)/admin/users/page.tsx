@@ -56,6 +56,7 @@ const permissionTables = [
   ["ai_service_providers", "AI servisleri"],
   ["ai_jobs", "AI iş kuyruğu"],
   ["ai_report_drafts", "AI ön raporları"],
+  ["ai_usage_events", "AI token tüketimi"],
   ["branches", "Şubeler"],
   ["organization_members", "Kullanıcı üyelikleri"],
   ["access_groups", "Gruplar"],

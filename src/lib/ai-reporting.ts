@@ -20,6 +20,16 @@ export type MockAiDraftInput = {
   seriesCount: number
 }
 
+const pricingUsdPerMillionTokens: Record<
+  string,
+  { input: number; output: number; note: string }
+> = {
+  "rai-mock": { input: 0, output: 0, note: "Mock geliştirme sağlayıcısı" },
+  openai: { input: 1.25, output: 10, note: "Temsili varsayılan fiyat" },
+  claude: { input: 3, output: 15, note: "Temsili varsayılan fiyat" },
+  gemini: { input: 1.25, output: 10, note: "Temsili varsayılan fiyat" },
+}
+
 export function createMockRadiologyDraft(input: MockAiDraftInput) {
   const modality = input.modality || "DICOM"
   const studyName = input.description || "Görüntüleme tetkiki"
@@ -48,6 +58,53 @@ export function createMockRadiologyDraft(input: MockAiDraftInput) {
       instanceCount: input.instanceCount,
       seriesCount: input.seriesCount,
       generator: "rai-mock-radiology-v0",
+    },
+  }
+}
+
+export function estimateTokenUsage({
+  findings,
+  impression,
+  inputContext,
+}: {
+  findings: string
+  impression: string
+  inputContext: Record<string, unknown>
+}) {
+  const inputChars = JSON.stringify(inputContext).length
+  const outputChars = `${findings}\n${impression}`.length
+
+  return {
+    inputTokens: Math.max(120, Math.ceil(inputChars / 4)),
+    outputTokens: Math.max(180, Math.ceil(outputChars / 4)),
+  }
+}
+
+export function calculateAiUsageCost({
+  inputTokens,
+  outputTokens,
+  providerSlug,
+}: {
+  inputTokens: number
+  outputTokens: number
+  providerSlug: string
+}) {
+  const pricing = pricingUsdPerMillionTokens[providerSlug] ?? {
+    input: 0,
+    output: 0,
+    note: "Fiyat tanımı bekliyor",
+  }
+  const inputCost = (inputTokens / 1_000_000) * pricing.input
+  const outputCost = (outputTokens / 1_000_000) * pricing.output
+
+  return {
+    currency: "USD",
+    inputCost,
+    outputCost,
+    pricingSnapshot: {
+      inputUsdPerMillionTokens: pricing.input,
+      outputUsdPerMillionTokens: pricing.output,
+      note: pricing.note,
     },
   }
 }

@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { z } from "zod"
 
-import { createMockRadiologyDraft, isMissingAiTableError } from "@/lib/ai-reporting"
+import {
+  calculateAiUsageCost,
+  createMockRadiologyDraft,
+  estimateTokenUsage,
+  isMissingAiTableError,
+} from "@/lib/ai-reporting"
 import { requireUser } from "@/lib/auth"
 import { isSupabaseConfigured } from "@/lib/config"
 import { createClient } from "@/lib/supabase/server"
@@ -127,6 +132,42 @@ export async function startAiPreReport(formData: FormData) {
     })
 
     if (draftError) throw new Error(`AI ön raporu oluşturulamadı: ${draftError.message}`)
+
+    const tokenUsage = estimateTokenUsage({
+      findings: draft.findings,
+      impression: draft.impression,
+      inputContext,
+    })
+    const cost = calculateAiUsageCost({
+      inputTokens: tokenUsage.inputTokens,
+      outputTokens: tokenUsage.outputTokens,
+      providerSlug: provider.slug,
+    })
+
+    const { error: usageError } = await supabase.from("ai_usage_events").insert({
+      organization_id: user.organizationId,
+      job_id: job.id,
+      study_id: studyId,
+      provider_slug: provider.slug,
+      model_name: provider.default_model,
+      usage_type: "pre_report",
+      input_tokens: tokenUsage.inputTokens,
+      output_tokens: tokenUsage.outputTokens,
+      currency: cost.currency,
+      input_cost: cost.inputCost,
+      output_cost: cost.outputCost,
+      pricing_snapshot: cost.pricingSnapshot,
+      metadata: {
+        accessionNumber: study.accession_number,
+        modality: study.modality,
+        estimated: true,
+      },
+      created_by: user.id,
+    })
+
+    if (usageError && !isMissingAiTableError(usageError)) {
+      throw new Error(`AI tüketim kaydı oluşturulamadı: ${usageError.message}`)
+    }
   }
 
   await supabase.from("audit_logs").insert({
