@@ -26,6 +26,13 @@ const returnToSchema = z.preprocess(
     .refine((value) => value.startsWith("/") && !value.startsWith("//"))
     .optional()
 )
+const memberRoleSchema = z.enum(["admin", "doctor"])
+const permissionTableSchema = z
+  .string()
+  .trim()
+  .min(2)
+  .max(80)
+  .regex(/^[a-z0-9_]+$/)
 
 const hisIntegrationSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -77,6 +84,163 @@ type HisIntegrationTestRow = {
 type StorageObjectRef = {
   storage_bucket: string
   storage_key: string
+}
+
+export async function updateMemberAccess(formData: FormData) {
+  const user = await requireAdmin()
+  if (!isSupabaseConfigured) redirect("/admin/users")
+
+  const memberUserId = idSchema.parse(formData.get("memberUserId"))
+  const role = memberRoleSchema.parse(formData.get("role"))
+  const branchId = optionalUuidSchema.parse(formData.get("branchId"))
+  const isActive = formData.get("isActive") === "on"
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from("organization_members")
+    .update({
+      role,
+      branch_id: branchId,
+      is_active: isActive,
+    })
+    .eq("organization_id", user.organizationId)
+    .eq("user_id", memberUserId)
+
+  if (error) throw new Error(`Kullanıcı erişimi güncellenemedi: ${error.message}`)
+
+  await supabase.from("audit_logs").insert({
+    organization_id: user.organizationId,
+    actor_id: user.id,
+    action: "member.access_updated",
+    resource_type: "organization_member",
+    resource_id: memberUserId,
+    metadata: { role, branchId, isActive },
+  })
+
+  revalidatePath("/admin/users")
+  redirect("/admin/users")
+}
+
+export async function createAccessGroup(formData: FormData) {
+  const user = await requireAdmin()
+  if (!isSupabaseConfigured) redirect("/admin/users")
+
+  const name = z.string().trim().min(2).max(80).parse(formData.get("name"))
+  const description = z
+    .string()
+    .trim()
+    .max(240)
+    .optional()
+    .parse(String(formData.get("description") ?? "").trim() || undefined)
+  const supabase = await createClient()
+  const slug = slugifyGroupName(name)
+
+  const { error } = await supabase.from("access_groups").insert({
+    organization_id: user.organizationId,
+    name,
+    slug,
+    description: description ?? null,
+    created_by: user.id,
+  })
+
+  if (error) throw new Error(`Grup oluşturulamadı: ${error.message}`)
+
+  await supabase.from("audit_logs").insert({
+    organization_id: user.organizationId,
+    actor_id: user.id,
+    action: "access_group.created",
+    resource_type: "access_group",
+    metadata: { name, slug },
+  })
+
+  revalidatePath("/admin/users")
+  redirect("/admin/users")
+}
+
+export async function updateGroupMembership(formData: FormData) {
+  const user = await requireAdmin()
+  if (!isSupabaseConfigured) redirect("/admin/users")
+
+  const memberUserId = idSchema.parse(formData.get("memberUserId"))
+  const groupId = idSchema.parse(formData.get("groupId"))
+  const intent = z.enum(["add", "remove"]).parse(formData.get("intent"))
+  const supabase = await createClient()
+
+  if (intent === "add") {
+    const { error } = await supabase.from("access_group_members").upsert(
+      {
+        organization_id: user.organizationId,
+        group_id: groupId,
+        user_id: memberUserId,
+        is_active: true,
+        added_by: user.id,
+      },
+      { onConflict: "group_id,user_id" }
+    )
+
+    if (error) throw new Error(`Grup üyeliği eklenemedi: ${error.message}`)
+  } else {
+    const { error } = await supabase
+      .from("access_group_members")
+      .delete()
+      .eq("organization_id", user.organizationId)
+      .eq("group_id", groupId)
+      .eq("user_id", memberUserId)
+
+    if (error) throw new Error(`Grup üyeliği kaldırılamadı: ${error.message}`)
+  }
+
+  await supabase.from("audit_logs").insert({
+    organization_id: user.organizationId,
+    actor_id: user.id,
+    action: intent === "add" ? "access_group.member_added" : "access_group.member_removed",
+    resource_type: "access_group",
+    resource_id: groupId,
+    metadata: { memberUserId },
+  })
+
+  revalidatePath("/admin/users")
+  redirect("/admin/users")
+}
+
+export async function updateGroupPermission(formData: FormData) {
+  const user = await requireAdmin()
+  if (!isSupabaseConfigured) redirect("/admin/users")
+
+  const groupId = idSchema.parse(formData.get("groupId"))
+  const tableName = permissionTableSchema.parse(formData.get("tableName"))
+  const permission = {
+    can_select: formData.get("canSelect") === "on",
+    can_insert: formData.get("canInsert") === "on",
+    can_update: formData.get("canUpdate") === "on",
+    can_delete: formData.get("canDelete") === "on",
+  }
+  const supabase = await createClient()
+
+  const { error } = await supabase.from("group_table_permissions").upsert(
+    {
+      organization_id: user.organizationId,
+      group_id: groupId,
+      table_name: tableName,
+      ...permission,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "group_id,table_name" }
+  )
+
+  if (error) throw new Error(`Grup yetkisi güncellenemedi: ${error.message}`)
+
+  await supabase.from("audit_logs").insert({
+    organization_id: user.organizationId,
+    actor_id: user.id,
+    action: "access_group.permission_updated",
+    resource_type: "group_table_permission",
+    resource_id: groupId,
+    metadata: { tableName, permission },
+  })
+
+  revalidatePath("/admin/users")
+  redirect("/admin/users")
 }
 
 export async function deleteStudy(formData: FormData) {
@@ -424,6 +588,19 @@ function evaluateHisIntegration(integration: HisIntegrationTestRow) {
         ? "HIS bağlantı tanımı temel doğrulamadan geçti"
         : `HIS bağlantı testi eksik: ${failed.map((check) => check.name).join(", ")}`,
   }
+}
+
+function slugifyGroupName(value: string) {
+  return (
+    value
+      .trim()
+      .toLocaleLowerCase("tr-TR")
+      .replaceAll("ı", "i")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "grup"
+  )
 }
 
 async function removeStorageObjects(instances: StorageObjectRef[]) {
