@@ -20,8 +20,11 @@ export function ExternalShareViewer({ token: initialToken = "" }: { token?: stri
 
   useEffect(() => {
     let cancelled = false
-    const token =
-      initialToken || new URLSearchParams(window.location.search).get("token") || ""
+    const queryToken = new URLSearchParams(window.location.search).get("token")
+    const hashToken = new URLSearchParams(window.location.hash.replace(/^#/, "")).get(
+      "token"
+    )
+    const token = initialToken || queryToken || hashToken || ""
 
     async function loadShare() {
       setIsLoading(true)

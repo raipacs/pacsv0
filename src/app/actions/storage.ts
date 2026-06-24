@@ -176,7 +176,7 @@ export async function createExternalStudyShareUrl(studyId: string, ttlSeconds: n
   const origin = host ? `${protocol}://${host}` : "https://app.raipacs.com"
 
   const shareUrl = new URL("/share", origin)
-  shareUrl.searchParams.set("token", token)
+  shareUrl.hash = new URLSearchParams({ token }).toString()
 
   return {
     ok: true as const,
