@@ -51,6 +51,9 @@ export default async function DicomServerAdminPage({
     (sum, modality) => sum + modality.instances,
     0
   )
+  const servicesWarningCount = countHealthWarnings(dashboard.services)
+  const apiWarningCount = countHealthWarnings(dashboard.apis)
+  const cloudWarningCount = countHealthWarnings(dashboard.cloudInfrastructure)
 
   return (
     <>
@@ -161,33 +164,72 @@ export default async function DicomServerAdminPage({
           </dl>
         </article>
 
-        <section className="data-panel">
-          <div className="panel-heading">
-            <h2>Servisler</h2>
-          </div>
+        <details
+          className="data-panel collapsible-panel"
+          open={servicesWarningCount > 0}
+        >
+          <summary className="panel-heading">
+            <div>
+              <h2>Servisler</h2>
+              <small>
+                {servicesWarningCount
+                  ? `${servicesWarningCount} uyarı / müdahale gerektiriyor`
+                  : "Tüm servis kontrolleri normal"}
+              </small>
+            </div>
+            <span className={`panel-toggle ${servicesWarningCount ? "warning" : ""}`}>
+              {formatWarningCount(servicesWarningCount)}
+            </span>
+          </summary>
           <div className="health-list">
             {dashboard.services.map((item) => (
               <HealthRow item={item} key={item.name} />
             ))}
           </div>
-        </section>
+        </details>
       </section>
 
-      <section className="data-panel admin-section">
-        <div className="panel-heading">
-          <h2>API durumu</h2>
-        </div>
+      <details
+        className="data-panel admin-section collapsible-panel"
+        open={apiWarningCount > 0}
+      >
+        <summary className="panel-heading">
+          <div>
+            <h2>API durumu</h2>
+            <small>
+              {apiWarningCount
+                ? `${apiWarningCount} uyarı / müdahale gerektiriyor`
+                : "Tüm API kontrolleri normal"}
+            </small>
+          </div>
+          <span className={`panel-toggle ${apiWarningCount ? "warning" : ""}`}>
+            {formatWarningCount(apiWarningCount)}
+          </span>
+        </summary>
         <div className="health-list">
           {dashboard.apis.map((item) => (
             <HealthRow item={item} key={item.name} />
           ))}
         </div>
-      </section>
+      </details>
 
-      <section className="data-panel admin-section">
-        <div className="panel-heading">
-          <h2>Google Cloud altyapısı</h2>
-        </div>
+      <details
+        className="data-panel admin-section collapsible-panel"
+        open={cloudWarningCount > 0}
+      >
+        <summary className="panel-heading">
+          <div>
+            <h2>Google Cloud altyapısı</h2>
+            <small>
+              {cloudWarningCount
+                ? `${cloudWarningCount} uyarı / müdahale gerektiriyor`
+                : "Tüm Google Cloud kontrolleri normal"}
+            </small>
+          </div>
+          <span className={`panel-toggle ${cloudWarningCount ? "warning" : ""}`}>
+            {formatWarningCount(cloudWarningCount)}
+          </span>
+        </summary>
         <div className="responsive-table">
           <table>
             <thead>
@@ -211,7 +253,7 @@ export default async function DicomServerAdminPage({
           izlenir. GCP Service Account bağlandığında gerçek firewall kuralı, VM
           state ve systemd timer durumu doğrudan okunabilir.
         </p>
-      </section>
+      </details>
 
       <section className="data-panel admin-section">
         <div className="panel-heading">
@@ -421,6 +463,14 @@ function SummaryTile({
       <small>{detail}</small>
     </article>
   )
+}
+
+function countHealthWarnings(items: Array<{ state: HealthState }>) {
+  return items.filter((item) => item.state !== "ok").length
+}
+
+function formatWarningCount(count: number) {
+  return count ? `${count} uyarı` : "OK"
 }
 
 function ModalityActivity({ item }: { item: ModalityConnection }) {

@@ -583,6 +583,16 @@ p {
   font-size: 14px;
 }
 
+.panel-toggle.warning {
+  border-color: #fedf89;
+  color: #b54708;
+  background: #fffaeb;
+}
+
+.panel-toggle.warning::after {
+  color: #dc6803;
+}
+
 .collapsible-panel[open] .panel-toggle::after {
   content: "↑";
 }
