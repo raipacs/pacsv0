@@ -31,6 +31,17 @@ type ViewerStudyContext = {
 
 type ViewerTool = "scroll" | "pan" | "window" | "zoom"
 type SeriesPanelMode = "list" | "preview"
+type DecodeWorkerResponse =
+  | {
+      id: number
+      ok: true
+      preview: DicomPreview
+    }
+  | {
+      id: number
+      ok: false
+      error: string
+    }
 
 type ViewerSeries = {
   id: string
@@ -135,6 +146,8 @@ export function RaiDicomViewer({
   const previewCacheRef = useRef(new Map<string, DicomPreview>())
   const signedUrlCacheRef = useRef(new Map<string, string>())
   const pendingPreviewRef = useRef(new Map<string, Promise<DicomPreview>>())
+  const decodeWorkerRef = useRef<Worker | null>(null)
+  const decodeWorkerRequestIdRef = useRef(0)
   const hasLoadedPreviewRef = useRef(false)
   const dragRef = useRef<{
     x: number
@@ -225,6 +238,22 @@ export function RaiDicomViewer({
     []
   )
 
+  const decodeBuffer = useCallback(async (buffer: ArrayBuffer) => {
+    if (typeof Worker === "undefined") {
+      return decodeDicomPreview(buffer)
+    }
+
+    try {
+      return await decodeDicomPreviewInWorker(
+        buffer,
+        decodeWorkerRef,
+        decodeWorkerRequestIdRef
+      )
+    } catch {
+      return decodeDicomPreview(buffer)
+    }
+  }, [])
+
   const decodeInstancePreview = useCallback(
     async (instanceId: string, onStatus?: (status: string) => void) => {
       const cached = previewCacheRef.current.get(instanceId)
@@ -257,7 +286,7 @@ export function RaiDicomViewer({
         if (!response.ok) throw new Error(`DICOM indirilemedi: ${response.status}`)
 
         onStatus?.("Görüntü çözümleniyor...")
-        const decoded = await decodeDicomPreview(await response.arrayBuffer())
+        const decoded = await decodeBuffer(await response.arrayBuffer())
         cachePreview(instanceId, decoded)
         return decoded
       })()
@@ -272,7 +301,7 @@ export function RaiDicomViewer({
         refreshCacheStats()
       }
     },
-    [cachePreview, getSignedUrls, refreshCacheStats]
+    [cachePreview, decodeBuffer, getSignedUrls, refreshCacheStats]
   )
 
   const selectSeries = useCallback(
@@ -493,6 +522,13 @@ export function RaiDicomViewer({
 
     document.addEventListener("fullscreenchange", handleFullscreenChange)
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      decodeWorkerRef.current?.terminate()
+      decodeWorkerRef.current = null
+    }
   }, [])
 
   useEffect(() => {
@@ -1249,6 +1285,63 @@ async function runLimitedPrefetch(
       }
     })
   )
+}
+
+function decodeDicomPreviewInWorker(
+  buffer: ArrayBuffer,
+  workerRef: { current: Worker | null },
+  requestIdRef: { current: number }
+) {
+  return new Promise<DicomPreview>((resolve, reject) => {
+    let worker = workerRef.current
+
+    if (!worker) {
+      worker = new Worker(new URL("../workers/dicom-preview.worker.ts", import.meta.url), {
+        type: "module",
+      })
+      workerRef.current = worker
+    }
+
+    const requestId = requestIdRef.current + 1
+    requestIdRef.current = requestId
+
+    const cleanup = () => {
+      window.clearTimeout(timeout)
+      worker.removeEventListener("message", handleMessage)
+      worker.removeEventListener("error", handleError)
+    }
+
+    const timeout = window.setTimeout(() => {
+      cleanup()
+      reject(new Error("DICOM worker zaman aşımına uğradı."))
+    }, DICOM_FETCH_TIMEOUT_MS)
+
+    const handleMessage = (event: MessageEvent<DecodeWorkerResponse>) => {
+      if (event.data.id !== requestId) return
+
+      cleanup()
+
+      if (event.data.ok) {
+        resolve(event.data.preview)
+        return
+      }
+
+      reject(new Error(event.data.error))
+    }
+
+    const handleError = (event: ErrorEvent) => {
+      cleanup()
+      workerRef.current?.terminate()
+      workerRef.current = null
+      reject(new Error(event.message || "DICOM worker çalıştırılamadı."))
+    }
+
+    worker.addEventListener("message", handleMessage)
+    worker.addEventListener("error", handleError)
+
+    const workerBuffer = buffer.slice(0)
+    worker.postMessage({ id: requestId, buffer: workerBuffer }, [workerBuffer])
+  })
 }
 
 function waitForIdleSlot() {
