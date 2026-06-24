@@ -1,6 +1,7 @@
 "use server"
 
 import { headers } from "next/headers"
+import { randomBytes } from "node:crypto"
 import { z } from "zod"
 
 import { requireUser } from "@/lib/auth"
@@ -170,17 +171,33 @@ export async function createExternalStudyShareUrl(studyId: string, ttlSeconds: n
     ttlSeconds: parsedTtl.data,
     userId: user.id,
   })
+  const expiresAt = new Date(Date.now() + parsedTtl.data * 1000).toISOString()
+  const shareId = createShareId()
+  const shareClient = isSupabaseServiceConfigured() ? createServiceClient() : supabase
+  const { error: shareError } = await shareClient.from("external_study_shares").insert({
+    created_by: user.id,
+    expires_at: expiresAt,
+    id: shareId,
+    organization_id: user.organizationId,
+    study_id: studyId,
+    token,
+  })
+
+  if (shareError) {
+    return { ok: false as const, error: shareError.message }
+  }
+
   const requestHeaders = await headers()
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host")
   const protocol = requestHeaders.get("x-forwarded-proto") ?? "https"
   const origin = host ? `${protocol}://${host}` : "https://app.raipacs.com"
 
   const shareUrl = new URL("/share", origin)
-  shareUrl.hash = new URLSearchParams({ token }).toString()
+  shareUrl.searchParams.set("s", shareId)
 
   return {
     ok: true as const,
-    expiresAt: new Date(Date.now() + parsedTtl.data * 1000).toISOString(),
+    expiresAt,
     url: shareUrl.toString(),
   }
 }
@@ -253,4 +270,8 @@ export async function createSharedDicomSignedUrls({
   }
 
   return { ok: true as const, urls }
+}
+
+function createShareId() {
+  return randomBytes(12).toString("base64url")
 }

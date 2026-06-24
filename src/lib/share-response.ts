@@ -6,11 +6,21 @@ import { hasOhifLaunchSecret } from "@/lib/ohif-launch"
 import { createOhifDicomJsonViewerUrl } from "@/lib/ohif-viewer"
 import { createServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service"
 
-export async function buildShareResponse(shareToken: string) {
-  const share = verifyExternalStudyShareToken(shareToken)
+type ShareLookup = {
+  shareId?: string
+  token?: string
+}
 
-  if (!share) {
-    return jsonError("Paylaşım linki geçersiz veya süresi dolmuş.", 401)
+type ExternalShareRow = {
+  expires_at: string
+  token: string
+}
+
+export async function buildShareResponse(lookup: ShareLookup | string) {
+  const input = typeof lookup === "string" ? { token: lookup } : lookup
+
+  if (!input.shareId && !input.token) {
+    return jsonError("Paylaşım token bulunamadı.", 400)
   }
 
   if (!isSupabaseServiceConfigured()) {
@@ -22,6 +32,20 @@ export async function buildShareResponse(shareToken: string) {
   }
 
   const supabase = createServiceClient()
+  const shareToken = input.shareId
+    ? await resolveStoredShareToken(supabase, input.shareId)
+    : input.token
+
+  if (!shareToken) {
+    return jsonError("Paylaşım linki geçersiz veya süresi dolmuş.", 401)
+  }
+
+  const share = verifyExternalStudyShareToken(shareToken)
+
+  if (!share) {
+    return jsonError("Paylaşım linki geçersiz veya süresi dolmuş.", 401)
+  }
+
   const { data: study, error } = await supabase
     .from("studies")
     .select(
@@ -95,6 +119,23 @@ export async function buildShareResponse(shareToken: string) {
       },
     }
   )
+}
+
+async function resolveStoredShareToken(
+  supabase: ReturnType<typeof createServiceClient>,
+  shareId: string
+) {
+  const { data, error } = await supabase
+    .from("external_study_shares")
+    .select("expires_at, token")
+    .eq("id", shareId)
+    .is("revoked_at", null)
+    .gt("expires_at", new Date().toISOString())
+    .maybeSingle()
+
+  if (error || !data) return null
+
+  return (data as ExternalShareRow).token
 }
 
 function jsonError(error: string, status: number) {

@@ -20,10 +20,11 @@ export function ExternalShareViewer({ token: initialToken = "" }: { token?: stri
 
   useEffect(() => {
     let cancelled = false
-    const queryToken = new URLSearchParams(window.location.search).get("token")
-    const hashToken = new URLSearchParams(window.location.hash.replace(/^#/, "")).get(
-      "token"
-    )
+    const query = new URLSearchParams(window.location.search)
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""))
+    const shareId = query.get("s") || hash.get("s") || ""
+    const queryToken = query.get("token")
+    const hashToken = hash.get("token")
     const token = initialToken || queryToken || hashToken || ""
 
     async function loadShare() {
@@ -31,12 +32,16 @@ export function ExternalShareViewer({ token: initialToken = "" }: { token?: stri
       setError("")
 
       try {
-        if (!token) {
+        if (!shareId && !token) {
           throw new Error("Paylaşım token bulunamadı.")
         }
 
         const url = new URL("/api/share", window.location.origin)
-        url.searchParams.set("token", token)
+        if (shareId) {
+          url.searchParams.set("s", shareId)
+        } else {
+          url.searchParams.set("token", token)
+        }
         const response = await fetch(url.toString(), {
           cache: "no-store",
         })
