@@ -111,7 +111,10 @@ export function calculateAiUsageCost({
 
 export function isMissingAiTableError(error: { code?: string; message?: string } | null) {
   if (!error) return false
-  return error.code === "42P01" || /ai_(service_providers|jobs|report_drafts)/i.test(error.message ?? "")
+  return (
+    error.code === "42P01" ||
+    /ai_(service_providers|jobs|report_drafts|usage_events)/i.test(error.message ?? "")
+  )
 }
 
 export function aiJobStatusLabel(status: string | null | undefined) {
