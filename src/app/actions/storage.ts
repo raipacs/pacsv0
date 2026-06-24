@@ -175,10 +175,13 @@ export async function createExternalStudyShareUrl(studyId: string, ttlSeconds: n
   const protocol = requestHeaders.get("x-forwarded-proto") ?? "https"
   const origin = host ? `${protocol}://${host}` : "https://app.raipacs.com"
 
+  const shareUrl = new URL("/share", origin)
+  shareUrl.searchParams.set("token", token)
+
   return {
     ok: true as const,
     expiresAt: new Date(Date.now() + parsedTtl.data * 1000).toISOString(),
-    url: `${origin}/share/${encodeURIComponent(token)}`,
+    url: shareUrl.toString(),
   }
 }
 

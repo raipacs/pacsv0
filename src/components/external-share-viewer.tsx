@@ -26,7 +26,9 @@ export function ExternalShareViewer({ token }: { token: string }) {
       setError("")
 
       try {
-        const response = await fetch(`/api/share/${encodeURIComponent(token)}`, {
+        const url = new URL("/api/share", window.location.origin)
+        url.searchParams.set("token", token)
+        const response = await fetch(url.toString(), {
           cache: "no-store",
         })
         const payload = (await response.json()) as SharedViewerData | { error?: string }
