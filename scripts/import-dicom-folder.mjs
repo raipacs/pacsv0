@@ -233,7 +233,6 @@ for (const filename of filenames) {
           priority: "routine",
           status: "received",
           source_ae_title: sourceAeTitle,
-          metadata: buildStudySourceMetadata(metadata),
         },
         { onConflict: "organization_id,study_instance_uid" }
       )
@@ -552,19 +551,6 @@ function resolveDicomSourceIdentity(metadata = {}, { fallbackAeTitle, fallbackSo
     deviceSerialNumber: normalizeIdentityValue(metadata.deviceSerialNumber),
     institutionName: normalizeIdentityValue(metadata.institutionName),
     gateway: importSource,
-  }
-}
-
-function buildStudySourceMetadata(metadata) {
-  return {
-    dicomSource: sourceIdentity,
-    device: {
-      stationName: normalizeIdentityValue(metadata.stationName),
-      manufacturer: normalizeIdentityValue(metadata.manufacturer),
-      manufacturerModelName: normalizeIdentityValue(metadata.manufacturerModelName),
-      deviceSerialNumber: normalizeIdentityValue(metadata.deviceSerialNumber),
-      institutionName: normalizeIdentityValue(metadata.institutionName),
-    },
   }
 }
 
