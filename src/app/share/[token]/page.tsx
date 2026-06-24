@@ -1,4 +1,4 @@
-import { ExternalShareViewer } from "@/components/external-share-viewer"
+import { ExternalShareShell } from "@/components/external-share-shell"
 
 export const metadata = { title: "RAI PACS Paylaşım" }
 
@@ -9,5 +9,5 @@ export default async function ExternalSharePage({
 }) {
   const { token } = await params
 
-  return <ExternalShareViewer token={decodeURIComponent(token)} />
+  return <ExternalShareShell token={decodeURIComponent(token)} />
 }
