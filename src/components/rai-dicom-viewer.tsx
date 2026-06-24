@@ -44,8 +44,9 @@ const MIN_ZOOM = 0.2
 const MAX_ZOOM = 12
 const SIGNED_URL_TIMEOUT_MS = 15_000
 const DICOM_FETCH_TIMEOUT_MS = 25_000
-const PREVIEW_CACHE_LIMIT = 48
-const PREFETCH_RADIUS = 4
+const PREVIEW_CACHE_LIMIT = 96
+const PREFETCH_RADIUS = 8
+const PREFETCH_CONCURRENCY = 2
 
 export function RaiDicomViewer({
   instances,
@@ -356,7 +357,13 @@ export function RaiDicomViewer({
       if (!idsToPrefetch.length) return
 
       void getSignedUrls(idsToPrefetch)
-        .then(() => Promise.allSettled(idsToPrefetch.map((id) => decodeInstancePreview(id))))
+        .then(() =>
+          runLimitedPrefetch(
+            idsToPrefetch,
+            (instanceId) => decodeInstancePreview(instanceId),
+            PREFETCH_CONCURRENCY
+          )
+        )
         .catch(() => {
           // Prefetch is opportunistic; active viewport loading reports real errors.
         })
@@ -1214,6 +1221,59 @@ function renderPreviewThumbnail(preview: DicomPreview) {
   })
 
   return canvas.toDataURL("image/jpeg", 0.76)
+}
+
+async function runLimitedPrefetch(
+  instanceIds: string[],
+  loader: (instanceId: string) => Promise<DicomPreview>,
+  concurrency: number
+) {
+  let cursor = 0
+  const workerCount = Math.min(concurrency, instanceIds.length)
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (cursor < instanceIds.length) {
+        const instanceId = instanceIds[cursor]
+        cursor += 1
+
+        if (!instanceId) continue
+
+        await waitForIdleSlot()
+
+        try {
+          await loader(instanceId)
+        } catch {
+          // Prefetch failures are ignored; direct viewport load will surface real errors.
+        }
+      }
+    })
+  )
+}
+
+function waitForIdleSlot() {
+  return new Promise<void>((resolve) => {
+    if (typeof window === "undefined") {
+      resolve()
+      return
+    }
+
+    const idle = (
+      window as Window & {
+        requestIdleCallback?: (
+          callback: IdleRequestCallback,
+          options?: IdleRequestOptions
+        ) => number
+      }
+    ).requestIdleCallback
+
+    if (idle) {
+      idle(() => resolve(), { timeout: 700 })
+      return
+    }
+
+    window.setTimeout(resolve, 60)
+  })
 }
 
 function formatViewerDateTime(value: string | null) {

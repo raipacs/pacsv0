@@ -49,6 +49,11 @@ const JPEG_LOSSLESS_TRANSFER_SYNTAXES = new Set([
   "1.2.840.10008.1.2.4.57",
   "1.2.840.10008.1.2.4.70",
 ])
+const PRESENTATION_CACHE_LIMIT = 6
+const presentationCache = new WeakMap<
+  DicomPreview,
+  Array<{ key: string; canvas: HTMLCanvasElement }>
+>()
 
 export async function decodeDicomPreview(buffer: ArrayBuffer): Promise<DicomPreview> {
   const bytes = new Uint8Array(buffer)
@@ -83,34 +88,10 @@ export function renderDicomImage(
     return
   }
 
-  const { rows, columns, photometricInterpretation, rescaleIntercept, rescaleSlope } =
-    preview.metadata
-  const source = document.createElement("canvas")
-  source.width = columns
-  source.height = rows
-  const sourceContext = source.getContext("2d")
+  const { rows, columns } = preview.metadata
+  const source = getWindowedCanvas(preview, options.center, options.width, options.invert)
   const targetContext = canvas.getContext("2d")
-  if (!sourceContext || !targetContext) return
-
-  const imageData = sourceContext.createImageData(columns, rows)
-  const low = options.center - options.width / 2
-  const high = options.center + options.width / 2
-  const shouldInvert =
-    options.invert || photometricInterpretation.toUpperCase() === "MONOCHROME1"
-
-  for (let index = 0; index < preview.pixels.length; index += 1) {
-    const storedValue = preview.pixels[index] ?? 0
-    const scaledValue = storedValue * rescaleSlope + rescaleIntercept
-    const normalized = Math.max(0, Math.min(255, ((scaledValue - low) / (high - low)) * 255))
-    const grayscale = shouldInvert ? 255 - normalized : normalized
-    const outputIndex = index * 4
-    imageData.data[outputIndex] = grayscale
-    imageData.data[outputIndex + 1] = grayscale
-    imageData.data[outputIndex + 2] = grayscale
-    imageData.data[outputIndex + 3] = 255
-  }
-
-  sourceContext.putImageData(imageData, 0, 0)
+  if (!targetContext) return
 
   targetContext.fillStyle = "#020617"
   targetContext.fillRect(0, 0, canvas.width, canvas.height)
@@ -128,6 +109,65 @@ export function renderDicomImage(
   targetContext.scale(options.flipHorizontal ? -1 : 1, options.flipVertical ? -1 : 1)
   targetContext.drawImage(source, -width / 2, -height / 2, width, height)
   targetContext.restore()
+}
+
+function getWindowedCanvas(
+  preview: DicomPreview,
+  center: number,
+  width: number,
+  invert: boolean
+) {
+  const { rows, columns, photometricInterpretation, rescaleIntercept, rescaleSlope } =
+    preview.metadata
+  const shouldInvert =
+    invert || photometricInterpretation.toUpperCase() === "MONOCHROME1"
+  const roundedCenter = Math.round(center)
+  const roundedWidth = Math.max(1, Math.round(width))
+  const key = `${roundedCenter}:${roundedWidth}:${shouldInvert ? "1" : "0"}`
+  const entries = presentationCache.get(preview) ?? []
+  const cachedIndex = entries.findIndex((entry) => entry.key === key)
+
+  if (cachedIndex >= 0) {
+    const [hit] = entries.splice(cachedIndex, 1)
+    if (hit) {
+      entries.push(hit)
+      presentationCache.set(preview, entries)
+      return hit.canvas
+    }
+  }
+
+  const source = document.createElement("canvas")
+  source.width = columns
+  source.height = rows
+  const sourceContext = source.getContext("2d")
+  if (!sourceContext || !preview.pixels) return source
+
+  const imageData = sourceContext.createImageData(columns, rows)
+  const low = roundedCenter - roundedWidth / 2
+  const high = roundedCenter + roundedWidth / 2
+  const range = Math.max(1, high - low)
+
+  for (let index = 0; index < preview.pixels.length; index += 1) {
+    const storedValue = preview.pixels[index] ?? 0
+    const scaledValue = storedValue * rescaleSlope + rescaleIntercept
+    const normalized = Math.max(0, Math.min(255, ((scaledValue - low) / range) * 255))
+    const grayscale = shouldInvert ? 255 - normalized : normalized
+    const outputIndex = index * 4
+    imageData.data[outputIndex] = grayscale
+    imageData.data[outputIndex + 1] = grayscale
+    imageData.data[outputIndex + 2] = grayscale
+    imageData.data[outputIndex + 3] = 255
+  }
+
+  sourceContext.putImageData(imageData, 0, 0)
+  entries.push({ key, canvas: source })
+
+  while (entries.length > PRESENTATION_CACHE_LIMIT) {
+    entries.shift()
+  }
+
+  presentationCache.set(preview, entries)
+  return source
 }
 
 function parseDicomElements(buffer: ArrayBuffer): ParserState {
