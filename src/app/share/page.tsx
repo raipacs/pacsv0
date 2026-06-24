@@ -1,4 +1,3 @@
-import { RaiDicomViewer } from "@/components/rai-dicom-viewer"
 import { getShareViewerData, type ShareViewerData } from "@/lib/share-response"
 
 export const metadata = { title: "RAI PACS Paylaşım" }
@@ -23,8 +22,8 @@ export default async function ExternalShareQueryPage({ searchParams }: SharePage
 
 function SharedViewer({ data }: { data: ShareViewerData }) {
   return (
-    <main className="external-share-page">
-      <header className="rai-viewer-bar external-share-bar">
+    <main className="external-share-page external-share-error-page">
+      <section className="data-panel viewer-error-panel">
         <div>
           <p className="eyebrow">RAI PACS güvenli paylaşım</p>
           <h1>{data.study.description}</h1>
@@ -36,23 +35,17 @@ function SharedViewer({ data }: { data: ShareViewerData }) {
             Link geçerlilik bitişi: {formatExpiry(data.expiresAt)}
           </p>
         </div>
-        <nav aria-label="Paylaşım viewer navigasyonu">
+        <div className="form-actions">
           <a
             className="button primary"
             href={data.ohifViewerUrl}
             rel="noreferrer"
             target="_blank"
           >
-            OHIF yeni sekme
+            Görüntüyü aç
           </a>
-        </nav>
-      </header>
-      <RaiDicomViewer
-        instances={data.instances}
-        shareToken={data.shareToken}
-        study={data.study}
-        studyId={data.studyId}
-      />
+        </div>
+      </section>
     </main>
   )
 }
