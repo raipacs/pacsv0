@@ -2045,6 +2045,12 @@ td span {
   padding: 16px;
 }
 
+.ai-usage-warning {
+  max-width: none;
+  margin: 14px 16px 0;
+  color: var(--warning);
+}
+
 .ai-usage-filter label {
   display: grid;
   gap: 6px;

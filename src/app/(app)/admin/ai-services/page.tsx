@@ -1,6 +1,7 @@
 import Link from "next/link"
 
 import { createAiProvider, updateAiProvider } from "@/app/actions/admin"
+import { isMissingAiTableError } from "@/lib/ai-reporting"
 import { requireAdmin } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 
@@ -129,14 +130,15 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
   if (draftsResult.error) {
     throw new Error(`AI ön raporları alınamadı: ${draftsResult.error.message}`)
   }
-  if (usageResult.error) {
+  const usageUnavailable = usageResult.error && isMissingAiTableError(usageResult.error)
+  if (usageResult.error && !usageUnavailable) {
     throw new Error(`AI token tüketimi alınamadı: ${usageResult.error.message}`)
   }
 
   const providers = (providersResult.data ?? []) as AiProviderRow[]
   const jobs = (jobsResult.data ?? []) as AiJobRow[]
   const drafts = (draftsResult.data ?? []) as AiDraftRow[]
-  const usageRows = (usageResult.data ?? []) as AiUsageRow[]
+  const usageRows = usageUnavailable ? [] : ((usageResult.data ?? []) as AiUsageRow[])
   const activeProviders = providers.filter((provider) => provider.is_active)
   const credentialReady = providers.filter(
     (provider) => !provider.requires_credentials || provider.credential_reference
@@ -197,6 +199,12 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
         <div className="panel-heading">
           <h2>Token ve maliyet tüketimi</h2>
         </div>
+        {usageUnavailable ? (
+          <p className="table-note ai-usage-warning">
+            Token tüketim tablosu henüz Supabase üzerinde uygulanmamış. Migration sonrası bu
+            rapor otomatik aktif olur.
+          </p>
+        ) : null}
         <form className="ai-usage-filter">
           <label>
             <span>Başlangıç</span>
