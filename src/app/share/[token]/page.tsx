@@ -1,4 +1,4 @@
-import { ExternalShareShell } from "@/components/external-share-shell"
+import ExternalShareQueryPage from "@/app/share/page"
 
 export const metadata = { title: "RAI PACS Paylaşım" }
 
@@ -9,5 +9,9 @@ export default async function ExternalSharePage({
 }) {
   const { token } = await params
 
-  return <ExternalShareShell token={decodeURIComponent(token)} />
+  return (
+    <ExternalShareQueryPage
+      searchParams={Promise.resolve({ token: decodeURIComponent(token) })}
+    />
+  )
 }

@@ -16,19 +16,47 @@ type ExternalShareRow = {
   token: string
 }
 
-export async function buildShareResponse(lookup: ShareLookup | string) {
+export type ShareViewerData = {
+  expiresAt: string
+  instances: Array<{
+    id: string
+    instanceNumber: number | null
+    seriesDescription: string | null
+    seriesId: string
+    seriesModality: string
+    seriesNumber: number | null
+    sopInstanceUid: string
+  }>
+  ohifViewerUrl: string
+  shareToken: string
+  study: {
+    accessionNumber: string
+    description: string
+    modality: string
+    patientName: string
+    patientNumber: string
+    studyAt: string
+  }
+  studyId: string
+}
+
+type ShareViewerResult =
+  | { data: ShareViewerData; ok: true }
+  | { error: string; ok: false; status: number }
+
+export async function getShareViewerData(lookup: ShareLookup | string): Promise<ShareViewerResult> {
   const input = typeof lookup === "string" ? { token: lookup } : lookup
 
   if (!input.shareId && !input.token) {
-    return jsonError("Paylaşım token bulunamadı.", 400)
+    return { error: "Paylaşım token bulunamadı.", ok: false, status: 400 }
   }
 
   if (!isSupabaseServiceConfigured()) {
-    return jsonError("Paylaşım servisi yapılandırılmamış.", 500)
+    return { error: "Paylaşım servisi yapılandırılmamış.", ok: false, status: 500 }
   }
 
   if (!hasOhifLaunchSecret()) {
-    return jsonError("Viewer launch secret tanımlı değil.", 500)
+    return { error: "Viewer launch secret tanımlı değil.", ok: false, status: 500 }
   }
 
   const supabase = createServiceClient()
@@ -37,13 +65,13 @@ export async function buildShareResponse(lookup: ShareLookup | string) {
     : input.token
 
   if (!shareToken) {
-    return jsonError("Paylaşım linki geçersiz veya süresi dolmuş.", 401)
+    return { error: "Paylaşım linki geçersiz veya süresi dolmuş.", ok: false, status: 401 }
   }
 
   const share = verifyExternalStudyShareToken(shareToken)
 
   if (!share) {
-    return jsonError("Paylaşım linki geçersiz veya süresi dolmuş.", 401)
+    return { error: "Paylaşım linki geçersiz veya süresi dolmuş.", ok: false, status: 401 }
   }
 
   const { data: study, error } = await supabase
@@ -55,8 +83,8 @@ export async function buildShareResponse(lookup: ShareLookup | string) {
     .eq("organization_id", share.organizationId)
     .maybeSingle()
 
-  if (error) return jsonError(error.message, 500)
-  if (!study) return jsonError("Tetkik bulunamadı.", 404)
+  if (error) return { error: error.message, ok: false, status: 500 }
+  if (!study) return { error: "Tetkik bulunamadı.", ok: false, status: 404 }
 
   const [{ data: series, error: seriesError }, { data: instances, error: instancesError }] =
     await Promise.all([
@@ -74,8 +102,8 @@ export async function buildShareResponse(lookup: ShareLookup | string) {
         .order("instance_number", { ascending: true }),
     ])
 
-  if (seriesError) return jsonError(seriesError.message, 500)
-  if (instancesError) return jsonError(instancesError.message, 500)
+  if (seriesError) return { error: seriesError.message, ok: false, status: 500 }
+  if (instancesError) return { error: instancesError.message, ok: false, status: 500 }
 
   const patient = Array.isArray(study.patients) ? study.patients[0] : study.patients
   const seriesById = new Map((series ?? []).map((item) => [item.id, item]))
@@ -84,8 +112,8 @@ export async function buildShareResponse(lookup: ShareLookup | string) {
   const protocol = requestHeaders.get("x-forwarded-proto") ?? "https"
   const origin = host ? `${protocol}://${host}` : "https://app.raipacs.com"
 
-  return NextResponse.json(
-    {
+  return {
+    data: {
       expiresAt: new Date(share.exp * 1000).toISOString(),
       ohifViewerUrl: createOhifDicomJsonViewerUrl({
         origin,
@@ -113,12 +141,20 @@ export async function buildShareResponse(lookup: ShareLookup | string) {
         sopInstanceUid: instance.sop_instance_uid,
       })),
     },
-    {
-      headers: {
-        "Cache-Control": "private, no-store",
-      },
-    }
-  )
+    ok: true,
+  }
+}
+
+export async function buildShareResponse(lookup: ShareLookup | string) {
+  const result = await getShareViewerData(lookup)
+
+  if (!result.ok) return jsonError(result.error, result.status)
+
+  return NextResponse.json(result.data, {
+    headers: {
+      "Cache-Control": "private, no-store",
+    },
+  })
 }
 
 async function resolveStoredShareToken(
