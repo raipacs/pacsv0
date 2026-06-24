@@ -116,7 +116,6 @@ export default async function RaiViewerPage({
         </div>
         <nav aria-label="Viewer navigasyonu">
           <PrivacyToggle />
-          <ExternalShareButton studyId={studyId} />
           <Link className="button subtle" href="/worklist">
             Worklist
           </Link>
@@ -133,6 +132,7 @@ export default async function RaiViewerPage({
           >
             OHIF yeni sekme
           </a>
+          <ExternalShareButton studyId={studyId} />
         </nav>
       </header>
       <RaiDicomViewer

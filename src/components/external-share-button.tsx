@@ -12,6 +12,7 @@ const SHARE_OPTIONS = [
 ]
 
 export function ExternalShareButton({ studyId }: { studyId: string }) {
+  const [isOpen, setIsOpen] = useState(false)
   const [ttlSeconds, setTtlSeconds] = useState(24 * 60 * 60)
   const [shareUrl, setShareUrl] = useState("")
   const [expiresAt, setExpiresAt] = useState("")
@@ -20,6 +21,7 @@ export function ExternalShareButton({ studyId }: { studyId: string }) {
   const [isPending, startTransition] = useTransition()
 
   function createShareLink() {
+    setIsOpen(true)
     setError("")
     setCopied(false)
 
@@ -45,46 +47,59 @@ export function ExternalShareButton({ studyId }: { studyId: string }) {
 
   return (
     <div className="external-share-control">
-      <div className="external-share-row">
-        <select
-          aria-label="Paylaşım süresi"
-          value={ttlSeconds}
-          onChange={(event) => setTtlSeconds(Number(event.target.value))}
-        >
-          {SHARE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <button
-          className="button subtle"
-          type="button"
-          disabled={isPending}
-          onClick={createShareLink}
-        >
-          {isPending ? "Hazırlanıyor" : "Paylaş"}
-        </button>
-      </div>
-      {shareUrl ? (
-        <div className="external-share-result">
-          <input readOnly aria-label="External paylaşım linki" value={shareUrl} />
-          <button
-            className="button subtle"
-            type="button"
-            onClick={async () => {
-              await navigator.clipboard.writeText(shareUrl)
-              setCopied(true)
-            }}
-          >
-            Kopyala
-          </button>
-          <span>
-            {copied ? "Kopyalandı" : "Hazır"} · {formatExpiry(expiresAt)}
-          </span>
+      <button
+        className="button subtle external-share-trigger"
+        type="button"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((current) => !current)}
+      >
+        <span aria-hidden="true">↗</span>
+        Paylaş
+      </button>
+      {isOpen ? (
+        <div className="external-share-panel">
+          <div className="external-share-row">
+            <select
+              aria-label="Paylaşım süresi"
+              value={ttlSeconds}
+              onChange={(event) => setTtlSeconds(Number(event.target.value))}
+            >
+              {SHARE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <button
+              className="button subtle"
+              type="button"
+              disabled={isPending}
+              onClick={createShareLink}
+            >
+              {isPending ? "Hazırlanıyor" : "Paylaş"}
+            </button>
+          </div>
+          {shareUrl ? (
+            <div className="external-share-result">
+              <input readOnly aria-label="External paylaşım linki" value={shareUrl} />
+              <button
+                className="button subtle"
+                type="button"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(shareUrl)
+                  setCopied(true)
+                }}
+              >
+                Kopyala
+              </button>
+              <span>
+                {copied ? "Kopyalandı" : "Hazır"} · {formatExpiry(expiresAt)}
+              </span>
+            </div>
+          ) : null}
+          {error ? <p className="inline-error">{error}</p> : null}
         </div>
       ) : null}
-      {error ? <p className="inline-error">{error}</p> : null}
     </div>
   )
 }

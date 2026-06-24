@@ -702,9 +702,34 @@ body:has(.rai-viewer-page) .app-header {
 }
 
 .external-share-control {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
+.external-share-trigger {
+  gap: 7px;
+}
+
+.external-share-trigger span {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.external-share-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  right: 0;
   display: grid;
-  min-width: min(480px, 45vw);
-  gap: 6px;
+  width: min(520px, calc(100vw - 24px));
+  gap: 8px;
+  border: 1px solid #24446f;
+  border-radius: 8px;
+  padding: 10px;
+  background: #061a3f;
+  box-shadow: 0 18px 45px rgba(2, 6, 23, 0.36);
 }
 
 .external-share-row,
@@ -2441,6 +2466,21 @@ td span {
 
   .rai-viewer-bar nav > * {
     flex: 1 1 140px;
+  }
+
+  .rai-viewer-bar nav > .external-share-control {
+    flex-basis: 100%;
+  }
+
+  .external-share-panel {
+    right: auto;
+    left: 0;
+    width: 100%;
+  }
+
+  .external-share-result {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .rai-dicom-viewer {
