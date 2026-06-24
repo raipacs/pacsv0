@@ -13,19 +13,25 @@ type SharedViewerData = {
   studyId: string
 }
 
-export function ExternalShareViewer({ token }: { token: string }) {
+export function ExternalShareViewer({ token: initialToken = "" }: { token?: string }) {
   const [data, setData] = useState<SharedViewerData | null>(null)
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
+    const token =
+      initialToken || new URLSearchParams(window.location.search).get("token") || ""
 
     async function loadShare() {
       setIsLoading(true)
       setError("")
 
       try {
+        if (!token) {
+          throw new Error("Paylaşım token bulunamadı.")
+        }
+
         const url = new URL("/api/share", window.location.origin)
         url.searchParams.set("token", token)
         const response = await fetch(url.toString(), {
@@ -54,7 +60,7 @@ export function ExternalShareViewer({ token }: { token: string }) {
     return () => {
       cancelled = true
     }
-  }, [token])
+  }, [initialToken])
 
   if (isLoading) {
     return (
