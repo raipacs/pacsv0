@@ -7,8 +7,10 @@ import {
   MaskedPatientName,
   PrivacyToggle,
 } from "@/components/privacy-mode"
+import { AiLaunchControl } from "@/components/ai-launch-control"
 import { ExternalShareButton } from "@/components/external-share-button"
 import { RaiDicomViewer } from "@/components/rai-dicom-viewer"
+import { aiJobStatusLabel, isMissingAiTableError, type AiProviderOption } from "@/lib/ai-reporting"
 import { requireUser } from "@/lib/auth"
 import { isSupabaseConfigured } from "@/lib/config"
 import { hasOhifLaunchSecret } from "@/lib/ohif-launch"
@@ -22,7 +24,7 @@ export default async function RaiViewerPage({
   searchParams,
 }: {
   params: Promise<{ studyId: string }>
-  searchParams: Promise<{ patientId?: string }>
+  searchParams: Promise<{ aiJob?: string; patientId?: string }>
 }) {
   const [{ studyId }, query, user] = await Promise.all([
     params,
@@ -51,8 +53,11 @@ export default async function RaiViewerPage({
   if (error) throw new Error(`Viewer tetkiki alınamadı: ${error.message}`)
   if (!study) notFound()
 
-  const [{ data: series, error: seriesError }, { data: instances, error: instancesError }] =
-    await Promise.all([
+  const [
+    { data: series, error: seriesError },
+    { data: instances, error: instancesError },
+    aiViewerState,
+  ] = await Promise.all([
       supabase
         .from("series")
         .select("id, series_number, modality, description")
@@ -65,6 +70,7 @@ export default async function RaiViewerPage({
         .eq("study_id", study.id)
         .eq("organization_id", user.organizationId)
         .order("instance_number", { ascending: true }),
+      loadAiViewerState(supabase, user.organizationId, study.id),
     ])
 
   if (seriesError) {
@@ -91,6 +97,9 @@ export default async function RaiViewerPage({
     : patient?.id
       ? `/patients/${patient.id}`
       : null
+  const returnTo = query.patientId
+    ? `/viewer/${studyId}?patientId=${encodeURIComponent(query.patientId)}`
+    : `/viewer/${studyId}`
 
   const seriesById = new Map((series ?? []).map((item) => [item.id, item]))
 
@@ -116,6 +125,12 @@ export default async function RaiViewerPage({
         </div>
         <nav aria-label="Viewer navigasyonu">
           <PrivacyToggle />
+          <AiLaunchControl
+            providers={aiViewerState.providers}
+            returnTo={returnTo}
+            studyId={studyId}
+            unavailableReason={aiViewerState.unavailableReason}
+          />
           <Link className="button subtle" href="/worklist">
             Worklist
           </Link>
@@ -135,6 +150,31 @@ export default async function RaiViewerPage({
           <ExternalShareButton studyId={studyId} />
         </nav>
       </header>
+      {aiViewerState.latestDraft ? (
+        <section className="ai-draft-strip" aria-label="AI ön rapor">
+          <div>
+            <span className="health-badge ok">
+              {aiJobStatusLabel(aiViewerState.latestDraft.jobStatus)}
+            </span>
+            <strong>{aiViewerState.latestDraft.providerName}</strong>
+            <small>
+              {aiViewerState.latestDraft.modelName || "model seçilmedi"} · Güven skoru{" "}
+              {formatConfidence(aiViewerState.latestDraft.confidenceScore)}
+            </small>
+          </div>
+          <dl>
+            <div>
+              <dt>Bulgular</dt>
+              <dd>{aiViewerState.latestDraft.findings}</dd>
+            </div>
+            <div>
+              <dt>İzlenim</dt>
+              <dd>{aiViewerState.latestDraft.impression}</dd>
+            </div>
+          </dl>
+          <p>AI ön değerlendirmedir. Nihai rapor yetkili hekim düzenlemesi ve onayıyla oluşur.</p>
+        </section>
+      ) : null}
       <RaiDicomViewer
         studyId={studyId}
         study={{
@@ -157,6 +197,115 @@ export default async function RaiViewerPage({
       />
     </section>
   )
+}
+
+type AiDraftView = {
+  confidenceScore: number | null
+  findings: string
+  impression: string
+  jobStatus: string
+  modelName: string | null
+  providerName: string
+}
+
+async function loadAiViewerState(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  studyId: string
+): Promise<{
+  latestDraft: AiDraftView | null
+  providers: AiProviderOption[]
+  unavailableReason?: string
+}> {
+  const { data: providers, error: providersError } = await supabase
+    .from("ai_service_providers")
+    .select("id, name, slug, provider_type, default_model, is_active, is_default, requires_credentials")
+    .eq("organization_id", organizationId)
+    .order("is_default", { ascending: false })
+    .order("name", { ascending: true })
+
+  if (providersError) {
+    if (isMissingAiTableError(providersError)) {
+      return {
+        latestDraft: null,
+        providers: [],
+        unavailableReason: "AI tabloları Supabase üzerinde hazır değil.",
+      }
+    }
+
+    throw new Error(`AI servisleri alınamadı: ${providersError.message}`)
+  }
+
+  const { data: latestDraft, error: draftError } = await supabase
+    .from("ai_report_drafts")
+    .select("id, job_id, findings, impression, confidence_score, created_at")
+    .eq("organization_id", organizationId)
+    .eq("study_id", studyId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (draftError) {
+    if (isMissingAiTableError(draftError)) {
+      return {
+        latestDraft: null,
+        providers: mapAiProviders(providers ?? []),
+        unavailableReason: "AI tabloları Supabase üzerinde hazır değil.",
+      }
+    }
+
+    throw new Error(`AI ön raporu alınamadı: ${draftError.message}`)
+  }
+
+  if (!latestDraft) {
+    return {
+      latestDraft: null,
+      providers: mapAiProviders(providers ?? []),
+    }
+  }
+
+  const { data: job, error: jobError } = await supabase
+    .from("ai_jobs")
+    .select("status, provider_slug, model_name, ai_service_providers(name)")
+    .eq("id", latestDraft.job_id)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (jobError) throw new Error(`AI iş bilgisi alınamadı: ${jobError.message}`)
+
+  const provider = Array.isArray(job?.ai_service_providers)
+    ? job?.ai_service_providers[0]
+    : job?.ai_service_providers
+
+  return {
+    latestDraft: {
+      confidenceScore: latestDraft.confidence_score,
+      findings: latestDraft.findings,
+      impression: latestDraft.impression,
+      jobStatus: job?.status ?? "draft_ready",
+      modelName: job?.model_name ?? null,
+      providerName: provider?.name ?? job?.provider_slug ?? "AI",
+    },
+    providers: mapAiProviders(providers ?? []),
+  }
+}
+
+function mapAiProviders(rows: Array<Record<string, unknown>>): AiProviderOption[] {
+  return rows.map((row) => ({
+    defaultModel: String(row.default_model ?? "") || null,
+    id: String(row.id),
+    isActive: row.is_active === true,
+    isDefault: row.is_default === true,
+    name: String(row.name ?? "AI"),
+    providerType: String(row.provider_type ?? "custom"),
+    requiresCredentials: row.requires_credentials === true,
+    slug: String(row.slug ?? ""),
+  }))
+}
+
+function formatConfidence(value: number | null) {
+  if (typeof value !== "number") return "-"
+  return `%${Math.round(value * 100)}`
 }
 
 function ViewerError({ message }: { message: string }) {

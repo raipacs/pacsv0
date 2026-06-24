@@ -696,6 +696,90 @@ body:has(.rai-viewer-page) .app-header {
   background: #0891b2;
 }
 
+.ai-launch-control {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-launch-control select {
+  min-height: 34px;
+  max-width: 210px;
+  min-width: 140px;
+  border: 1px solid #24446f;
+  border-radius: 7px;
+  padding: 0 10px;
+  color: #e2e8f0;
+  background: #0b2148;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ai-launch-control select:disabled,
+.ai-launch-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+.ai-draft-strip {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.4fr) minmax(0, 1fr) minmax(180px, 0.34fr);
+  gap: 12px;
+  border-bottom: 1px solid #123366;
+  padding: 10px clamp(10px, 1.5vw, 18px);
+  color: #dbeafe;
+  background: #08142e;
+}
+
+.ai-draft-strip > div:first-child {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+}
+
+.ai-draft-strip strong,
+.ai-draft-strip small {
+  display: block;
+}
+
+.ai-draft-strip small,
+.ai-draft-strip p {
+  color: #93c5fd;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.ai-draft-strip dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.ai-draft-strip dt {
+  color: #67e8f9;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.ai-draft-strip dd {
+  display: -webkit-box;
+  margin: 4px 0 0;
+  overflow: hidden;
+  color: #e2e8f0;
+  font-size: 12px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.ai-draft-strip p {
+  margin: 0;
+  align-self: center;
+}
+
 .external-share-page {
   display: grid;
   height: 100dvh;
@@ -2679,6 +2763,23 @@ td span {
 
   .rai-viewer-bar nav > .external-share-control {
     flex-basis: 100%;
+  }
+
+  .rai-viewer-bar nav > .ai-launch-control {
+    flex-basis: 100%;
+  }
+
+  .ai-launch-control select {
+    max-width: none;
+    flex: 1;
+  }
+
+  .ai-draft-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-draft-strip dl {
+    grid-template-columns: 1fr;
   }
 
   .external-share-panel {
