@@ -1,6 +1,6 @@
 import Link from "next/link"
 
-import { createHisIntegration } from "@/app/actions/admin"
+import { createHisIntegration, testHisIntegration } from "@/app/actions/admin"
 import { requireAdmin } from "@/lib/auth"
 import { getBranchOptions } from "@/lib/branches"
 import {
@@ -264,7 +264,9 @@ export default async function HisIntegrationPage() {
                   <th>Yön</th>
                   <th>Güvenlik</th>
                   <th>Endpoint</th>
+                  <th>Son test</th>
                   <th>Durum</th>
+                  <th>İşlem</th>
                 </tr>
               </thead>
               <tbody>
@@ -328,12 +330,30 @@ function IntegrationRow({ integration }: { integration: HisIntegrationSummary })
       <td>{authTypeLabel(integration.authType)}</td>
       <td>{integration.endpoint}</td>
       <td>
+        <strong>{formatDateTime(integration.lastCheckedAt)}</strong>
+        <span>
+          {integration.lastSuccessAt
+            ? `Başarılı: ${formatDateTime(integration.lastSuccessAt)}`
+            : integration.lastErrorAt
+              ? `Hata: ${formatDateTime(integration.lastErrorAt)}`
+              : "Henüz test yok"}
+        </span>
+      </td>
+      <td>
         <span className={`health-badge ${statusClass(integration.status)}`}>
           {integrationStatusLabel(integration.status)}
         </span>
         {integration.lastErrorMessage ? (
           <span className="table-note">{integration.lastErrorMessage}</span>
         ) : null}
+      </td>
+      <td>
+        <form action={testHisIntegration} className="inline-action-form">
+          <input name="integrationId" type="hidden" value={integration.id} />
+          <button className="button subtle small" type="submit">
+            Test et
+          </button>
+        </form>
       </td>
     </tr>
   )

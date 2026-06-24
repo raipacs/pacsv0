@@ -54,6 +54,26 @@ const hisIntegrationSchema = z.object({
   notes: z.string().trim().max(1200).optional(),
 })
 
+type HisIntegrationTestRow = {
+  id: string
+  organization_id: string
+  branch_id: string | null
+  name: string
+  protocol: "hl7_v2_mllp" | "fhir_r4" | "rest_api" | "webhook" | "file_drop"
+  direction: "inbound" | "outbound" | "bidirectional"
+  auth_type:
+    | "none"
+    | "basic"
+    | "bearer"
+    | "oauth2_client_credentials"
+    | "mutual_tls"
+    | "vpn"
+  endpoint_url: string | null
+  host: string | null
+  port: number | null
+  enabled_message_types: string[] | null
+}
+
 type StorageObjectRef = {
   storage_bucket: string
   storage_key: string
@@ -289,6 +309,121 @@ export async function createHisIntegration(formData: FormData) {
 
   revalidatePath("/admin/his-integration")
   redirect("/admin/his-integration")
+}
+
+export async function testHisIntegration(formData: FormData) {
+  const user = await requireAdmin()
+  if (!isSupabaseConfigured) redirect("/admin/his-integration")
+
+  const integrationId = idSchema.parse(formData.get("integrationId"))
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("his_integrations")
+    .select(
+      "id, organization_id, branch_id, name, protocol, direction, auth_type, endpoint_url, host, port, enabled_message_types"
+    )
+    .eq("id", integrationId)
+    .eq("organization_id", user.organizationId)
+    .maybeSingle()
+
+  if (error) throw new Error(`HIS tanımı okunamadı: ${error.message}`)
+  if (!data) throw new Error("HIS tanımı bulunamadı.")
+
+  const integration = data as HisIntegrationTestRow
+  const result = evaluateHisIntegration(integration)
+  const now = new Date().toISOString()
+
+  const { error: updateError } = await supabase
+    .from("his_integrations")
+    .update({
+      status: result.success ? "active" : "error",
+      last_checked_at: now,
+      last_success_at: result.success ? now : null,
+      last_error_at: result.success ? null : now,
+      last_error_message: result.success ? null : result.message,
+    })
+    .eq("id", integration.id)
+    .eq("organization_id", user.organizationId)
+
+  if (updateError) {
+    throw new Error(`HIS test sonucu kaydedilemedi: ${updateError.message}`)
+  }
+
+  await supabase.from("his_integration_events").insert({
+    organization_id: user.organizationId,
+    branch_id: integration.branch_id,
+    integration_id: integration.id,
+    event_type: "connection_test",
+    direction: integration.direction,
+    message_type: integration.enabled_message_types?.[0] ?? null,
+    status: result.success ? "success" : "failed",
+    message: result.message,
+    metadata: {
+      protocol: integration.protocol,
+      authType: integration.auth_type,
+      checks: result.checks,
+      testedBy: user.email,
+    },
+  })
+
+  revalidatePath("/admin/his-integration")
+  redirect("/admin/his-integration")
+}
+
+function evaluateHisIntegration(integration: HisIntegrationTestRow) {
+  const checks: Array<{ name: string; ok: boolean; detail: string }> = []
+  const hasUrl = Boolean(integration.endpoint_url?.trim())
+  const hasHost = Boolean(integration.host?.trim())
+  const hasPort = typeof integration.port === "number"
+  const messageTypes = integration.enabled_message_types ?? []
+
+  if (integration.protocol === "hl7_v2_mllp") {
+    checks.push({
+      name: "HL7 host",
+      ok: hasHost,
+      detail: hasHost ? integration.host ?? "" : "Host/IP girilmeli",
+    })
+    checks.push({
+      name: "MLLP port",
+      ok: hasPort,
+      detail: hasPort ? String(integration.port) : "Port girilmeli",
+    })
+    checks.push({
+      name: "Mesaj tipleri",
+      ok: messageTypes.some((type) => /^(ADT|ORM|ORU)/.test(type)),
+      detail: messageTypes.join(", ") || "ADT/ORM/ORU tiplerinden en az biri önerilir",
+    })
+  } else if (["fhir_r4", "rest_api", "webhook"].includes(integration.protocol)) {
+    checks.push({
+      name: "Endpoint URL",
+      ok: hasUrl && /^https?:\/\//i.test(integration.endpoint_url ?? ""),
+      detail: hasUrl ? integration.endpoint_url ?? "" : "HTTP/HTTPS endpoint girilmeli",
+    })
+    checks.push({
+      name: "Auth",
+      ok: integration.auth_type !== "none",
+      detail:
+        integration.auth_type === "none"
+          ? "Canlı bağlantı için auth önerilir"
+          : integration.auth_type,
+    })
+  } else {
+    checks.push({
+      name: "Dosya aktarım yolu",
+      ok: hasHost || hasUrl,
+      detail: integration.host || integration.endpoint_url || "Host veya path girilmeli",
+    })
+  }
+
+  const failed = checks.filter((check) => !check.ok)
+  return {
+    success: failed.length === 0,
+    checks,
+    message:
+      failed.length === 0
+        ? "HIS bağlantı tanımı temel doğrulamadan geçti"
+        : `HIS bağlantı testi eksik: ${failed.map((check) => check.name).join(", ")}`,
+  }
 }
 
 async function removeStorageObjects(instances: StorageObjectRef[]) {
