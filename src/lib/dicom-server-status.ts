@@ -674,7 +674,7 @@ async function getImportJobs(
     )
     .eq("organization_id", organizationId)
     .order("last_seen_at", { ascending: false })
-    .limit(12)
+    .limit(80)
 
   if (branchId) query.eq("branch_id", branchId)
 

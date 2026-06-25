@@ -44,10 +44,11 @@ export default async function DicomServerAdminPage({
   const totalChecks = dashboard.services.length + dashboard.apis.length
   const activeJobs = dashboard.importJobs.filter((job) =>
     ["received", "importing", "retrying"].includes(job.status)
-  ).length
+  )
   const failedJobs = dashboard.importJobs.filter(
     (job) => job.status === "failed" || job.failedInstances > 0
   )
+  const completedJobs = dashboard.importJobs.filter((job) => job.status === "completed")
   const totalInstances = dashboard.modalities.reduce(
     (sum, modality) => sum + modality.instances,
     0
@@ -66,6 +67,9 @@ export default async function DicomServerAdminPage({
     (event) => eventStatusClass(event.status) !== "ok"
   ).length
   const importQueueWarningCount = dashboard.importJobs.filter(
+    (job) => jobStatusClass(job.status) !== "ok"
+  ).length
+  const activeQueueWarningCount = activeJobs.filter(
     (job) => jobStatusClass(job.status) !== "ok"
   ).length
 
@@ -116,7 +120,7 @@ export default async function DicomServerAdminPage({
         </article>
         <article>
           <span>Aktif import</span>
-          <strong>{activeJobs}</strong>
+          <strong>{activeJobs.length}</strong>
         </article>
       </section>
 
@@ -146,6 +150,12 @@ export default async function DicomServerAdminPage({
             value={String(failedJobs.length)}
             detail={failedJobs[0]?.errorMessage ?? "Açık hata yok"}
             tone={failedJobs.length ? "error" : "ok"}
+          />
+          <SummaryTile
+            label="Tamamlanan import"
+            value={String(completedJobs.length)}
+            detail="Geçmiş import kuyruğunda"
+            tone="ok"
           />
           <SummaryTile
             label="Sessiz modalite"
@@ -428,30 +438,33 @@ export default async function DicomServerAdminPage({
       </CollapsiblePanel>
 
       <CollapsiblePanel
-        detail={`${dashboard.importJobs.length} import job kaydı`}
+        detail={
+          activeJobs.length
+            ? `${activeJobs.length} aktif/bekleyen import`
+            : "Anlık bekleyen import yok"
+        }
+        open={activeJobs.length > 0}
+        title="Anlık import kuyruğu"
+        warningCount={activeQueueWarningCount}
+      >
+        {activeJobs.length ? (
+          <ImportJobsTable jobs={activeJobs} mode="active" />
+        ) : (
+          <p className="empty-state">
+            Anlık bekleyen veya çalışan import yok. Yeni C-STORE/import işlemi
+            başladığında bu bölüm canlı kuyruk olarak dolacak.
+          </p>
+        )}
+      </CollapsiblePanel>
+
+      <CollapsiblePanel
+        detail={`${dashboard.importJobs.length} geçmiş import job kaydı`}
         open={importQueueWarningCount > 0}
-        title="Import kuyruğu"
+        title="Import kuyruğu geçmişi"
         warningCount={importQueueWarningCount}
       >
         {dashboard.importJobs.length ? (
-          <div className="responsive-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Kaynak</th>
-                  <th>Hasta / Accession</th>
-                  <th>Instance</th>
-                  <th>Son hareket</th>
-                  <th>Durum</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dashboard.importJobs.map((job) => (
-                  <ImportJobRow job={job} key={job.id} />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ImportJobsTable jobs={dashboard.importJobs} mode="history" />
         ) : (
           <p className="empty-state">
             Import job kaydı yok. Migration uygulandıktan sonra Orthanc ve upload
@@ -638,7 +651,44 @@ function CloudInfrastructureRow({ item }: { item: CloudInfrastructureItem }) {
   )
 }
 
-function ImportJobRow({ job }: { job: ImportJobSummary }) {
+function ImportJobsTable({
+  jobs,
+  mode,
+}: {
+  jobs: ImportJobSummary[]
+  mode: "active" | "history"
+}) {
+  return (
+    <div className="responsive-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Kaynak</th>
+            <th>Hasta / Accession</th>
+            <th>Instance</th>
+            <th>Başlangıç</th>
+            {mode === "history" ? <th>Bitiş</th> : null}
+            <th>Son hareket</th>
+            <th>Durum</th>
+          </tr>
+        </thead>
+        <tbody>
+          {jobs.map((job) => (
+            <ImportJobRow job={job} key={job.id} mode={mode} />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function ImportJobRow({
+  job,
+  mode,
+}: {
+  job: ImportJobSummary
+  mode: "active" | "history"
+}) {
   return (
     <tr>
       <td>
@@ -655,6 +705,8 @@ function ImportJobRow({ job }: { job: ImportJobSummary }) {
         </strong>
         {job.failedInstances ? <span>{job.failedInstances} hata</span> : null}
       </td>
+      <td>{formatDateTime(job.startedAt)}</td>
+      {mode === "history" ? <td>{formatDateTime(job.completedAt)}</td> : null}
       <td>{formatDateTime(job.lastSeenAt)}</td>
       <td>
         <span className={`health-badge ${jobStatusClass(job.status)}`}>
