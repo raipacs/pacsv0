@@ -443,7 +443,7 @@ export default async function DicomServerAdminPage({
             ? `${activeJobs.length} aktif/bekleyen import`
             : "Anlık bekleyen import yok"
         }
-        open={activeJobs.length > 0}
+        open
         title="Anlık import kuyruğu"
         warningCount={activeQueueWarningCount}
       >
@@ -459,7 +459,7 @@ export default async function DicomServerAdminPage({
 
       <CollapsiblePanel
         detail={`${dashboard.importJobs.length} geçmiş import job kaydı`}
-        open={importQueueWarningCount > 0}
+        open
         title="Import kuyruğu geçmişi"
         warningCount={importQueueWarningCount}
       >
