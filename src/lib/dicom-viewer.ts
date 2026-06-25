@@ -1,7 +1,7 @@
 import { Decoder } from "jpeg-lossless-decoder-js"
 
 export type DicomPreview = {
-  pixels: Int16Array | Uint16Array | Uint8Array | null
+  pixels: Int16Array | Uint16Array | Uint8Array | Uint8ClampedArray | null
   metadata: DicomPreviewMetadata
   voi: {
     center: number
@@ -21,6 +21,7 @@ export type DicomPreviewMetadata = {
   rows: number
   columns: number
   samplesPerPixel: number
+  planarConfiguration: number
   bitsAllocated: number
   bitsStored: number
   pixelRepresentation: number
@@ -117,13 +118,20 @@ function getWindowedCanvas(
   width: number,
   invert: boolean
 ) {
-  const { rows, columns, photometricInterpretation, rescaleIntercept, rescaleSlope } =
-    preview.metadata
+  const {
+    rows,
+    columns,
+    photometricInterpretation,
+    rescaleIntercept,
+    rescaleSlope,
+    samplesPerPixel,
+  } = preview.metadata
   const shouldInvert =
     invert || photometricInterpretation.toUpperCase() === "MONOCHROME1"
   const roundedCenter = Math.round(center)
   const roundedWidth = Math.max(1, Math.round(width))
-  const key = `${roundedCenter}:${roundedWidth}:${shouldInvert ? "1" : "0"}`
+  const colorMode = samplesPerPixel > 1 ? "color" : "gray"
+  const key = `${colorMode}:${roundedCenter}:${roundedWidth}:${shouldInvert ? "1" : "0"}`
   const entries = presentationCache.get(preview) ?? []
   const cachedIndex = entries.findIndex((entry) => entry.key === key)
 
@@ -143,6 +151,19 @@ function getWindowedCanvas(
   if (!sourceContext || !preview.pixels) return source
 
   const imageData = sourceContext.createImageData(columns, rows)
+  if (preview.metadata.samplesPerPixel > 1 && preview.pixels instanceof Uint8ClampedArray) {
+    imageData.data.set(preview.pixels.subarray(0, imageData.data.length))
+    sourceContext.putImageData(imageData, 0, 0)
+    entries.push({ key, canvas: source })
+
+    while (entries.length > PRESENTATION_CACHE_LIMIT) {
+      entries.shift()
+    }
+
+    presentationCache.set(preview, entries)
+    return source
+  }
+
   const low = roundedCenter - roundedWidth / 2
   const high = roundedCenter + roundedWidth / 2
   const range = Math.max(1, high - low)
@@ -292,6 +313,7 @@ function readMetadata(buffer: ArrayBuffer, state: ParserState): DicomPreviewMeta
   const bitsAllocated = readUint16(buffer, elements.get("0028,0100")) ?? 0
   const bitsStored = readUint16(buffer, elements.get("0028,0101")) ?? bitsAllocated
   const pixelRepresentation = readUint16(buffer, elements.get("0028,0103")) ?? 0
+  const planarConfiguration = readUint16(buffer, elements.get("0028,0006")) ?? 0
 
   return {
     transferSyntaxUid: state.transferSyntaxUid,
@@ -305,6 +327,7 @@ function readMetadata(buffer: ArrayBuffer, state: ParserState): DicomPreviewMeta
     rows,
     columns,
     samplesPerPixel,
+    planarConfiguration,
     bitsAllocated,
     bitsStored,
     pixelRepresentation,
@@ -323,12 +346,6 @@ function decodePixels(
   metadata: DicomPreviewMetadata
 ) {
   if (!state.pixelData || metadata.rows <= 0 || metadata.columns <= 0) return null
-  if (metadata.samplesPerPixel !== 1) {
-    throw new Error("Bu MVP viewer şimdilik tek kanallı gri seviye DICOM gösterir.")
-  }
-  if (metadata.numberOfFrames > 1) {
-    throw new Error("Bu MVP viewer şimdilik ilk aşamada tek frame DICOM gösterir.")
-  }
 
   let pixelBuffer: ArrayBuffer
 
@@ -348,8 +365,17 @@ function decodePixels(
     throw new Error(`Transfer syntax desteklenmiyor: ${metadata.transferSyntaxUid}`)
   }
 
+  const framePixelCount = metadata.rows * metadata.columns
+  const frameByteLength =
+    framePixelCount * metadata.samplesPerPixel * Math.max(1, metadata.bitsAllocated / 8)
+  const firstFrameBuffer = pixelBuffer.slice(0, Math.min(pixelBuffer.byteLength, frameByteLength))
+
+  if (metadata.samplesPerPixel > 1) {
+    return decodeColorPixels(firstFrameBuffer, metadata)
+  }
+
   if (metadata.bitsAllocated === 8) {
-    return new Uint8Array(pixelBuffer)
+    return new Uint8Array(firstFrameBuffer)
   }
 
   if (metadata.bitsAllocated !== 16) {
@@ -357,8 +383,63 @@ function decodePixels(
   }
 
   return metadata.pixelRepresentation === 1
-    ? new Int16Array(pixelBuffer)
-    : new Uint16Array(pixelBuffer)
+    ? new Int16Array(firstFrameBuffer)
+    : new Uint16Array(firstFrameBuffer)
+}
+
+function decodeColorPixels(buffer: ArrayBuffer, metadata: DicomPreviewMetadata) {
+  if (metadata.bitsAllocated !== 8) {
+    throw new Error(`${metadata.bitsAllocated}-bit renkli DICOM pixel verisi desteklenmiyor.`)
+  }
+  if (metadata.samplesPerPixel < 3) {
+    throw new Error(`${metadata.samplesPerPixel} kanallı renkli DICOM desteklenmiyor.`)
+  }
+
+  const source = new Uint8Array(buffer)
+  const pixelCount = metadata.rows * metadata.columns
+  const output = new Uint8ClampedArray(pixelCount * 4)
+  const photometric = metadata.photometricInterpretation.toUpperCase()
+  const planar = metadata.planarConfiguration === 1
+
+  for (let pixel = 0; pixel < pixelCount; pixel += 1) {
+    let c1: number
+    let c2: number
+    let c3: number
+
+    if (planar) {
+      c1 = source[pixel] ?? 0
+      c2 = source[pixel + pixelCount] ?? 0
+      c3 = source[pixel + pixelCount * 2] ?? 0
+    } else {
+      const inputIndex = pixel * metadata.samplesPerPixel
+      c1 = source[inputIndex] ?? 0
+      c2 = source[inputIndex + 1] ?? 0
+      c3 = source[inputIndex + 2] ?? 0
+    }
+
+    const [red, green, blue] = photometric.startsWith("YBR")
+      ? ybrToRgb(c1, c2, c3)
+      : [c1, c2, c3]
+    const outputIndex = pixel * 4
+    output[outputIndex] = red
+    output[outputIndex + 1] = green
+    output[outputIndex + 2] = blue
+    output[outputIndex + 3] = 255
+  }
+
+  return output
+}
+
+function ybrToRgb(y: number, cb: number, cr: number): [number, number, number] {
+  return [
+    clampByte(y + 1.402 * (cr - 128)),
+    clampByte(y - 0.344136 * (cb - 128) - 0.714136 * (cr - 128)),
+    clampByte(y + 1.772 * (cb - 128)),
+  ]
+}
+
+function clampByte(value: number) {
+  return Math.max(0, Math.min(255, Math.round(value)))
 }
 
 function readFirstEncapsulatedFragment(buffer: ArrayBuffer, pixelData: ParsedElement) {
@@ -397,9 +478,13 @@ function readFirstEncapsulatedFragment(buffer: ArrayBuffer, pixelData: ParsedEle
 }
 
 function defaultVoi(
-  pixels: Int16Array | Uint16Array | Uint8Array | null,
+  pixels: Int16Array | Uint16Array | Uint8Array | Uint8ClampedArray | null,
   metadata: DicomPreviewMetadata
 ) {
+  if (metadata.samplesPerPixel > 1) {
+    return { center: 128, width: 256 }
+  }
+
   const center = firstNumber(metadata.windowCenter)
   const width = firstNumber(metadata.windowWidth)
 
