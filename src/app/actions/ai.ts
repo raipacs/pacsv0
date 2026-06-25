@@ -85,9 +85,14 @@ export async function startAiPreReport(formData: FormData) {
     provider.provider_type === "anthropic" && provider.credential_reference
       ? process.env[provider.credential_reference]
       : null
+  const googleApiKey =
+    provider.provider_type === "google" && provider.credential_reference
+      ? process.env[provider.credential_reference]
+      : null
   const canRunOpenAi = provider.provider_type === "openai" && Boolean(openAiApiKey)
   const canRunAnthropic = provider.provider_type === "anthropic" && Boolean(anthropicApiKey)
-  const canRunLiveProvider = canRunOpenAi || canRunAnthropic
+  const canRunGemini = provider.provider_type === "google" && Boolean(googleApiKey)
+  const canRunLiveProvider = canRunOpenAi || canRunAnthropic || canRunGemini
   const now = new Date().toISOString()
   const jobStatus = isMock ? "draft_ready" : canRunLiveProvider ? "running" : "waiting_credentials"
   const inputContext = {
@@ -356,6 +361,91 @@ export async function startAiPreReport(formData: FormData) {
     }
   }
 
+  if (canRunGemini && googleApiKey) {
+    try {
+      const draft = await createGeminiRadiologyDraft({
+        apiKey: googleApiKey,
+        inputContext,
+        model: provider.default_model || "gemini-3.5-flash",
+        patientName: patient ? `${patient.first_name} ${patient.last_name}` : "",
+      })
+
+      const { error: draftError } = await supabase.from("ai_report_drafts").insert({
+        organization_id: user.organizationId,
+        study_id: studyId,
+        job_id: job.id,
+        findings: draft.findings,
+        impression: draft.impression,
+        recommendations: draft.recommendations,
+        confidence_score: draft.confidenceScore,
+        criticality: draft.criticality,
+        source_summary: draft.sourceSummary,
+      })
+
+      if (draftError) throw new Error(`Gemini ön raporu kaydedilemedi: ${draftError.message}`)
+
+      const tokenUsage =
+        draft.usage ??
+        estimateTokenUsage({
+          findings: draft.findings,
+          impression: draft.impression,
+          inputContext,
+        })
+      const cost = calculateAiUsageCost({
+        inputTokens: tokenUsage.inputTokens,
+        outputTokens: tokenUsage.outputTokens,
+        providerSlug: provider.slug,
+      })
+
+      const { error: usageError } = await supabase.from("ai_usage_events").insert({
+        organization_id: user.organizationId,
+        job_id: job.id,
+        study_id: studyId,
+        provider_slug: provider.slug,
+        model_name: provider.default_model,
+        usage_type: "pre_report",
+        input_tokens: tokenUsage.inputTokens,
+        output_tokens: tokenUsage.outputTokens,
+        currency: cost.currency,
+        input_cost: cost.inputCost,
+        output_cost: cost.outputCost,
+        pricing_snapshot: cost.pricingSnapshot,
+        metadata: {
+          accessionNumber: study.accession_number,
+          modality: study.modality,
+          estimated: !draft.usage,
+          responseId: draft.responseId,
+        },
+        created_by: user.id,
+      })
+
+      if (usageError && !isMissingAiTableError(usageError)) {
+        throw new Error(`Gemini tüketim kaydı oluşturulamadı: ${usageError.message}`)
+      }
+
+      await supabase
+        .from("ai_jobs")
+        .update({
+          status: "draft_ready",
+          completed_at: new Date().toISOString(),
+          error_message: null,
+        })
+        .eq("id", job.id)
+        .eq("organization_id", user.organizationId)
+    } catch (error) {
+      await supabase
+        .from("ai_jobs")
+        .update({
+          status: "failed",
+          completed_at: new Date().toISOString(),
+          error_message: error instanceof Error ? error.message : "Gemini ön raporu üretilemedi.",
+        })
+        .eq("id", job.id)
+        .eq("organization_id", user.organizationId)
+      throw error
+    }
+  }
+
   await supabase.from("audit_logs").insert({
     organization_id: user.organizationId,
     actor_id: user.id,
@@ -417,6 +507,26 @@ type AnthropicResponse = {
   usage?: {
     input_tokens?: number
     output_tokens?: number
+  }
+}
+
+type GeminiResponse = {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string
+      }>
+    }
+  }>
+  modelVersion?: string
+  responseId?: string
+  usageMetadata?: {
+    promptTokenCount?: number
+    candidatesTokenCount?: number
+    totalTokenCount?: number
+  }
+  error?: {
+    message?: string
   }
 }
 
@@ -590,6 +700,107 @@ function extractAnthropicOutputText(payload: AnthropicResponse) {
       .filter(Boolean) ?? []
   const text = chunks.join("\n").trim()
   if (!text) throw new Error("Claude boş ön rapor döndürdü.")
+  return text
+}
+
+async function createGeminiRadiologyDraft({
+  apiKey,
+  inputContext,
+  model,
+  patientName,
+}: {
+  apiKey: string
+  inputContext: Record<string, unknown>
+  model: string
+  patientName: string
+}): Promise<OpenAiDraft> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+      model
+    )}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: [
+                  "Sen radyoloji ön rapor asistanısın.",
+                  "Tanı koymazsın; yalnızca hekimin düzenleyip onaylayacağı Türkçe bir ön rapor taslağı hazırlarsın.",
+                  "Elinde şu an görüntü pikselleri değil DICOM metadata ve tetkik bağlamı var; belirsizlikleri açıkça belirt.",
+                  "Sadece JSON döndür. Markdown, açıklama veya kod bloğu kullanma.",
+                  JSON.stringify({
+                    task: "radiology_pre_report",
+                    patientName,
+                    study: inputContext,
+                    expectedJson: {
+                      findings: "string",
+                      impression: "string",
+                      recommendations: "string",
+                      confidenceScore: "number 0..1",
+                      criticality: "none | low | medium | high",
+                    },
+                  }),
+                ].join("\n"),
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: "application/json",
+          temperature: 0.2,
+          maxOutputTokens: 1200,
+        },
+      }),
+    }
+  )
+
+  const payload = (await response.json().catch(() => null)) as GeminiResponse | null
+  if (!response.ok) {
+    const message = payload?.error?.message || `Gemini isteği başarısız oldu (${response.status}).`
+    throw new Error(message)
+  }
+
+  const text = extractGeminiOutputText(payload)
+  const parsed = parseOpenAiDraftJson(text)
+
+  return {
+    findings: parsed.findings,
+    impression: parsed.impression,
+    recommendations: parsed.recommendations,
+    confidenceScore: parsed.confidenceScore,
+    criticality: parsed.criticality,
+    sourceSummary: {
+      generator: "google-gemini-generate-content",
+      model,
+      modelVersion: payload?.modelVersion,
+      inputContext,
+    },
+    usage:
+      typeof payload?.usageMetadata?.promptTokenCount === "number" &&
+      typeof payload?.usageMetadata?.candidatesTokenCount === "number"
+        ? {
+            inputTokens: payload.usageMetadata.promptTokenCount,
+            outputTokens: payload.usageMetadata.candidatesTokenCount,
+          }
+        : undefined,
+    responseId: payload?.responseId,
+  }
+}
+
+function extractGeminiOutputText(payload: GeminiResponse | null) {
+  const chunks =
+    payload?.candidates
+      ?.flatMap((candidate) => candidate.content?.parts ?? [])
+      .map((part) => part.text)
+      .filter(Boolean) ?? []
+  const text = chunks.join("\n").trim()
+  if (!text) throw new Error("Gemini boş ön rapor döndürdü.")
   return text
 }
 
