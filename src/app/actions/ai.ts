@@ -52,7 +52,9 @@ export async function startAiPreReport(formData: FormData) {
 
   const { data: provider, error: providerError } = await supabase
     .from("ai_service_providers")
-    .select("id, name, slug, provider_type, default_model, is_active, requires_credentials")
+    .select(
+      "id, name, slug, provider_type, default_model, is_active, requires_credentials, credential_reference"
+    )
     .eq("id", providerId)
     .eq("organization_id", user.organizationId)
     .maybeSingle()
@@ -75,8 +77,13 @@ export async function startAiPreReport(formData: FormData) {
 
   const patient = Array.isArray(study.patients) ? study.patients[0] : study.patients
   const isMock = provider.provider_type === "mock"
+  const openAiApiKey =
+    provider.provider_type === "openai" && provider.credential_reference
+      ? process.env[provider.credential_reference]
+      : null
+  const canRunOpenAi = provider.provider_type === "openai" && Boolean(openAiApiKey)
   const now = new Date().toISOString()
-  const jobStatus = isMock ? "draft_ready" : "waiting_credentials"
+  const jobStatus = isMock ? "draft_ready" : canRunOpenAi ? "running" : "waiting_credentials"
   const inputContext = {
     accessionNumber: study.accession_number,
     description: study.description,
@@ -100,7 +107,8 @@ export async function startAiPreReport(formData: FormData) {
       input_context: inputContext,
       started_at: now,
       completed_at: isMock ? now : null,
-      error_message: isMock ? null : "AI sağlayıcı hesabı/anahtarı tanımlanınca çalıştırılacak.",
+      error_message:
+        isMock || canRunOpenAi ? null : "AI sağlayıcı hesabı/anahtarı tanımlanınca çalıştırılacak.",
     })
     .select("id")
     .single()
@@ -170,6 +178,91 @@ export async function startAiPreReport(formData: FormData) {
     }
   }
 
+  if (canRunOpenAi && openAiApiKey) {
+    try {
+      const draft = await createOpenAiRadiologyDraft({
+        apiKey: openAiApiKey,
+        inputContext,
+        model: provider.default_model || "gpt-5.1",
+        patientName: patient ? `${patient.first_name} ${patient.last_name}` : "",
+      })
+
+      const { error: draftError } = await supabase.from("ai_report_drafts").insert({
+        organization_id: user.organizationId,
+        study_id: studyId,
+        job_id: job.id,
+        findings: draft.findings,
+        impression: draft.impression,
+        recommendations: draft.recommendations,
+        confidence_score: draft.confidenceScore,
+        criticality: draft.criticality,
+        source_summary: draft.sourceSummary,
+      })
+
+      if (draftError) throw new Error(`OpenAI ön raporu kaydedilemedi: ${draftError.message}`)
+
+      const tokenUsage =
+        draft.usage ??
+        estimateTokenUsage({
+          findings: draft.findings,
+          impression: draft.impression,
+          inputContext,
+        })
+      const cost = calculateAiUsageCost({
+        inputTokens: tokenUsage.inputTokens,
+        outputTokens: tokenUsage.outputTokens,
+        providerSlug: provider.slug,
+      })
+
+      const { error: usageError } = await supabase.from("ai_usage_events").insert({
+        organization_id: user.organizationId,
+        job_id: job.id,
+        study_id: studyId,
+        provider_slug: provider.slug,
+        model_name: provider.default_model,
+        usage_type: "pre_report",
+        input_tokens: tokenUsage.inputTokens,
+        output_tokens: tokenUsage.outputTokens,
+        currency: cost.currency,
+        input_cost: cost.inputCost,
+        output_cost: cost.outputCost,
+        pricing_snapshot: cost.pricingSnapshot,
+        metadata: {
+          accessionNumber: study.accession_number,
+          modality: study.modality,
+          estimated: !draft.usage,
+          responseId: draft.responseId,
+        },
+        created_by: user.id,
+      })
+
+      if (usageError && !isMissingAiTableError(usageError)) {
+        throw new Error(`OpenAI tüketim kaydı oluşturulamadı: ${usageError.message}`)
+      }
+
+      await supabase
+        .from("ai_jobs")
+        .update({
+          status: "draft_ready",
+          completed_at: new Date().toISOString(),
+          error_message: null,
+        })
+        .eq("id", job.id)
+        .eq("organization_id", user.organizationId)
+    } catch (error) {
+      await supabase
+        .from("ai_jobs")
+        .update({
+          status: "failed",
+          completed_at: new Date().toISOString(),
+          error_message: error instanceof Error ? error.message : "OpenAI ön raporu üretilemedi.",
+        })
+        .eq("id", job.id)
+        .eq("organization_id", user.organizationId)
+      throw error
+    }
+  }
+
   await supabase.from("audit_logs").insert({
     organization_id: user.organizationId,
     actor_id: user.id,
@@ -191,4 +284,144 @@ export async function startAiPreReport(formData: FormData) {
 function appendQuery(path: string, key: string, value: string) {
   const separator = path.includes("?") ? "&" : "?"
   return `${path}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+}
+
+type OpenAiDraft = {
+  findings: string
+  impression: string
+  recommendations: string
+  confidenceScore: number
+  criticality: "none" | "low" | "medium" | "high"
+  sourceSummary: Record<string, unknown>
+  usage?: {
+    inputTokens: number
+    outputTokens: number
+  }
+  responseId?: string
+}
+
+type OpenAiResponse = {
+  id?: string
+  output_text?: string
+  output?: Array<{
+    content?: Array<{
+      text?: string
+      type?: string
+    }>
+  }>
+  usage?: {
+    input_tokens?: number
+    output_tokens?: number
+  }
+}
+
+async function createOpenAiRadiologyDraft({
+  apiKey,
+  inputContext,
+  model,
+  patientName,
+}: {
+  apiKey: string
+  inputContext: Record<string, unknown>
+  model: string
+  patientName: string
+}): Promise<OpenAiDraft> {
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      instructions: [
+        "Sen radyoloji ön rapor asistanısın.",
+        "Tanı koymazsın; yalnızca hekimin düzenleyip onaylayacağı Türkçe bir ön rapor taslağı hazırlarsın.",
+        "Elinde şu an görüntü pikselleri değil DICOM metadata ve tetkik bağlamı var; belirsizlikleri açıkça belirt.",
+        "Sadece JSON döndür. Markdown, açıklama veya kod bloğu kullanma.",
+      ].join(" "),
+      input: JSON.stringify({
+        task: "radiology_pre_report",
+        patientName,
+        study: inputContext,
+        expectedJson: {
+          findings: "string",
+          impression: "string",
+          recommendations: "string",
+          confidenceScore: "number 0..1",
+          criticality: "none | low | medium | high",
+        },
+      }),
+    }),
+  })
+
+  const payload = (await response.json().catch(() => null)) as OpenAiResponse | { error?: { message?: string } } | null
+  if (!response.ok) {
+    const message =
+      payload && "error" in payload && payload.error?.message
+        ? payload.error.message
+        : `OpenAI isteği başarısız oldu (${response.status}).`
+    throw new Error(message)
+  }
+
+  const openAiPayload = payload as OpenAiResponse
+  const text = extractOpenAiOutputText(openAiPayload)
+  const parsed = parseOpenAiDraftJson(text)
+
+  return {
+    findings: parsed.findings,
+    impression: parsed.impression,
+    recommendations: parsed.recommendations,
+    confidenceScore: parsed.confidenceScore,
+    criticality: parsed.criticality,
+    sourceSummary: {
+      generator: "openai-responses",
+      model,
+      inputContext,
+    },
+    usage:
+      typeof openAiPayload.usage?.input_tokens === "number" &&
+      typeof openAiPayload.usage?.output_tokens === "number"
+        ? {
+            inputTokens: openAiPayload.usage.input_tokens,
+            outputTokens: openAiPayload.usage.output_tokens,
+          }
+        : undefined,
+    responseId: openAiPayload.id,
+  }
+}
+
+function extractOpenAiOutputText(payload: OpenAiResponse) {
+  if (payload.output_text) return payload.output_text
+  const chunks =
+    payload.output
+      ?.flatMap((item) => item.content ?? [])
+      .map((content) => content.text)
+      .filter(Boolean) ?? []
+  const text = chunks.join("\n").trim()
+  if (!text) throw new Error("OpenAI boş ön rapor döndürdü.")
+  return text
+}
+
+function parseOpenAiDraftJson(text: string) {
+  const cleanText = text
+    .trim()
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/, "")
+    .trim()
+  const parsed = JSON.parse(cleanText) as Partial<OpenAiDraft>
+  const criticality = ["none", "low", "medium", "high"].includes(String(parsed.criticality))
+    ? (parsed.criticality as OpenAiDraft["criticality"])
+    : "none"
+
+  return {
+    findings: String(parsed.findings ?? "").trim() || "OpenAI bulgu taslağı boş döndü.",
+    impression: String(parsed.impression ?? "").trim() || "OpenAI sonuç taslağı boş döndü.",
+    recommendations: String(parsed.recommendations ?? "").trim(),
+    confidenceScore:
+      typeof parsed.confidenceScore === "number"
+        ? Math.min(1, Math.max(0, parsed.confidenceScore))
+        : 0.5,
+    criticality,
+  }
 }
