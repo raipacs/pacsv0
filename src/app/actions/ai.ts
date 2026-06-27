@@ -730,6 +730,7 @@ async function createGeminiRadiologyDraft({
                   "Sen radyoloji ön rapor asistanısın.",
                   "Tanı koymazsın; yalnızca hekimin düzenleyip onaylayacağı Türkçe bir ön rapor taslağı hazırlarsın.",
                   "Elinde şu an görüntü pikselleri değil DICOM metadata ve tetkik bağlamı var; belirsizlikleri açıkça belirt.",
+                  "Bulgular ve izlenim alanlarını kısa tut; her biri en fazla 3 cümle olsun.",
                   "Sadece JSON döndür. Markdown, açıklama veya kod bloğu kullanma.",
                   JSON.stringify({
                     task: "radiology_pre_report",
@@ -750,8 +751,22 @@ async function createGeminiRadiologyDraft({
         ],
         generationConfig: {
           responseMimeType: "application/json",
+          responseSchema: {
+            properties: {
+              confidenceScore: { type: "NUMBER" },
+              criticality: {
+                enum: ["none", "low", "medium", "high"],
+                type: "STRING",
+              },
+              findings: { type: "STRING" },
+              impression: { type: "STRING" },
+              recommendations: { type: "STRING" },
+            },
+            required: ["findings", "impression", "recommendations", "confidenceScore", "criticality"],
+            type: "OBJECT",
+          },
           temperature: 0.2,
-          maxOutputTokens: 1200,
+          maxOutputTokens: 2000,
         },
       }),
     }
