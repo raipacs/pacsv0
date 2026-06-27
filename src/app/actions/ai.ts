@@ -668,6 +668,11 @@ type MedGemmaResponse = {
   }
 }
 
+const MEDGEMMA_REQUEST_TIMEOUT_MS = readPositiveIntegerEnv("RAI_MEDGEMMA_TIMEOUT_MS", 90_000)
+const MEDGEMMA_MAX_ATTEMPTS = readPositiveIntegerEnv("RAI_MEDGEMMA_MAX_ATTEMPTS", 3)
+const MEDGEMMA_RETRY_BASE_DELAY_MS = readPositiveIntegerEnv("RAI_MEDGEMMA_RETRY_DELAY_MS", 8_000)
+const MEDGEMMA_RETRYABLE_STATUS_CODES = new Set([408, 409, 425, 429, 500, 502, 503, 504])
+
 async function loadAiDicomReferences({
   organizationId,
   studyId,
@@ -1091,32 +1096,17 @@ async function createMedGemmaRadiologyDraft({
           model,
         }
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 90_000)
-
   try {
     const headers: Record<string, string> = { "Content-Type": "application/json" }
     if (apiKey) headers.Authorization = `Bearer ${apiKey}`
 
-    const response = await fetch(endpoint, {
-      body: JSON.stringify(body),
-      cache: "no-store",
+    const result = await postMedGemmaEndpoint({
+      body,
+      endpoint,
       headers,
-      method: "POST",
-      signal: controller.signal,
     })
-    const rawText = await response.text()
-    const payload = parseJsonResponse(rawText) as MedGemmaResponse | null
 
-    if (!response.ok) {
-      const message =
-        payload?.error?.message ||
-        rawText.trim() ||
-        `MedGemma endpoint isteği başarısız oldu (${response.status}).`
-      throw new Error(message)
-    }
-
-    const parsed = extractMedGemmaDraft(payload, rawText)
+    const parsed = extractMedGemmaDraft(result.payload, result.rawText)
 
     return {
       findings: parsed.findings,
@@ -1131,17 +1121,13 @@ async function createMedGemmaRadiologyDraft({
         generator: "medgemma-endpoint",
         inputContext,
         model: endpointModel,
+        requestAttempts: result.attemptCount,
       },
-      usage: extractMedGemmaUsage(payload),
-      responseId: payload?.responseId ?? payload?.id,
+      usage: extractMedGemmaUsage(result.payload),
+      responseId: result.payload?.responseId ?? result.payload?.id,
     }
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("MedGemma endpoint zaman aşımına uğradı.")
-    }
-    throw error
-  } finally {
-    clearTimeout(timeout)
+    throw normalizeMedGemmaError(error)
   }
 }
 
@@ -1159,6 +1145,120 @@ function extractMedGemmaDraft(payload: MedGemmaResponse | null, rawText: string)
 
   const text = extractMedGemmaOutputText(payload, rawText)
   return parseOpenAiDraftJson(text)
+}
+
+async function postMedGemmaEndpoint({
+  body,
+  endpoint,
+  headers,
+}: {
+  body: unknown
+  endpoint: string
+  headers: Record<string, string>
+}) {
+  let lastError: Error | null = null
+
+  for (let attemptIndex = 0; attemptIndex < MEDGEMMA_MAX_ATTEMPTS; attemptIndex += 1) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), MEDGEMMA_REQUEST_TIMEOUT_MS)
+
+    try {
+      const response = await fetch(endpoint, {
+        body: JSON.stringify(body),
+        cache: "no-store",
+        headers,
+        method: "POST",
+        signal: controller.signal,
+      })
+      const rawText = await response.text()
+      const payload = parseJsonResponse(rawText) as MedGemmaResponse | null
+
+      if (response.ok) {
+        return {
+          attemptCount: attemptIndex + 1,
+          payload,
+          rawText,
+        }
+      }
+
+      const message =
+        payload?.error?.message ||
+        rawText.trim() ||
+        `MedGemma endpoint isteği başarısız oldu (${response.status}).`
+      const endpointError = new Error(message)
+
+      if (!isRetryableMedGemmaStatus(response.status) || attemptIndex === MEDGEMMA_MAX_ATTEMPTS - 1) {
+        throw endpointError
+      }
+
+      lastError = endpointError
+      await waitForMedGemmaRetryDelay(attemptIndex, response.headers.get("retry-after"))
+    } catch (error) {
+      const endpointError = error instanceof Error ? error : new Error("MedGemma endpoint isteği başarısız oldu.")
+      const canRetry = isRetryableMedGemmaError(endpointError) && attemptIndex < MEDGEMMA_MAX_ATTEMPTS - 1
+
+      if (!canRetry) {
+        throw addMedGemmaAttemptContext(endpointError, attemptIndex + 1)
+      }
+
+      lastError = endpointError
+      await waitForMedGemmaRetryDelay(attemptIndex)
+    } finally {
+      clearTimeout(timeout)
+    }
+  }
+
+  throw addMedGemmaAttemptContext(lastError ?? new Error("MedGemma endpoint yanıt vermedi."), MEDGEMMA_MAX_ATTEMPTS)
+}
+
+function isRetryableMedGemmaStatus(status: number) {
+  return MEDGEMMA_RETRYABLE_STATUS_CODES.has(status)
+}
+
+function isRetryableMedGemmaError(error: Error) {
+  return error.name === "AbortError" || error.message.includes("503") || error.message.includes("fetch failed")
+}
+
+function addMedGemmaAttemptContext(error: Error, attemptCount: number) {
+  if (error.name === "AbortError") {
+    return new Error(
+      `MedGemma endpoint ${attemptCount} deneme sonunda zaman aşımına uğradı. Endpoint uyanıyor veya yoğun olabilir; lütfen birazdan tekrar deneyin.`
+    )
+  }
+
+  return new Error(
+    `MedGemma endpoint ${attemptCount} deneme sonunda yanıt veremedi. Son hata: ${error.message}`
+  )
+}
+
+function normalizeMedGemmaError(error: unknown) {
+  if (!(error instanceof Error)) return new Error("MedGemma ön raporu üretilemedi.")
+  if (error.name === "AbortError") return new Error("MedGemma endpoint zaman aşımına uğradı.")
+  return error
+}
+
+async function waitForMedGemmaRetryDelay(attemptIndex: number, retryAfterHeader?: string | null) {
+  const retryAfterMs = parseRetryAfterMs(retryAfterHeader)
+  const exponentialDelayMs = MEDGEMMA_RETRY_BASE_DELAY_MS * 2 ** attemptIndex
+  const delayMs = Math.min(retryAfterMs ?? exponentialDelayMs, 15_000)
+  await new Promise<void>((resolve) => setTimeout(resolve, delayMs))
+}
+
+function parseRetryAfterMs(value?: string | null) {
+  if (!value) return null
+
+  const seconds = Number(value)
+  if (Number.isFinite(seconds) && seconds > 0) return seconds * 1000
+
+  const timestamp = Date.parse(value)
+  if (Number.isNaN(timestamp)) return null
+
+  return Math.max(timestamp - Date.now(), 0)
+}
+
+function readPositiveIntegerEnv(name: string, fallback: number) {
+  const value = Number(process.env[name])
+  return Number.isInteger(value) && value > 0 ? value : fallback
 }
 
 function extractMedGemmaOutputText(payload: MedGemmaResponse | null, rawText: string) {
