@@ -1051,6 +1051,8 @@ async function createMedGemmaRadiologyDraft({
   model: string
   patientName: string
 }): Promise<OpenAiDraft> {
+  const endpointModel =
+    endpointMode === "openai-compatible" && !model.includes("/") ? `google/${model}` : model
   const instructions = [
     "Sen radyoloji ön rapor asistanısın.",
     "Tanı koymazsın; yalnızca hekimin düzenleyip onaylayacağı Türkçe bir ön rapor taslağı hazırlarsın.",
@@ -1075,7 +1077,7 @@ async function createMedGemmaRadiologyDraft({
   const body =
     endpointMode === "openai-compatible"
       ? {
-          model,
+          model: endpointModel,
           messages: [
             { content: instructions.join(" "), role: "system" },
             { content: JSON.stringify(taskPayload), role: "user" },
@@ -1128,7 +1130,7 @@ async function createMedGemmaRadiologyDraft({
         endpointMode,
         generator: "medgemma-endpoint",
         inputContext,
-        model,
+        model: endpointModel,
       },
       usage: extractMedGemmaUsage(payload),
       responseId: payload?.responseId ?? payload?.id,
