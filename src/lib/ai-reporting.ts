@@ -28,6 +28,8 @@ const pricingUsdPerMillionTokens: Record<
   openai: { input: 1.25, output: 10, note: "Temsili varsayılan fiyat" },
   claude: { input: 3, output: 15, note: "Temsili varsayılan fiyat" },
   gemini: { input: 1.25, output: 10, note: "Temsili varsayılan fiyat" },
+  medgemma: { input: 0, output: 0, note: "Custom endpoint fiyatı tanımlanacak" },
+  radialog: { input: 0, output: 0, note: "Custom endpoint fiyatı tanımlanacak" },
 }
 
 export function createMockRadiologyDraft(input: MockAiDraftInput) {

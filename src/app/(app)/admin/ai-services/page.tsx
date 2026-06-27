@@ -294,7 +294,7 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
                   <div>
                     <strong>{provider.name}</strong>
                     <span>
-                      {providerLabel(provider.provider_type)} · {provider.slug}
+                      {providerLabel(provider.provider_type, provider.slug)} · {provider.slug}
                     </span>
                   </div>
                   <div className="chip-list">
@@ -325,7 +325,7 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
                     <input
                       name="credentialReference"
                       defaultValue={provider.credential_reference ?? ""}
-                      placeholder={credentialPlaceholder(provider.provider_type)}
+                      placeholder={credentialPlaceholder(provider.provider_type, provider.slug)}
                     />
                   </label>
                   <div className="ai-provider-switches">
@@ -627,7 +627,10 @@ function summarizeUsage(rows: AiUsageRow[]) {
   return Array.from(byProvider.values()).sort((a, b) => b.totalTokens - a.totalTokens)
 }
 
-function providerLabel(value: string) {
+function providerLabel(value: string, slug?: string) {
+  if (slug === "medgemma") return "MedGemma"
+  if (slug === "radialog") return "RaDialog"
+
   switch (value) {
     case "openai":
       return "OpenAI"
@@ -638,11 +641,14 @@ function providerLabel(value: string) {
     case "mock":
       return "RAI Mock"
     default:
-      return "Custom"
+      return "Custom medikal AI"
   }
 }
 
-function credentialPlaceholder(providerType: string) {
+function credentialPlaceholder(providerType: string, slug?: string) {
+  if (slug === "medgemma") return "RAI_MEDGEMMA_API_KEY veya RAI_MEDGEMMA_ENDPOINT"
+  if (slug === "radialog") return "RAI_RADIALOG_API_KEY veya RAI_RADIALOG_ENDPOINT"
+
   switch (providerType) {
     case "openai":
       return "OPENAI_API_KEY"
