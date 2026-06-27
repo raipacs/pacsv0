@@ -64,7 +64,7 @@ if (membershipError) {
   throw new Error(`Importer membership lookup failed: ${membershipError.message}`)
 }
 
-const branchId = await resolveBranchId()
+const defaultBranchId = await resolveBranchId()
 const state = await readState()
 const since = Number.isInteger(state.lastSeq) ? state.lastSeq : 0
 const changes = await orthancJson(`/changes?since=${since}&limit=100`)
@@ -187,12 +187,22 @@ async function recordConnectionEvent({
   sourceIdentity,
   metadata,
 }) {
+  const sourceAeTitle =
+    normalizeDicomIdentityForMatch(sourceIdentity?.aeTitle) ||
+    normalizeDicomIdentityForMatch(configuredSourceAeTitle) ||
+    "ORTHANC"
+  const eventBranchId =
+    (await resolveModalityBranchId({
+      sourceAeTitle,
+      calledAeTitle,
+    })) ?? defaultBranchId
+
   const { error } = await supabase.from("dicom_connection_events").insert({
     organization_id: membership.organization_id,
-    ...(branchId ? { branch_id: branchId } : {}),
+    ...(eventBranchId ? { branch_id: eventBranchId } : {}),
     event_type: eventType,
     source: "orthanc",
-    source_ae_title: sourceIdentity?.aeTitle || configuredSourceAeTitle || "ORTHANC",
+    source_ae_title: sourceAeTitle,
     called_ae_title: calledAeTitle,
     modality,
     study_instance_uid: studyInstanceUid,
@@ -220,6 +230,30 @@ async function resolveBranchId() {
   if (isOptionalBranchError(error)) return null
   if (error) throw new Error(`Branch lookup failed: ${error.message}`)
   return data?.id ?? null
+}
+
+async function resolveModalityBranchId({ sourceAeTitle, calledAeTitle }) {
+  const aeTitle = normalizeDicomIdentityForMatch(sourceAeTitle)
+  if (!aeTitle) return null
+
+  const { data, error } = await supabase
+    .from("dicom_modalities")
+    .select("branch_id, called_ae_title")
+    .eq("organization_id", membership.organization_id)
+    .eq("ae_title", aeTitle)
+    .not("branch_id", "is", null)
+    .limit(20)
+
+  if (isOptionalDicomOpsError(error) || isOptionalBranchError(error)) return null
+  if (error) throw new Error(`Modality branch lookup failed: ${error.message}`)
+
+  const called = normalizeDicomIdentityForMatch(calledAeTitle)
+  const candidates = (data ?? []).filter((row) => {
+    const rowCalled = normalizeDicomIdentityForMatch(row.called_ae_title)
+    return row.branch_id && (!rowCalled || !called || rowCalled === called)
+  })
+
+  return candidates[0]?.branch_id ?? null
 }
 
 async function getFirstStudyInstanceId(study) {
@@ -268,6 +302,12 @@ function normalizeIdentityValue(value) {
     .trim()
   if (!normalized || normalized === "-") return null
   return normalized.slice(0, 80)
+}
+
+function normalizeDicomIdentityForMatch(value) {
+  const normalized = normalizeIdentityValue(value)
+  if (!normalized) return null
+  return normalized.replace(/\s+/g, "_").toUpperCase()
 }
 
 function isGatewayIdentity(value) {

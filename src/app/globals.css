@@ -2383,6 +2383,44 @@ td span {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.form-grid .wide {
+  grid-column: 1 / -1;
+}
+
+.modality-definition-panel {
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+}
+
+.panel-heading.compact {
+  border-bottom: 0;
+  padding-bottom: 6px;
+}
+
+.modality-definition-list {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+}
+
+.modality-definition-list h3,
+.modality-definition-panel h3 {
+  margin: 0;
+}
+
+.compact-modality-form {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #f8fafc;
+}
+
+.modality-form-grid {
+  align-items: end;
+}
+
 .integration-flow-list {
   display: grid;
 }

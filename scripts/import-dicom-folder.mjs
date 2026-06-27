@@ -103,7 +103,6 @@ if (membership.role !== "admin") {
   )
 }
 
-const branchId = await resolveImportBranchId()
 const filenames = (await fs.readdir(sourceDir))
   .filter((filename) => !filename.startsWith("."))
   .sort()
@@ -112,7 +111,13 @@ const sourceIdentity = resolveDicomSourceIdentity(firstDicomMetadata, {
   fallbackAeTitle: configuredSourceAeTitle,
   fallbackSource: importSource,
 })
-const sourceAeTitle = sourceIdentity.aeTitle
+const sourceAeTitle = normalizeDicomIdentityForMatch(sourceIdentity.aeTitle) || "DICOM_DEVICE"
+const branchId =
+  (await resolveModalityBranchId({
+    sourceAeTitle,
+    sourceIp,
+    calledAeTitle,
+  })) ?? (await resolveImportBranchId())
 const results = []
 const loggedStudyEvents = new Set()
 let importJob = await startImportJob({
@@ -441,6 +446,8 @@ async function syncModalityRegistry({ modality, studyInstanceUid, accessionNumbe
       organization_id: membership.organization_id,
       ...(branchId ? { branch_id: branchId } : {}),
       ae_title: sourceAeTitle,
+      called_ae_title: normalizeDicomIdentityForMatch(calledAeTitle),
+      ip_address: sourceIp || null,
       modality,
       status: "observed",
       last_seen_at: new Date().toISOString(),
@@ -510,6 +517,42 @@ async function resolveImportBranchId() {
   return data?.id ?? null
 }
 
+async function resolveModalityBranchId({ sourceAeTitle, sourceIp, calledAeTitle }) {
+  const aeTitle = normalizeDicomIdentityForMatch(sourceAeTitle)
+  if (!aeTitle) return null
+
+  const { data, error } = await supabase
+    .from("dicom_modalities")
+    .select("branch_id, ip_address, called_ae_title")
+    .eq("organization_id", membership.organization_id)
+    .eq("ae_title", aeTitle)
+    .not("branch_id", "is", null)
+    .limit(20)
+
+  if (isOptionalDicomOpsError(error) || isOptionalBranchError(error)) return null
+  if (error) throw new Error(`Modality branch lookup failed: ${error.message}`)
+
+  const called = normalizeDicomIdentityForMatch(calledAeTitle)
+  const ip = String(sourceIp ?? "").trim()
+  const candidates = (data ?? [])
+    .filter((row) => {
+      const rowCalled = normalizeDicomIdentityForMatch(row.called_ae_title)
+      const rowIp = String(row.ip_address ?? "").trim()
+      const calledMatches = !rowCalled || !called || rowCalled === called
+      const ipMatches = !rowIp || !ip || rowIp === ip
+      return row.branch_id && calledMatches && ipMatches
+    })
+    .sort((left, right) => {
+      const leftScore =
+        Number(Boolean(left.ip_address)) + Number(Boolean(left.called_ae_title))
+      const rightScore =
+        Number(Boolean(right.ip_address)) + Number(Boolean(right.called_ae_title))
+      return rightScore - leftScore
+    })
+
+  return candidates[0]?.branch_id ?? null
+}
+
 async function readFirstDicomMetadata(candidateFilenames) {
   for (const filename of candidateFilenames) {
     try {
@@ -561,6 +604,12 @@ function normalizeIdentityValue(value) {
     .trim()
   if (!normalized || normalized === "-") return null
   return normalized.slice(0, 80)
+}
+
+function normalizeDicomIdentityForMatch(value) {
+  const normalized = normalizeIdentityValue(value)
+  if (!normalized) return null
+  return normalized.replace(/\s+/g, "_").toUpperCase()
 }
 
 function isGatewayIdentity(value) {

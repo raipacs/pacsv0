@@ -15,11 +15,15 @@ export type HealthItem = {
 export type ModalityConnection = {
   key: string
   aeTitle: string
+  branchId: string | null
+  calledAeTitle: string | null
+  sourceIp: string | null
   modality: string
   studies: number
   instances: number
   lastReceivedAt: string | null
   lastDescription: string
+  location: string | null
   status: "Aktif" | "Sessiz" | "Yeni"
 }
 
@@ -123,9 +127,13 @@ type InstanceRow = {
 
 type ModalityRegistryRow = {
   id: string
+  branch_id: string | null
   ae_title: string
+  called_ae_title: string | null
   modality: string | null
   description: string | null
+  location: string | null
+  ip_address: string | null
   last_seen_at: string | null
   last_store_at: string | null
   last_accession_number: string | null
@@ -529,11 +537,15 @@ async function getModalityConnections(organizationId: string, branchId?: string 
         {
           key: "demo-dx",
           aeTitle: "Demo AE",
+          branchId: null,
+          calledAeTitle: "RAIPACS",
+          sourceIp: "10.0.0.10",
           modality: "DX",
           studies: 2,
           instances: 5,
           lastReceivedAt: null,
           lastDescription: "Demo DICOM akışı",
+          location: "Demo",
           status: "Yeni" as const,
         },
       ],
@@ -544,7 +556,7 @@ async function getModalityConnections(organizationId: string, branchId?: string 
   const registryQuery = supabase
     .from("dicom_modalities")
     .select(
-      "id, ae_title, modality, description, last_seen_at, last_store_at, last_accession_number, received_study_count, received_instance_count"
+      "id, branch_id, ae_title, called_ae_title, modality, description, location, ip_address, last_seen_at, last_store_at, last_accession_number, received_study_count, received_instance_count"
     )
     .eq("organization_id", organizationId)
     .order("last_seen_at", { ascending: false, nullsFirst: false })
@@ -557,12 +569,16 @@ async function getModalityConnections(organizationId: string, branchId?: string 
     const modalities = ((registryRows ?? []) as ModalityRegistryRow[]).map((row) => ({
       key: row.id,
       aeTitle: row.ae_title,
+      branchId: row.branch_id,
+      calledAeTitle: row.called_ae_title,
+      sourceIp: row.ip_address,
       modality: row.modality?.trim().toUpperCase() || "DICOM",
       studies: row.received_study_count ?? 0,
       instances: row.received_instance_count ?? 0,
       lastReceivedAt: row.last_store_at ?? row.last_seen_at,
       lastDescription:
         row.description || row.last_accession_number || "Kayıtlı DICOM modalitesi",
+      location: row.location,
       status: classifyModalityStatus(row.last_store_at ?? row.last_seen_at),
     }))
 
@@ -612,11 +628,15 @@ async function getModalityConnections(organizationId: string, branchId?: string 
       groups.set(key, {
         key,
         aeTitle,
+        branchId: branchId ?? null,
+        calledAeTitle: null,
+        sourceIp: null,
         modality,
         studies: 1,
         instances: instanceCount,
         lastReceivedAt: receivedAt,
         lastDescription: study.description || "Açıklama yok",
+        location: null,
         status: classifyModalityStatus(receivedAt),
       })
       continue

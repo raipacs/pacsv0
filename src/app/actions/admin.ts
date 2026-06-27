@@ -34,6 +34,17 @@ const permissionTableSchema = z
   .max(80)
   .regex(/^[a-z0-9_]+$/)
 const aiProviderTypeSchema = z.enum(["mock", "openai", "anthropic", "google", "custom"])
+const dicomModalitySchema = z.object({
+  modalityId: optionalUuidSchema,
+  branchId: optionalUuidSchema,
+  aeTitle: z.string().trim().min(2).max(64),
+  modality: z.string().trim().min(2).max(20),
+  calledAeTitle: z.string().trim().max(64).optional(),
+  ipAddress: z.string().trim().max(64).optional(),
+  description: z.string().trim().max(200).optional(),
+  location: z.string().trim().max(120).optional(),
+  returnTo: returnToSchema,
+})
 
 const hisIntegrationSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -254,6 +265,85 @@ export async function updateMemberAccess(formData: FormData) {
 
   revalidatePath("/admin/users")
   redirect("/admin/users")
+}
+
+export async function upsertDicomModality(formData: FormData) {
+  const user = await requireAdmin()
+  if (!isSupabaseConfigured) redirect("/admin/dicom-server")
+
+  const values = dicomModalitySchema.parse({
+    modalityId: formData.get("modalityId"),
+    branchId: formData.get("branchId"),
+    aeTitle: formData.get("aeTitle"),
+    modality: formData.get("modality"),
+    calledAeTitle: formData.get("calledAeTitle"),
+    ipAddress: formData.get("ipAddress"),
+    description: formData.get("description"),
+    location: formData.get("location"),
+    returnTo: formData.get("returnTo"),
+  })
+  const supabase = await createClient()
+
+  if (values.branchId) {
+    const { data: branch, error: branchError } = await supabase
+      .from("branches")
+      .select("id")
+      .eq("id", values.branchId)
+      .eq("organization_id", user.organizationId)
+      .maybeSingle()
+
+    if (branchError) throw new Error(`Şube doğrulanamadı: ${branchError.message}`)
+    if (!branch) throw new Error("Seçilen şube bulunamadı.")
+  }
+
+  const payload = {
+    organization_id: user.organizationId,
+    branch_id: values.branchId,
+    ae_title: normalizeDicomIdentity(values.aeTitle),
+    modality: values.modality.trim().toUpperCase(),
+    called_ae_title: normalizeOptionalDicomIdentity(values.calledAeTitle),
+    ip_address: values.ipAddress?.trim() || null,
+    description: values.description?.trim() || null,
+    location: values.location?.trim() || null,
+    status: "observed",
+    metadata: {
+      managedFrom: "admin-ui",
+      matching: {
+        aeTitle: normalizeDicomIdentity(values.aeTitle),
+        calledAeTitle: normalizeOptionalDicomIdentity(values.calledAeTitle),
+        ipAddress: values.ipAddress?.trim() || null,
+      },
+    },
+  }
+
+  const query = values.modalityId
+    ? supabase
+        .from("dicom_modalities")
+        .update(payload)
+        .eq("id", values.modalityId)
+        .eq("organization_id", user.organizationId)
+        .select("id")
+        .single()
+    : supabase
+        .from("dicom_modalities")
+        .upsert(payload, { onConflict: "organization_id,ae_title" })
+        .select("id")
+        .single()
+
+  const { data, error } = await query
+  if (error) throw new Error(`Modalite tanımı kaydedilemedi: ${error.message}`)
+
+  await supabase.from("audit_logs").insert({
+    organization_id: user.organizationId,
+    actor_id: user.id,
+    action: values.modalityId ? "dicom_modality.updated" : "dicom_modality.created",
+    resource_type: "dicom_modality",
+    resource_id: data.id,
+    metadata: payload.metadata,
+  })
+
+  revalidatePath("/admin/dicom-server")
+  redirect(values.returnTo ?? "/admin/dicom-server")
 }
 
 export async function createAccessGroup(formData: FormData) {
@@ -736,6 +826,15 @@ function slugifyGroupName(value: string) {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "") || "grup"
   )
+}
+
+function normalizeDicomIdentity(value: string) {
+  return value.trim().replace(/\s+/g, "_").toUpperCase()
+}
+
+function normalizeOptionalDicomIdentity(value?: string) {
+  const normalized = value ? normalizeDicomIdentity(value) : ""
+  return normalized || null
 }
 
 async function removeStorageObjects(instances: StorageObjectRef[]) {

@@ -1,9 +1,10 @@
 import Link from "next/link"
 import type { ReactNode } from "react"
 
+import { upsertDicomModality } from "@/app/actions/admin"
 import { BranchFilter } from "@/components/branch-filter"
 import { requireAdmin } from "@/lib/auth"
-import { resolveSelectedBranch } from "@/lib/branches"
+import { resolveSelectedBranch, type BranchOption } from "@/lib/branches"
 import {
   formatDateTime,
   getDicomServerDashboard,
@@ -34,6 +35,10 @@ export default async function DicomServerAdminPage({
     user.organizationId,
     params.branch
   )
+  const currentReturnTo = params.branch
+    ? `/admin/dicom-server?branch=${encodeURIComponent(params.branch)}`
+    : "/admin/dicom-server"
+  const branchNameById = new Map(branches.map((branch) => [branch.id, branch.name]))
   const dashboard = await getDicomServerDashboard(
     user.organizationId,
     selectedBranch?.id
@@ -271,16 +276,32 @@ export default async function DicomServerAdminPage({
 
       <CollapsiblePanel
         detail={`${dashboard.modalities.length} modalite bağlantısı izleniyor`}
-        open={modalityWarningCount > 0}
+        open
         title="Modalite bağlantıları"
         warningCount={modalityWarningCount}
       >
+        <section className="modality-definition-panel">
+          <div className="panel-heading compact">
+            <div>
+              <h3>Yeni modalite tanımı</h3>
+              <small>AE Title, IP ve hedef AE bilgisini şubeye bağlayın.</small>
+            </div>
+          </div>
+          <ModalityDefinitionForm
+            branches={branches}
+            returnTo={currentReturnTo}
+            selectedBranchId={selectedBranch?.id ?? null}
+          />
+        </section>
         {dashboard.modalities.length ? (
           <div className="responsive-table">
             <table>
               <thead>
                 <tr>
                   <th>AE Title</th>
+                  <th>Şube</th>
+                  <th>Kaynak IP</th>
+                  <th>Called AE</th>
                   <th>Modalite</th>
                   <th>Son tetkik</th>
                   <th>Study</th>
@@ -296,9 +317,21 @@ export default async function DicomServerAdminPage({
                       <span>{modality.lastDescription}</span>
                     </td>
                     <td>
+                      <strong>
+                        {modality.branchId
+                          ? branchNameById.get(modality.branchId) ?? "Şube yok"
+                          : "Şube yok"}
+                      </strong>
+                      <span>{modality.location || "Konum yok"}</span>
+                    </td>
+                    <td>{modality.sourceIp || "-"}</td>
+                    <td>{modality.calledAeTitle || dashboard.endpoint.aeTitle}</td>
+                    <td>
                       <span className="modality">{modality.modality}</span>
                     </td>
-                    <td>{formatDateTime(modality.lastReceivedAt)}</td>
+                    <td>
+                      {formatDateTime(modality.lastReceivedAt)}
+                    </td>
                     <td>{modality.studies}</td>
                     <td>{modality.instances}</td>
                     <td>
@@ -317,6 +350,20 @@ export default async function DicomServerAdminPage({
             olduğunda bu liste otomatik dolacak.
           </p>
         )}
+        {dashboard.modalities.length ? (
+          <div className="modality-definition-list">
+            <h3>Mevcut modalite tanımlarını düzenle</h3>
+            {dashboard.modalities.map((modality) => (
+              <ModalityDefinitionForm
+                branches={branches}
+                key={`edit-${modality.key}`}
+                modality={modality}
+                returnTo={currentReturnTo}
+                selectedBranchId={selectedBranch?.id ?? null}
+              />
+            ))}
+          </div>
+        ) : null}
       </CollapsiblePanel>
 
       <CollapsiblePanel
@@ -496,6 +543,96 @@ function SummaryTile({
   )
 }
 
+function ModalityDefinitionForm({
+  branches,
+  modality,
+  returnTo,
+  selectedBranchId,
+}: {
+  branches: BranchOption[]
+  modality?: ModalityConnection
+  returnTo: string
+  selectedBranchId: string | null
+}) {
+  const defaultBranchId =
+    modality?.branchId ??
+    selectedBranchId ??
+    branches.find((branch) => branch.slug === "dev")?.id ??
+    branches[0]?.id ??
+    ""
+  const registryId = modality && isUuid(modality.key) ? modality.key : null
+
+  return (
+    <form action={upsertDicomModality} className="admin-form compact-modality-form">
+      {registryId ? (
+        <input name="modalityId" type="hidden" value={registryId} />
+      ) : null}
+      <input name="returnTo" type="hidden" value={returnTo} />
+      <div className="form-grid two modality-form-grid">
+        <label>
+          AE Title
+          <input
+            name="aeTitle"
+            defaultValue={modality?.aeTitle ?? ""}
+            placeholder="US_KOSOVA_01"
+            required
+          />
+        </label>
+        <label>
+          Şube
+          <select name="branchId" defaultValue={defaultBranchId}>
+            {branches.map((branch) => (
+              <option key={branch.id} value={branch.id}>
+                {branch.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Modalite
+          <input name="modality" defaultValue={modality?.modality ?? "DICOM"} required />
+        </label>
+        <label>
+          Called AE Title
+          <input
+            name="calledAeTitle"
+            defaultValue={modality?.calledAeTitle ?? "RAIPACS"}
+            placeholder="RAIPACS"
+          />
+        </label>
+        <label>
+          Kaynak IP
+          <input
+            name="ipAddress"
+            defaultValue={modality?.sourceIp ?? ""}
+            inputMode="numeric"
+            placeholder="46.19.228.194"
+          />
+        </label>
+        <label>
+          Konum
+          <input
+            name="location"
+            defaultValue={modality?.location ?? ""}
+            placeholder="Kosova US odası"
+          />
+        </label>
+        <label className="wide">
+          Açıklama
+          <input
+            name="description"
+            defaultValue={modality?.lastDescription ?? ""}
+            placeholder="Ultrason cihazı / canlı bağlantı"
+          />
+        </label>
+      </div>
+      <button className="button primary" type="submit">
+        {modality ? "Tanımı güncelle" : "Modalite tanımı ekle"}
+      </button>
+    </form>
+  )
+}
+
 function CollapsiblePanel({
   children,
   detail,
@@ -525,6 +662,12 @@ function CollapsiblePanel({
       </summary>
       {children}
     </details>
+  )
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
   )
 }
 
