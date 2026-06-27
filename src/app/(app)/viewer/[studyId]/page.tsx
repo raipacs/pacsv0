@@ -140,6 +140,7 @@ export default async function RaiViewerPage({
         <nav aria-label="Viewer navigasyonu">
           <PrivacyToggle />
           <AiLaunchControl
+            latestJob={aiViewerState.latestJob}
             providers={aiViewerState.providers}
             returnTo={returnTo}
             studyId={studyId}
@@ -174,6 +175,7 @@ export default async function RaiViewerPage({
         </section>
       ) : null}
       <ReportEditorPanel
+        isNewAiDraft={Boolean(query.aiJob && query.aiJob === aiViewerState.latestDraft?.jobId)}
         latestDraft={aiViewerState.latestDraft}
         report={latestReport}
         returnTo={returnTo}
@@ -214,11 +216,13 @@ type ReportRow = {
 } | null
 
 function ReportEditorPanel({
+  isNewAiDraft,
   latestDraft,
   report,
   returnTo,
   studyId,
 }: {
+  isNewAiDraft: boolean
   latestDraft: AiDraftView | null
   report: ReportRow
   returnTo: string
@@ -241,7 +245,9 @@ function ReportEditorPanel({
         </strong>
         {latestDraft ? (
           <small>
-            <span className="health-badge ok">{aiJobStatusLabel(latestDraft.jobStatus)}</span>
+            <span className="health-badge ok">
+              {isNewAiDraft ? "Yeni ön rapor hazır" : aiJobStatusLabel(latestDraft.jobStatus)}
+            </span>
             {latestDraft.providerName} · {latestDraft.modelName || "model seçilmedi"} · Güven skoru{" "}
             {formatConfidence(latestDraft.confidenceScore)}
           </small>
@@ -306,11 +312,14 @@ type AiDraftView = {
   findings: string
   impression: string
   jobStatus: string
+  jobId: string
   modelName: string | null
   providerName: string
 }
 
 type AiJobView = {
+  completedAt: string | null
+  createdAt: string
   errorMessage: string | null
   modelName: string | null
   providerName: string
@@ -399,6 +408,7 @@ async function loadAiViewerState(
       findings: latestDraft.findings,
       impression: latestDraft.impression,
       jobStatus: job?.status ?? "draft_ready",
+      jobId: latestDraft.job_id,
       modelName: job?.model_name ?? null,
       providerName: provider?.name ?? job?.provider_slug ?? "AI",
     },
@@ -413,7 +423,9 @@ async function loadLatestAiJob(
 ): Promise<AiJobView | null> {
   const { data: job, error } = await supabase
     .from("ai_jobs")
-    .select("status, provider_slug, model_name, error_message, created_at, ai_service_providers(name)")
+    .select(
+      "status, provider_slug, model_name, error_message, created_at, completed_at, ai_service_providers(name)"
+    )
     .eq("organization_id", organizationId)
     .eq("study_id", studyId)
     .order("created_at", { ascending: false })
@@ -432,6 +444,8 @@ async function loadLatestAiJob(
     : job.ai_service_providers
 
   return {
+    completedAt: job.completed_at ?? null,
+    createdAt: job.created_at,
     errorMessage: job.error_message,
     modelName: job.model_name ?? null,
     providerName: provider?.name ?? job.provider_slug ?? "AI",

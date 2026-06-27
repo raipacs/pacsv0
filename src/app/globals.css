@@ -701,7 +701,9 @@ body:has(.rai-viewer-page) .app-header {
   display: inline-flex;
   min-width: 0;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
+  max-width: min(520px, 48vw);
 }
 
 .ai-launch-control select {
@@ -721,6 +723,32 @@ body:has(.rai-viewer-page) .app-header {
 .ai-launch-button:disabled {
   cursor: not-allowed;
   opacity: 0.56;
+}
+
+.ai-launch-button {
+  min-width: 48px;
+}
+
+.ai-launch-button:disabled {
+  min-width: 116px;
+}
+
+.ai-launch-status {
+  display: block;
+  flex: 1 1 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  color: #93c5fd;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-launch-status.is-running {
+  color: #67e8f9;
 }
 
 .ai-job-alert {
