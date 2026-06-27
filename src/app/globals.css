@@ -613,7 +613,7 @@ p {
   display: grid;
   height: 100dvh;
   overflow: hidden;
-  grid-template-rows: auto auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   background: #030712;
 }
 
@@ -723,70 +723,8 @@ body:has(.rai-viewer-page) .app-header {
   opacity: 0.56;
 }
 
-.ai-draft-strip {
-  grid-row: 2;
-  display: grid;
-  grid-template-columns: minmax(170px, 0.4fr) minmax(0, 1fr) minmax(180px, 0.34fr);
-  max-height: 132px;
-  min-height: 0;
-  gap: 12px;
-  overflow: auto;
-  border-bottom: 1px solid #123366;
-  padding: 10px clamp(10px, 1.5vw, 18px);
-  color: #dbeafe;
-  background: #08142e;
-}
-
-.ai-draft-strip > div:first-child {
-  display: grid;
-  align-content: start;
-  gap: 5px;
-}
-
-.ai-draft-strip strong,
-.ai-draft-strip small {
-  display: block;
-}
-
-.ai-draft-strip small,
-.ai-draft-strip p {
-  color: #93c5fd;
-  font-size: 12px;
-  line-height: 1.35;
-}
-
-.ai-draft-strip dl {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin: 0;
-}
-
-.ai-draft-strip dt {
-  color: #67e8f9;
-  font-size: 11px;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.ai-draft-strip dd {
-  display: -webkit-box;
-  margin: 4px 0 0;
-  overflow: hidden;
-  color: #e2e8f0;
-  font-size: 12px;
-  line-height: 1.35;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-
-.ai-draft-strip p {
-  margin: 0;
-  align-self: center;
-}
-
 .ai-job-alert {
-  grid-row: 3;
+  grid-row: 2;
   display: flex;
   min-height: 38px;
   align-items: center;
@@ -819,7 +757,7 @@ body:has(.rai-viewer-page) .app-header {
 }
 
 .report-editor-strip {
-  grid-row: 4;
+  grid-row: 3;
   max-height: 236px;
   min-height: 0;
   overflow: auto;
@@ -855,6 +793,23 @@ body:has(.rai-viewer-page) .app-header {
 
 .report-editor-strip > summary strong {
   font-size: 13px;
+}
+
+.report-editor-strip > summary small {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  color: #93c5fd;
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-editor-strip > summary .health-badge {
+  flex: 0 0 auto;
 }
 
 .report-editor-form {
@@ -911,7 +866,7 @@ body:has(.rai-viewer-page) .app-header {
 }
 
 .rai-viewer-page > .rai-dicom-viewer {
-  grid-row: 5;
+  grid-row: 4;
 }
 
 .external-share-page {
@@ -3036,14 +2991,6 @@ td span {
   .ai-launch-control select {
     max-width: none;
     flex: 1;
-  }
-
-  .ai-draft-strip {
-    grid-template-columns: 1fr;
-  }
-
-  .ai-draft-strip dl {
-    grid-template-columns: 1fr;
   }
 
   .report-editor-form {

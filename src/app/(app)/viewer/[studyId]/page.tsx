@@ -164,31 +164,6 @@ export default async function RaiViewerPage({
           <ExternalShareButton studyId={studyId} />
         </nav>
       </header>
-      {aiViewerState.latestDraft ? (
-        <section className="ai-draft-strip" aria-label="AI ön rapor">
-          <div>
-            <span className="health-badge ok">
-              {aiJobStatusLabel(aiViewerState.latestDraft.jobStatus)}
-            </span>
-            <strong>{aiViewerState.latestDraft.providerName}</strong>
-            <small>
-              {aiViewerState.latestDraft.modelName || "model seçilmedi"} · Güven skoru{" "}
-              {formatConfidence(aiViewerState.latestDraft.confidenceScore)}
-            </small>
-          </div>
-          <dl>
-            <div>
-              <dt>Bulgular</dt>
-              <dd>{aiViewerState.latestDraft.findings}</dd>
-            </div>
-            <div>
-              <dt>İzlenim</dt>
-              <dd>{aiViewerState.latestDraft.impression}</dd>
-            </div>
-          </dl>
-          <p>AI ön değerlendirmedir. Nihai rapor yetkili hekim düzenlemesi ve onayıyla oluşur.</p>
-        </section>
-      ) : null}
       {aiViewerState.latestJob?.status === "failed" ? (
         <section className="ai-job-alert" aria-label="AI son çalışma durumu">
           <strong>{aiViewerState.latestJob.providerName}</strong>
@@ -264,6 +239,13 @@ function ReportEditorPanel({
               ? "AI ön rapordan taslak"
               : "Manuel rapor"}
         </strong>
+        {latestDraft ? (
+          <small>
+            <span className="health-badge ok">{aiJobStatusLabel(latestDraft.jobStatus)}</span>
+            {latestDraft.providerName} · {latestDraft.modelName || "model seçilmedi"} · Güven skoru{" "}
+            {formatConfidence(latestDraft.confidenceScore)}
+          </small>
+        ) : null}
       </summary>
       <form className="report-editor-form">
         <input name="studyId" type="hidden" value={studyId} />
