@@ -613,7 +613,7 @@ p {
   display: grid;
   height: 100dvh;
   overflow: hidden;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   background: #030712;
 }
 
@@ -725,7 +725,10 @@ body:has(.rai-viewer-page) .app-header {
 .ai-draft-strip {
   display: grid;
   grid-template-columns: minmax(170px, 0.4fr) minmax(0, 1fr) minmax(180px, 0.34fr);
+  max-height: 132px;
+  min-height: 0;
   gap: 12px;
+  overflow: auto;
   border-bottom: 1px solid #123366;
   padding: 10px clamp(10px, 1.5vw, 18px);
   color: #dbeafe;
@@ -781,12 +784,18 @@ body:has(.rai-viewer-page) .app-header {
 }
 
 .report-editor-strip {
+  max-height: 236px;
+  min-height: 0;
+  overflow: auto;
   border-bottom: 1px solid #123366;
   color: #dbeafe;
   background: #071225;
 }
 
 .report-editor-strip > summary {
+  position: sticky;
+  top: 0;
+  z-index: 3;
   display: flex;
   min-height: 38px;
   cursor: pointer;
@@ -794,6 +803,7 @@ body:has(.rai-viewer-page) .app-header {
   align-items: center;
   gap: 10px;
   padding: 8px clamp(10px, 1.5vw, 18px);
+  background: #071225;
 }
 
 .report-editor-strip > summary::-webkit-details-marker {
@@ -829,6 +839,7 @@ body:has(.rai-viewer-page) .app-header {
 .report-editor-form textarea {
   width: 100%;
   min-height: 92px;
+  max-height: 128px;
   border: 1px solid #24446f;
   border-radius: 8px;
   padding: 10px;
@@ -838,7 +849,7 @@ body:has(.rai-viewer-page) .app-header {
   font-size: 12px;
   line-height: 1.45;
   outline: none;
-  resize: vertical;
+  resize: none;
 }
 
 .report-editor-form textarea:focus {
