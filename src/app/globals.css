@@ -613,7 +613,7 @@ p {
   display: grid;
   height: 100dvh;
   overflow: hidden;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
   background: #030712;
 }
 
@@ -631,6 +631,7 @@ body:has(.rai-viewer-page) .app-header {
 }
 
 .rai-viewer-bar {
+  grid-row: 1;
   display: flex;
   min-width: 0;
   align-items: center;
@@ -723,6 +724,7 @@ body:has(.rai-viewer-page) .app-header {
 }
 
 .ai-draft-strip {
+  grid-row: 2;
   display: grid;
   grid-template-columns: minmax(170px, 0.4fr) minmax(0, 1fr) minmax(180px, 0.34fr);
   max-height: 132px;
@@ -783,7 +785,41 @@ body:has(.rai-viewer-page) .app-header {
   align-self: center;
 }
 
+.ai-job-alert {
+  grid-row: 3;
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  border-bottom: 1px solid #7c2d12;
+  padding: 8px clamp(10px, 1.5vw, 18px);
+  color: #fed7aa;
+  background: #2b1007;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ai-job-alert strong,
+.ai-job-alert span,
+.ai-job-alert small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-job-alert strong {
+  color: #ffedd5;
+}
+
+.ai-job-alert small {
+  min-width: 0;
+  color: #fdba74;
+  font-weight: 700;
+}
+
 .report-editor-strip {
+  grid-row: 4;
   max-height: 236px;
   min-height: 0;
   overflow: auto;
@@ -872,6 +908,10 @@ body:has(.rai-viewer-page) .app-header {
   color: #93c5fd;
   font-size: 12px;
   line-height: 1.35;
+}
+
+.rai-viewer-page > .rai-dicom-viewer {
+  grid-row: 5;
 }
 
 .external-share-page {

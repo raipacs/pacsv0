@@ -189,6 +189,15 @@ export default async function RaiViewerPage({
           <p>AI ön değerlendirmedir. Nihai rapor yetkili hekim düzenlemesi ve onayıyla oluşur.</p>
         </section>
       ) : null}
+      {aiViewerState.latestJob?.status === "failed" ? (
+        <section className="ai-job-alert" aria-label="AI son çalışma durumu">
+          <strong>{aiViewerState.latestJob.providerName}</strong>
+          <span>
+            {aiViewerState.latestJob.modelName || "model seçilmedi"} · Ön rapor üretimi başarısız.
+          </span>
+          <small>{aiViewerState.latestJob.errorMessage || "AI sağlayıcı hatası kaydedildi."}</small>
+        </section>
+      ) : null}
       <ReportEditorPanel
         latestDraft={aiViewerState.latestDraft}
         report={latestReport}
@@ -319,11 +328,19 @@ type AiDraftView = {
   providerName: string
 }
 
+type AiJobView = {
+  errorMessage: string | null
+  modelName: string | null
+  providerName: string
+  status: string
+}
+
 async function loadAiViewerState(
   supabase: Awaited<ReturnType<typeof createClient>>,
   organizationId: string,
   studyId: string
 ): Promise<{
+  latestJob: AiJobView | null
   latestDraft: AiDraftView | null
   providers: AiProviderOption[]
   unavailableReason?: string
@@ -338,6 +355,7 @@ async function loadAiViewerState(
   if (providersError) {
     if (isMissingAiTableError(providersError)) {
       return {
+        latestJob: null,
         latestDraft: null,
         providers: [],
         unavailableReason: "AI tabloları Supabase üzerinde hazır değil.",
@@ -359,6 +377,7 @@ async function loadAiViewerState(
   if (draftError) {
     if (isMissingAiTableError(draftError)) {
       return {
+        latestJob: null,
         latestDraft: null,
         providers: mapAiProviders(providers ?? []),
         unavailableReason: "AI tabloları Supabase üzerinde hazır değil.",
@@ -368,8 +387,11 @@ async function loadAiViewerState(
     throw new Error(`AI ön raporu alınamadı: ${draftError.message}`)
   }
 
+  const latestJob = await loadLatestAiJob(supabase, organizationId, studyId)
+
   if (!latestDraft) {
     return {
+      latestJob,
       latestDraft: null,
       providers: mapAiProviders(providers ?? []),
     }
@@ -389,6 +411,7 @@ async function loadAiViewerState(
     : job?.ai_service_providers
 
   return {
+    latestJob,
     latestDraft: {
       confidenceScore: latestDraft.confidence_score,
       findings: latestDraft.findings,
@@ -398,6 +421,39 @@ async function loadAiViewerState(
       providerName: provider?.name ?? job?.provider_slug ?? "AI",
     },
     providers: mapAiProviders(providers ?? []),
+  }
+}
+
+async function loadLatestAiJob(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  studyId: string
+): Promise<AiJobView | null> {
+  const { data: job, error } = await supabase
+    .from("ai_jobs")
+    .select("status, provider_slug, model_name, error_message, created_at, ai_service_providers(name)")
+    .eq("organization_id", organizationId)
+    .eq("study_id", studyId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    if (isMissingAiTableError(error)) return null
+    throw new Error(`Son AI iş bilgisi alınamadı: ${error.message}`)
+  }
+
+  if (!job) return null
+
+  const provider = Array.isArray(job.ai_service_providers)
+    ? job.ai_service_providers[0]
+    : job.ai_service_providers
+
+  return {
+    errorMessage: job.error_message,
+    modelName: job.model_name ?? null,
+    providerName: provider?.name ?? job.provider_slug ?? "AI",
+    status: job.status,
   }
 }
 

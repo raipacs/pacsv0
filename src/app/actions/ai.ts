@@ -272,7 +272,6 @@ export async function startAiPreReport(formData: FormData) {
         })
         .eq("id", job.id)
         .eq("organization_id", user.organizationId)
-      throw error
     }
   }
 
@@ -357,7 +356,6 @@ export async function startAiPreReport(formData: FormData) {
         })
         .eq("id", job.id)
         .eq("organization_id", user.organizationId)
-      throw error
     }
   }
 
@@ -442,7 +440,6 @@ export async function startAiPreReport(formData: FormData) {
         })
         .eq("id", job.id)
         .eq("organization_id", user.organizationId)
-      throw error
     }
   }
 
