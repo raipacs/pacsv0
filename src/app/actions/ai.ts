@@ -834,19 +834,94 @@ function parseOpenAiDraftJson(text: string) {
     .replace(/^```(?:json)?/i, "")
     .replace(/```$/, "")
     .trim()
-  const parsed = JSON.parse(cleanText) as Partial<OpenAiDraft>
+  let parsed: Partial<OpenAiDraft>
+  try {
+    parsed = JSON.parse(cleanText) as Partial<OpenAiDraft>
+  } catch (error) {
+    const recovered = recoverDraftFromLooseJson(cleanText)
+    if (recovered) return recovered
+    throw error
+  }
+
+  return normalizeDraftJson(parsed)
+}
+
+function normalizeDraftJson(parsed: Partial<OpenAiDraft>) {
   const criticality = ["none", "low", "medium", "high"].includes(String(parsed.criticality))
     ? (parsed.criticality as OpenAiDraft["criticality"])
     : "none"
 
   return {
-    findings: String(parsed.findings ?? "").trim() || "OpenAI bulgu taslağı boş döndü.",
-    impression: String(parsed.impression ?? "").trim() || "OpenAI sonuç taslağı boş döndü.",
+    findings: String(parsed.findings ?? "").trim() || "AI bulgu taslağı boş döndü.",
+    impression: String(parsed.impression ?? "").trim() || "AI sonuç taslağı boş döndü.",
     recommendations: String(parsed.recommendations ?? "").trim(),
     confidenceScore:
       typeof parsed.confidenceScore === "number"
         ? Math.min(1, Math.max(0, parsed.confidenceScore))
         : 0.5,
     criticality,
+  }
+}
+
+function recoverDraftFromLooseJson(text: string) {
+  const findings = extractLooseJsonString(text, "findings")
+  const impression = extractLooseJsonString(text, "impression")
+  const recommendations = extractLooseJsonString(text, "recommendations")
+  const criticality = extractLooseJsonString(text, "criticality")
+  const confidenceMatch = text.match(/"confidenceScore"\s*:\s*([0-9.]+)/)
+  const confidenceScore = confidenceMatch ? Number(confidenceMatch[1]) : 0.25
+
+  if (!findings && !impression) return null
+
+  return normalizeDraftJson({
+    criticality: criticality as OpenAiDraft["criticality"],
+    confidenceScore: Number.isFinite(confidenceScore) ? confidenceScore : 0.25,
+    findings:
+      findings ||
+      "AI sağlayıcısı bulgular alanını eksik döndürdü; yanıt kısmi olarak kurtarıldı.",
+    impression:
+      impression ||
+      "AI sağlayıcısı izlenim alanını eksik döndürdü; bu taslak düşük güven skoru ile kontrol edilmelidir.",
+    recommendations:
+      recommendations ||
+      "Yanıt formatı eksik geldiği için hekim kontrolü ve gerekirse yeniden AI çalıştırma önerilir.",
+  })
+}
+
+function extractLooseJsonString(text: string, field: string) {
+  const fieldIndex = text.indexOf(`"${field}"`)
+  if (fieldIndex === -1) return ""
+
+  const colonIndex = text.indexOf(":", fieldIndex)
+  if (colonIndex === -1) return ""
+
+  const firstQuoteIndex = text.indexOf('"', colonIndex + 1)
+  if (firstQuoteIndex === -1) return ""
+
+  let value = ""
+  let escaped = false
+  for (let index = firstQuoteIndex + 1; index < text.length; index += 1) {
+    const char = text[index]
+    if (escaped) {
+      value += `\\${char}`
+      escaped = false
+      continue
+    }
+    if (char === "\\") {
+      escaped = true
+      continue
+    }
+    if (char === '"') break
+    value += char
+  }
+
+  return decodeLooseJsonString(value).trim()
+}
+
+function decodeLooseJsonString(value: string) {
+  try {
+    return JSON.parse(`"${value.replace(/"/g, '\\"')}"`) as string
+  } catch {
+    return value.replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\")
   }
 }
