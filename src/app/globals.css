@@ -544,10 +544,15 @@ p {
 }
 
 .collapsible-panel > summary.panel-heading {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   user-select: none;
+}
+
+.collapsible-panel > summary.panel-heading > div {
+  min-width: 0;
 }
 
 .collapsible-panel > summary.panel-heading h2 {
