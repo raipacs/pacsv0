@@ -254,6 +254,16 @@ export async function updateMemberAccess(formData: FormData) {
 
   if (error) throw new Error(`Kullanıcı erişimi güncellenemedi: ${error.message}`)
 
+  if (branchId) {
+    await grantMemberBranchAccess({
+      branchId,
+      grantedBy: user.id,
+      memberUserId,
+      organizationId: user.organizationId,
+      supabase,
+    })
+  }
+
   await supabase.from("audit_logs").insert({
     organization_id: user.organizationId,
     actor_id: user.id,
@@ -261,6 +271,86 @@ export async function updateMemberAccess(formData: FormData) {
     resource_type: "organization_member",
     resource_id: memberUserId,
     metadata: { fullName, role, branchId, isActive },
+  })
+
+  revalidatePath("/admin/users")
+  redirect("/admin/users")
+}
+
+export async function updateMemberBranchAccess(formData: FormData) {
+  const user = await requireAdmin()
+  if (!isSupabaseConfigured) redirect("/admin/users")
+
+  const memberUserId = idSchema.parse(formData.get("memberUserId"))
+  const requestedBranchIds = formData
+    .getAll("branchIds")
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean)
+    .map((value) => idSchema.parse(value))
+  const supabase = await createClient()
+
+  const { data: member, error: memberError } = await supabase
+    .from("organization_members")
+    .select("branch_id")
+    .eq("organization_id", user.organizationId)
+    .eq("user_id", memberUserId)
+    .maybeSingle()
+
+  if (memberError) throw new Error(`Kullanıcı üyeliği alınamadı: ${memberError.message}`)
+  if (!member) throw new Error("Kullanıcı üyeliği bulunamadı.")
+
+  const branchIds = new Set(requestedBranchIds)
+  if (member.branch_id) branchIds.add(member.branch_id)
+
+  if (!branchIds.size) {
+    throw new Error("En az bir şube yetkisi seçilmeli.")
+  }
+
+  const { data: branches, error: branchesError } = await supabase
+    .from("branches")
+    .select("id")
+    .eq("organization_id", user.organizationId)
+    .in("id", [...branchIds])
+
+  if (branchesError) throw new Error(`Şubeler doğrulanamadı: ${branchesError.message}`)
+  if ((branches ?? []).length !== branchIds.size) {
+    throw new Error("Seçilen şubelerden biri bu kuruma ait değil.")
+  }
+
+  const { error: deactivateError } = await supabase
+    .from("organization_member_branches")
+    .update({ is_active: false })
+    .eq("organization_id", user.organizationId)
+    .eq("user_id", memberUserId)
+
+  if (deactivateError) {
+    if (isMissingBranchAccessTableError(deactivateError)) {
+      throw new Error("Şube yetki tablosu henüz Supabase üzerinde uygulanmamış.")
+    }
+
+    throw new Error(`Mevcut şube yetkileri güncellenemedi: ${deactivateError.message}`)
+  }
+
+  const { error: upsertError } = await supabase.from("organization_member_branches").upsert(
+    [...branchIds].map((branchId) => ({
+      branch_id: branchId,
+      granted_by: user.id,
+      is_active: true,
+      organization_id: user.organizationId,
+      user_id: memberUserId,
+    })),
+    { onConflict: "organization_id,user_id,branch_id" }
+  )
+
+  if (upsertError) throw new Error(`Şube yetkileri kaydedilemedi: ${upsertError.message}`)
+
+  await supabase.from("audit_logs").insert({
+    organization_id: user.organizationId,
+    actor_id: user.id,
+    action: "member.branch_access_updated",
+    resource_type: "organization_member",
+    resource_id: memberUserId,
+    metadata: { branchIds: [...branchIds] },
   })
 
   revalidatePath("/admin/users")
@@ -854,4 +944,41 @@ async function removeStorageObjects(instances: StorageObjectRef[]) {
     const { error } = await supabase.storage.from(bucket).remove(uniquePaths)
     if (error) throw new Error(`Storage temizlenemedi: ${error.message}`)
   }
+}
+
+async function grantMemberBranchAccess({
+  branchId,
+  grantedBy,
+  memberUserId,
+  organizationId,
+  supabase,
+}: {
+  branchId: string
+  grantedBy: string
+  memberUserId: string
+  organizationId: string
+  supabase: Awaited<ReturnType<typeof createClient>>
+}) {
+  const { error } = await supabase.from("organization_member_branches").upsert(
+    {
+      branch_id: branchId,
+      granted_by: grantedBy,
+      is_active: true,
+      organization_id: organizationId,
+      user_id: memberUserId,
+    },
+    { onConflict: "organization_id,user_id,branch_id" }
+  )
+
+  if (error && !isMissingBranchAccessTableError(error)) {
+    throw new Error(`Varsayılan şube yetkisi kaydedilemedi: ${error.message}`)
+  }
+}
+
+function isMissingBranchAccessTableError(error: { code?: string; message?: string } | null) {
+  if (!error) return false
+  return (
+    error.code === "42P01" ||
+    /organization_member_branches|schema cache|does not exist|relation/i.test(error.message ?? "")
+  )
 }

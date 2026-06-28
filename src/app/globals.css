@@ -2060,6 +2060,25 @@ td span {
   vertical-align: top;
 }
 
+.branch-access-form {
+  display: grid;
+  min-width: 180px;
+  gap: 6px;
+}
+
+.branch-access-form .checkbox-line {
+  min-height: 26px;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.branch-access-form small {
+  color: var(--warning);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .admin-user-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);

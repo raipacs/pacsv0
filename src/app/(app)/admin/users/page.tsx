@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import {
   createAccessGroup,
+  updateMemberBranchAccess,
   updateGroupMembership,
   updateGroupPermission,
   updateMemberAccess,
@@ -22,7 +23,12 @@ type MemberRow = {
 type BranchRow = {
   id: string
   name: string
-  is_default: boolean | null
+  is_main: boolean | null
+}
+type BranchAccessRow = {
+  branch_id: string
+  user_id: string
+  is_active: boolean | null
 }
 type GroupRow = {
   id: string
@@ -90,8 +96,14 @@ export default async function UsersPage() {
   const admin = await requireAdmin()
   const supabase = await createClient()
 
-  const [membersResult, branchesResult, groupsResult, groupMembersResult, permissionsResult] =
-    await Promise.all([
+  const [
+    membersResult,
+    branchesResult,
+    branchAccessResult,
+    groupsResult,
+    groupMembersResult,
+    permissionsResult,
+  ] = await Promise.all([
       supabase
         .from("organization_members")
         .select("user_id, role, is_active, branch_id, profiles(full_name)")
@@ -99,10 +111,15 @@ export default async function UsersPage() {
         .order("role", { ascending: true }),
       supabase
         .from("branches")
-        .select("id, name, is_default")
+        .select("id, name, is_main")
         .eq("organization_id", admin.organizationId)
-        .order("is_default", { ascending: false })
+        .order("is_main", { ascending: false })
         .order("name", { ascending: true }),
+      supabase
+        .from("organization_member_branches")
+        .select("user_id, branch_id, is_active")
+        .eq("organization_id", admin.organizationId)
+        .eq("is_active", true),
       supabase
         .from("access_groups")
         .select("id, name, slug, description")
@@ -123,10 +140,26 @@ export default async function UsersPage() {
     memberName(a, admin).localeCompare(memberName(b, admin), "tr")
   )
   const branches = (branchesResult.data ?? []) as BranchRow[]
+  const branchAccessRows = isMissingBranchAccessTableError(branchAccessResult.error)
+    ? []
+    : ((branchAccessResult.data ?? []) as BranchAccessRow[])
   const groups = (groupsResult.data ?? []) as GroupRow[]
   const groupMembers = (groupMembersResult.data ?? []) as GroupMemberRow[]
   const permissions = (permissionsResult.data ?? []) as PermissionRow[]
   const branchById = new Map(branches.map((branch) => [branch.id, branch]))
+  const branchAccessByUser = branchAccessRows.reduce<Map<string, Set<string>>>((acc, row) => {
+    const values = acc.get(row.user_id) ?? new Set<string>()
+    values.add(row.branch_id)
+    acc.set(row.user_id, values)
+    return acc
+  }, new Map())
+  members.forEach((member) => {
+    if (!member.branch_id) return
+    const values = branchAccessByUser.get(member.user_id) ?? new Set<string>()
+    values.add(member.branch_id)
+    branchAccessByUser.set(member.user_id, values)
+  })
+  const branchAccessReady = !branchAccessResult.error
   const groupById = new Map(groups.map((group) => [group.id, group]))
   const groupsByUser = groupMembers.reduce<Map<string, GroupRow[]>>((acc, row) => {
     const group = groupById.get(row.group_id)
@@ -197,9 +230,10 @@ export default async function UsersPage() {
             <thead>
               <tr>
                 <th>Kullanıcı</th>
-                <th>Rol ve şube</th>
+                <th>Rol ve varsayılan şube</th>
                 <th>Gruplar</th>
                 <th>Sorumluluk</th>
+                <th>Şube yetkileri</th>
                 <th>Durum</th>
                 <th>Güncelle</th>
               </tr>
@@ -208,6 +242,7 @@ export default async function UsersPage() {
               {members.map((member) => {
                 const userGroups = groupsByUser.get(member.user_id) ?? []
                 const branch = member.branch_id ? branchById.get(member.branch_id) : null
+                const userBranchAccess = branchAccessByUser.get(member.user_id) ?? new Set<string>()
                 const availableGroups = groups.filter(
                   (group) => !userGroups.some((item) => item.id === group.id)
                 )
@@ -238,9 +273,11 @@ export default async function UsersPage() {
                           </select>
                         </label>
                         <label>
-                          Şube
-                          <select name="branchId" defaultValue={member.branch_id ?? ""}>
-                            <option value="">Tüm şubeler</option>
+                          Varsayılan şube
+                          <select name="branchId" defaultValue={member.branch_id ?? ""} required>
+                            <option value="" disabled>
+                              Şube seç
+                            </option>
                             {branches.map((item) => (
                               <option key={item.id} value={item.id}>
                                 {item.name}
@@ -260,7 +297,7 @@ export default async function UsersPage() {
                           Kaydet
                         </button>
                       </form>
-                      <small>{branch?.name ?? "Şube kısıtı yok"}</small>
+                      <small>{branch?.name ?? "Varsayılan şube seçilmemiş"}</small>
                     </td>
                     <td>
                       <div className="chip-list">
@@ -276,6 +313,30 @@ export default async function UsersPage() {
                       </div>
                     </td>
                     <td>{responsibilityText(member.role, userGroups)}</td>
+                    <td>
+                      <form action={updateMemberBranchAccess} className="branch-access-form">
+                        <input name="memberUserId" type="hidden" value={member.user_id} />
+                        {branches.map((item) => (
+                          <label className="checkbox-line" key={item.id}>
+                            <input
+                              defaultChecked={userBranchAccess.has(item.id)}
+                              disabled={!branchAccessReady}
+                              name="branchIds"
+                              type="checkbox"
+                              value={item.id}
+                            />
+                            {item.name}
+                            {item.is_main ? " (Merkez)" : ""}
+                          </label>
+                        ))}
+                        <button className="button subtle" disabled={!branchAccessReady} type="submit">
+                          Şubeleri kaydet
+                        </button>
+                        {!branchAccessReady ? (
+                          <small>Şube yetki migration&apos;ı bekleniyor.</small>
+                        ) : null}
+                      </form>
+                    </td>
                     <td>
                       <span
                         className={`health-badge ${member.is_active === false ? "warning" : "ok"}`}
@@ -513,4 +574,12 @@ function responsibilityText(role: string, groups: GroupRow[]) {
   if (slugs.includes("doctors")) return "Worklist, viewer, raporlama ve klinik okuma"
   if (slugs.includes("technicians")) return "DICOM import, modalite aktarımı ve çekim takibi"
   return "Temel RIS/PACS erişimi"
+}
+
+function isMissingBranchAccessTableError(error: { code?: string; message?: string } | null) {
+  if (!error) return false
+  return (
+    error.code === "42P01" ||
+    /organization_member_branches|schema cache|does not exist|relation/i.test(error.message ?? "")
+  )
 }

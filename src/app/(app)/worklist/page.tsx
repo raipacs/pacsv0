@@ -17,7 +17,8 @@ export default async function WorklistPage({ searchParams }: WorklistPageProps) 
   const params = (await searchParams) ?? {}
   const { branches, selectedBranch } = await resolveSelectedBranch(
     user.organizationId,
-    params.branch
+    params.branch,
+    user
   )
   const studies = await getWorklist(user.organizationId, selectedBranch?.id)
   const urgent = studies.filter((study) => study.priority === "Acil").length

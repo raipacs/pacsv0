@@ -1,5 +1,6 @@
 import { isSupabaseConfigured } from "@/lib/config"
 import { createClient } from "@/lib/supabase/server"
+import type { CurrentUser } from "@/lib/auth"
 
 export type BranchSummary = {
   id: string
@@ -153,18 +154,79 @@ export async function getBranchOptions(organizationId: string): Promise<BranchOp
   }))
 }
 
+export async function getAuthorizedBranchOptions({
+  organizationId,
+  user,
+}: {
+  organizationId: string
+  user?: Pick<CurrentUser, "defaultBranchId" | "id" | "role"> | null
+}): Promise<BranchOption[]> {
+  const branches = await getBranchOptions(organizationId)
+  if (!isSupabaseConfigured || !user || user.role === "admin" || !branches.length) {
+    return orderBranchesByDefault(branches, user?.defaultBranchId ?? null)
+  }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("organization_member_branches")
+    .select("branch_id")
+    .eq("organization_id", organizationId)
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+
+  if (error) {
+    if (isMissingBranchAccessTableError(error)) {
+      return orderBranchesByDefault(branches, user.defaultBranchId)
+    }
+
+    return user.defaultBranchId
+      ? branches.filter((branch) => branch.id === user.defaultBranchId)
+      : []
+  }
+
+  const allowedBranchIds = new Set((data ?? []).map((row) => String(row.branch_id)))
+  if (user.defaultBranchId) allowedBranchIds.add(user.defaultBranchId)
+
+  const authorizedBranches = branches.filter((branch) => allowedBranchIds.has(branch.id))
+  return orderBranchesByDefault(
+    authorizedBranches.length ? authorizedBranches : branches.filter((branch) => branch.id === user.defaultBranchId),
+    user.defaultBranchId
+  )
+}
+
 export async function resolveSelectedBranch(
   organizationId: string,
-  requestedSlug?: string
+  requestedSlug?: string,
+  user?: Pick<CurrentUser, "defaultBranchId" | "id" | "role"> | null
 ) {
-  const branches = await getBranchOptions(organizationId)
+  const branches = await getAuthorizedBranchOptions({ organizationId, user })
   const normalizedSlug = requestedSlug?.trim().toLowerCase()
   const selectedBranch =
     branches.find((branch) => branch.slug === normalizedSlug) ??
+    branches.find((branch) => branch.id === user?.defaultBranchId) ??
     branches.find((branch) => branch.isMain) ??
     branches.find((branch) => branch.slug === "merkez") ??
     branches[0] ??
     null
 
   return { branches, selectedBranch }
+}
+
+function orderBranchesByDefault(branches: BranchOption[], defaultBranchId: string | null) {
+  if (!defaultBranchId) return branches
+
+  return [...branches].sort((left, right) => {
+    if (left.id === defaultBranchId) return -1
+    if (right.id === defaultBranchId) return 1
+    if (left.isMain && !right.isMain) return -1
+    if (!left.isMain && right.isMain) return 1
+    return left.name.localeCompare(right.name, "tr")
+  })
+}
+
+function isMissingBranchAccessTableError(error: { code?: string; message?: string }) {
+  return (
+    error.code === "42P01" ||
+    /organization_member_branches|schema cache|does not exist|relation/i.test(error.message ?? "")
+  )
 }

@@ -18,7 +18,8 @@ export default async function PatientsPage({ searchParams }: PatientsPageProps) 
   const params = (await searchParams) ?? {}
   const { branches, selectedBranch } = await resolveSelectedBranch(
     user.organizationId,
-    params.branch
+    params.branch,
+    user
   )
   const patients = await getPatients(user.organizationId, selectedBranch?.id)
   const canCreatePatient = await canManagePatients(user, "insert")

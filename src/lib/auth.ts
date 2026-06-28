@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import type { AppRole } from "@/lib/types"
 
 export type CurrentUser = {
+  defaultBranchId: string | null
   id: string
   email: string
   fullName: string
@@ -15,6 +16,7 @@ export type CurrentUser = {
 }
 
 const demoUser: CurrentUser = {
+  defaultBranchId: "demo-branch",
   id: "demo-admin",
   email: "admin@raipacs.com",
   fullName: "RAI PACS Admin",
@@ -35,7 +37,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   const { data: membership } = await supabase
     .from("organization_members")
     .select(
-      "role, organization_id, profiles(full_name), organizations(name)"
+      "role, organization_id, branch_id, profiles(full_name), organizations(name)"
     )
     .eq("user_id", userId)
     .eq("is_active", true)
@@ -53,6 +55,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
   return {
     id: userId,
+    defaultBranchId: membership.branch_id ?? null,
     email: String(data.claims.email ?? ""),
     fullName: profile?.full_name ?? String(data.claims.email ?? "Kullanıcı"),
     role: membership.role as AppRole,

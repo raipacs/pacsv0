@@ -34,7 +34,8 @@ export default async function DicomServerAdminPage({
   const params = (await searchParams) ?? {}
   const { branches, selectedBranch } = await resolveSelectedBranch(
     user.organizationId,
-    params.branch
+    params.branch,
+    user
   )
   const currentReturnTo = params.branch
     ? `/admin/dicom-server?branch=${encodeURIComponent(params.branch)}`

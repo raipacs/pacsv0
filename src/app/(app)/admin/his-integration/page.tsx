@@ -2,7 +2,7 @@ import Link from "next/link"
 
 import { createHisIntegration, testHisIntegration } from "@/app/actions/admin"
 import { requireAdmin } from "@/lib/auth"
-import { getBranchOptions } from "@/lib/branches"
+import { getAuthorizedBranchOptions } from "@/lib/branches"
 import {
   authTypeLabel,
   directionLabel,
@@ -58,7 +58,7 @@ const messageTypePresets = [
 export default async function HisIntegrationPage() {
   const user = await requireAdmin()
   const [branches, integrations, events] = await Promise.all([
-    getBranchOptions(user.organizationId),
+    getAuthorizedBranchOptions({ organizationId: user.organizationId, user }),
     getHisIntegrations(user.organizationId),
     getHisIntegrationEvents(user.organizationId),
   ])
