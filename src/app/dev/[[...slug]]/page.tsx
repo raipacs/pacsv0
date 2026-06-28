@@ -26,7 +26,7 @@ const guideCards = [
   },
   {
     title: "AI Raporlama",
-    text: "OpenAI, Claude, Gemini ve MedGemma adaptorlari ayni AI job ve draft rapor modelinde toplanir.",
+    text: "OpenAI, Claude, Gemini, MedGemma ve RAI LLM adaptorlari ayni AI job ve draft rapor modelinde toplanir.",
     href: "#ai",
   },
 ]
@@ -105,7 +105,7 @@ const searchItems = [
   {
     category: "AI",
     title: "AI servisleri ve on rapor akisi",
-    text: "OpenAI, Claude, Gemini, MedGemma, RaDialog, token ve maliyet izleme.",
+    text: "OpenAI, Claude, Gemini, MedGemma, RAI LLM, RaDialog, token ve maliyet izleme.",
     href: "#ai",
   },
   {
@@ -129,6 +129,16 @@ const searchItems = [
 ]
 
 const changelog = [
+  {
+    date: "2026-06-28",
+    version: "0.2.0-dev.8",
+    title: "RAI LLM self-hosted model hatti baslatildi",
+    items: [
+      "RAI LLM provider seed'i ve RAI_LLM_ENDPOINT entegrasyonu eklendi.",
+      "Qwen/Qwen2.5-VL-7B-Instruct tabanli OpenAI-compatible inference servisi hazirlandi.",
+      "RAI LLM modeli ileride RAI radyoloji veri setleriyle fine-tune edilebilir hat olarak konumlandi.",
+    ],
+  },
   {
     date: "2026-06-28",
     version: "0.2.0-dev.7",
@@ -406,6 +416,7 @@ export default function DevDocsPage() {
               <article>Claude</article>
               <article>Gemini</article>
               <article>MedGemma endpoint</article>
+              <article>RAI LLM self-hosted</article>
               <article>RaDialog preset</article>
             </div>
             <p>

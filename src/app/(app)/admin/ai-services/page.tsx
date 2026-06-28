@@ -629,6 +629,7 @@ function summarizeUsage(rows: AiUsageRow[]) {
 
 function providerLabel(value: string, slug?: string) {
   if (slug === "medgemma") return "MedGemma"
+  if (slug === "rai-llm") return "RAI LLM"
   if (slug === "radialog") return "RaDialog"
 
   switch (value) {
@@ -647,6 +648,7 @@ function providerLabel(value: string, slug?: string) {
 
 function credentialPlaceholder(providerType: string, slug?: string) {
   if (slug === "medgemma") return "RAI_MEDGEMMA_API_KEY veya RAI_MEDGEMMA_ENDPOINT"
+  if (slug === "rai-llm") return "RAI_LLM_API_KEY veya RAI_LLM_ENDPOINT"
   if (slug === "radialog") return "RAI_RADIALOG_API_KEY veya RAI_RADIALOG_ENDPOINT"
 
   switch (providerType) {
