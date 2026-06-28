@@ -2060,6 +2060,69 @@ td span {
   vertical-align: top;
 }
 
+.admin-filter-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(130px, 0.75fr)) auto;
+  align-items: end;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  padding: 16px;
+}
+
+.admin-filter-form label {
+  display: grid;
+  gap: 6px;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.admin-filter-form input,
+.admin-filter-form select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 10px;
+  color: var(--text);
+  background: white;
+  outline: none;
+}
+
+.admin-filter-form input:focus,
+.admin-filter-form select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+}
+
+.admin-filter-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-summary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  padding: 10px 16px;
+  background: #f8fafc;
+}
+
+.filter-summary-bar span {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.filter-summary-bar small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .branch-access-form {
   display: grid;
   min-width: 180px;
@@ -2085,6 +2148,10 @@ td span {
   gap: 16px;
   align-items: start;
   margin-top: 16px;
+}
+
+.admin-user-grid .admin-section {
+  margin-top: 0;
 }
 
 .ai-admin-grid {
@@ -3248,6 +3315,15 @@ td span {
   .ai-usage-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .admin-filter-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-filter-form label:first-child,
+  .admin-filter-actions {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 640px) {
@@ -3289,12 +3365,18 @@ td span {
   }
 
   .admin-user-metrics,
+  .admin-filter-form,
   .ai-usage-summary-grid,
   .compact-admin-form,
   .ai-provider-card-header,
   .group-card,
   .responsibility-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-filter-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .ai-provider-card-header {

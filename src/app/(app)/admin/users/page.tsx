@@ -1,4 +1,5 @@
 import Link from "next/link"
+import type { ReactNode } from "react"
 
 import {
   createAccessGroup,
@@ -11,6 +12,16 @@ import { requireAdmin } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 
 export const metadata = { title: "Admin" }
+
+type UsersPageProps = {
+  searchParams?: Promise<{
+    branch?: string
+    group?: string
+    q?: string
+    role?: string
+    status?: string
+  }>
+}
 
 type ProfileRef = { full_name: string | null } | null
 type MemberRow = {
@@ -92,7 +103,15 @@ const responsibilityPresets = [
   },
 ]
 
-export default async function UsersPage() {
+export default async function UsersPage({ searchParams }: UsersPageProps) {
+  const params = (await searchParams) ?? {}
+  const filters = {
+    branch: normalizeFilter(params.branch),
+    group: normalizeFilter(params.group),
+    q: normalizeSearch(params.q),
+    role: normalizeFilter(params.role),
+    status: normalizeFilter(params.status),
+  }
   const admin = await requireAdmin()
   const supabase = await createClient()
 
@@ -173,6 +192,15 @@ export default async function UsersPage() {
       permission,
     ])
   )
+  const filteredMembers = members.filter((member) =>
+    memberMatchesFilters(member, {
+      admin,
+      branchAccessByUser,
+      branchById,
+      filters,
+      groupsByUser,
+    })
+  )
   const activeUsers = members.filter((member) => member.is_active !== false).length
   const adminUsers = members.filter((member) => member.role === "admin").length
 
@@ -221,9 +249,72 @@ export default async function UsersPage() {
         </article>
       </section>
 
-      <section className="data-panel admin-section">
-        <div className="panel-heading">
-          <h2>Kullanıcı yönetimi</h2>
+      <CollapsiblePanel
+        detail={`${filteredMembers.length}/${members.length} kullanıcı gösteriliyor`}
+        open
+        title="Kullanıcı yönetimi"
+      >
+        <form action="/admin/users" className="admin-filter-form" method="get">
+          <label>
+            Arama
+            <input
+              defaultValue={filters.q}
+              name="q"
+              placeholder="Ad, kullanıcı, rol, grup veya şube ara"
+              type="search"
+            />
+          </label>
+          <label>
+            Rol
+            <select defaultValue={filters.role} name="role">
+              <option value="">Tümü</option>
+              <option value="admin">Admin</option>
+              <option value="doctor">Klinik kullanıcı</option>
+            </select>
+          </label>
+          <label>
+            Şube
+            <select defaultValue={filters.branch} name="branch">
+              <option value="">Tümü</option>
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name}
+                  {branch.is_main ? " (Merkez)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Grup
+            <select defaultValue={filters.group} name="group">
+              <option value="">Tümü</option>
+              {groups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Durum
+            <select defaultValue={filters.status} name="status">
+              <option value="">Tümü</option>
+              <option value="active">Aktif</option>
+              <option value="inactive">Pasif</option>
+            </select>
+          </label>
+          <div className="admin-filter-actions">
+            <button className="button primary" type="submit">
+              Filtrele
+            </button>
+            <Link className="button subtle" href="/admin/users">
+              Sıfırla
+            </Link>
+          </div>
+        </form>
+        <div className="filter-summary-bar">
+          <span>{filteredMembers.length} kullanıcı listeleniyor</span>
+          <small>Arama; kullanıcı, rol, grup, sorumluluk, varsayılan şube ve şube yetkilerinde çalışır.</small>
         </div>
         <div className="responsive-table">
           <table className="admin-users-table">
@@ -239,7 +330,7 @@ export default async function UsersPage() {
               </tr>
             </thead>
             <tbody>
-              {members.map((member) => {
+              {filteredMembers.map((member) => {
                 const userGroups = groupsByUser.get(member.user_id) ?? []
                 const branch = member.branch_id ? branchById.get(member.branch_id) : null
                 const userBranchAccess = branchAccessByUser.get(member.user_id) ?? new Set<string>()
@@ -366,16 +457,23 @@ export default async function UsersPage() {
                   </tr>
                 )
               })}
+              {!filteredMembers.length ? (
+                <tr>
+                  <td colSpan={7}>
+                    <p className="empty-state">Bu filtrelerle eşleşen kullanıcı yok.</p>
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>
-      </section>
+      </CollapsiblePanel>
 
       <section className="admin-user-grid">
-        <section className="data-panel admin-section">
-          <div className="panel-heading">
-            <h2>Grup yönetimi</h2>
-          </div>
+        <CollapsiblePanel
+          detail={`${groups.length} grup / ${groupMembers.length} aktif üyelik`}
+          title="Grup yönetimi"
+        >
           <div className="group-card-list">
             {groups.map((group) => {
               const memberIds = groupMembers
@@ -409,12 +507,9 @@ export default async function UsersPage() {
               )
             })}
           </div>
-        </section>
+        </CollapsiblePanel>
 
-        <section className="data-panel admin-section">
-          <div className="panel-heading">
-            <h2>Yeni grup</h2>
-          </div>
+        <CollapsiblePanel detail="Yeni rol ve sorumluluk grubu tanımla" title="Yeni grup">
           <form action={createAccessGroup} className="admin-create-group">
             <label>
               Grup adı
@@ -432,14 +527,13 @@ export default async function UsersPage() {
               Grup oluştur
             </button>
           </form>
-        </section>
+        </CollapsiblePanel>
       </section>
 
-      <details className="data-panel admin-section collapsible-panel" open>
-        <summary className="panel-heading">
-          <h2>Yetki matrisi</h2>
-          <span className="panel-toggle">Liste</span>
-        </summary>
+      <CollapsiblePanel
+        detail={`${groups.length} grup / ${permissionTables.length} yetki alanı`}
+        title="Yetki matrisi"
+      >
         <div className="responsive-table">
           <table className="permission-matrix">
             <thead>
@@ -478,12 +572,12 @@ export default async function UsersPage() {
             </tbody>
           </table>
         </div>
-      </details>
+      </CollapsiblePanel>
 
-      <section className="data-panel admin-section">
-        <div className="panel-heading">
-          <h2>RIS/PACS sorumluluk şablonları</h2>
-        </div>
+      <CollapsiblePanel
+        detail={`${responsibilityPresets.length} hazır sorumluluk tanımı`}
+        title="RIS/PACS sorumluluk şablonları"
+      >
         <div className="responsibility-grid">
           {responsibilityPresets.map((preset) => (
             <article key={preset.title}>
@@ -492,8 +586,33 @@ export default async function UsersPage() {
             </article>
           ))}
         </div>
-      </section>
+      </CollapsiblePanel>
     </>
+  )
+}
+
+function CollapsiblePanel({
+  children,
+  detail,
+  open = false,
+  title,
+}: {
+  children: ReactNode
+  detail: string
+  open?: boolean
+  title: string
+}) {
+  return (
+    <details className="data-panel admin-section collapsible-panel" open={open}>
+      <summary className="panel-heading">
+        <div>
+          <h2>{title}</h2>
+          <small>{detail}</small>
+        </div>
+        <span className="panel-toggle">Liste</span>
+      </summary>
+      {children}
+    </details>
   )
 }
 
@@ -574,6 +693,73 @@ function responsibilityText(role: string, groups: GroupRow[]) {
   if (slugs.includes("doctors")) return "Worklist, viewer, raporlama ve klinik okuma"
   if (slugs.includes("technicians")) return "DICOM import, modalite aktarımı ve çekim takibi"
   return "Temel RIS/PACS erişimi"
+}
+
+function memberMatchesFilters(
+  member: MemberRow,
+  {
+    admin,
+    branchAccessByUser,
+    branchById,
+    filters,
+    groupsByUser,
+  }: {
+    admin: { id: string; fullName: string | null; email: string }
+    branchAccessByUser: Map<string, Set<string>>
+    branchById: Map<string, BranchRow>
+    filters: {
+      branch: string
+      group: string
+      q: string
+      role: string
+      status: string
+    }
+    groupsByUser: Map<string, GroupRow[]>
+  }
+) {
+  const userGroups = groupsByUser.get(member.user_id) ?? []
+  const accessBranchIds = branchAccessByUser.get(member.user_id) ?? new Set<string>()
+  const defaultBranch = member.branch_id ? branchById.get(member.branch_id) : null
+  const accessBranches = Array.from(accessBranchIds)
+    .map((branchId) => branchById.get(branchId))
+    .filter((branch): branch is BranchRow => Boolean(branch))
+
+  if (filters.role && normalizeFilter(member.role) !== filters.role) return false
+  if (filters.status === "active" && member.is_active === false) return false
+  if (filters.status === "inactive" && member.is_active !== false) return false
+  if (filters.group && !userGroups.some((group) => group.id === filters.group)) return false
+  if (filters.branch) {
+    const hasDefaultBranch = member.branch_id === filters.branch
+    const hasBranchAccess = accessBranchIds.has(filters.branch)
+    if (!hasDefaultBranch && !hasBranchAccess) return false
+  }
+
+  if (!filters.q) return true
+
+  const haystack = [
+    memberName(member, admin),
+    member.user_id,
+    shortId(member.user_id),
+    member.role,
+    member.is_active === false ? "pasif" : "aktif",
+    defaultBranch?.name,
+    ...accessBranches.map((branch) => branch.name),
+    ...userGroups.flatMap((group) => [group.name, group.slug, group.description ?? ""]),
+    responsibilityText(member.role, userGroups),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLocaleLowerCase("tr")
+
+  return haystack.includes(filters.q)
+}
+
+function normalizeFilter(value: string | undefined) {
+  return (value ?? "").trim().toLocaleLowerCase("tr")
+}
+
+function normalizeSearch(value: string | undefined) {
+  return normalizeFilter(value).replace(/\s+/g, " ")
 }
 
 function isMissingBranchAccessTableError(error: { code?: string; message?: string } | null) {
