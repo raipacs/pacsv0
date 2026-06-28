@@ -131,6 +131,16 @@ const searchItems = [
 const changelog = [
   {
     date: "2026-06-28",
+    version: "0.2.0-dev.10",
+    title: "RAI LLM operasyon durumu Admin ekranina eklendi",
+    items: [
+      "Admin AI Servisleri ekraninda RAI LLM provider, model, endpoint ve API token hazirlik durumu gosterilir.",
+      "Endpoint degeri maskeli gosterilir; secret degerleri UI'da aciga cikmaz.",
+      "Canli GPU endpoint hazir oldugunda kullanilacak smoke-test komutu ayni panelde yer alir.",
+    ],
+  },
+  {
+    date: "2026-06-28",
     version: "0.2.0-dev.9",
     title: "RAI LLM endpoint test ve operasyon runbook'u eklendi",
     items: [

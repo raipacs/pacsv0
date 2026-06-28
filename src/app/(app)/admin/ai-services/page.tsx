@@ -145,6 +145,8 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
   const credentialReady = providers.filter(
     (provider) => !provider.requires_credentials || provider.credential_reference
   )
+  const raiLlmProvider = providers.find((provider) => provider.slug === "rai-llm") ?? null
+  const raiLlmStatus = buildRaiLlmStatus(raiLlmProvider)
   const readyDrafts = drafts.filter((draft) => draft.status === "ready")
   const usageSummary = summarizeUsage(usageRows)
   const totalUsage = usageSummary.reduce(
@@ -195,6 +197,47 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
           <span>Hazır ön rapor</span>
           <strong>{readyDrafts.length}</strong>
         </article>
+      </section>
+
+      <section className="data-panel admin-section">
+        <div className="panel-heading">
+          <div>
+            <h2>RAI LLM operasyon durumu</h2>
+            <p>Self-hosted model hattı, endpoint ayarları ve canlı test adımları.</p>
+          </div>
+          <span className={`health-badge ${raiLlmStatus.ready ? "ok" : "warning"}`}>
+            {raiLlmStatus.ready ? "Endpoint hazır" : "Kurulum bekliyor"}
+          </span>
+        </div>
+        <div className="rai-llm-status-grid">
+          <article>
+            <span>Provider</span>
+            <strong>{raiLlmStatus.providerLabel}</strong>
+            <small>{raiLlmStatus.providerState}</small>
+          </article>
+          <article>
+            <span>Model</span>
+            <strong>{raiLlmStatus.model}</strong>
+            <small>RAI fine-tune hattı için başlangıç modeli</small>
+          </article>
+          <article>
+            <span>Endpoint</span>
+            <strong>{raiLlmStatus.endpointState}</strong>
+            <small>{raiLlmStatus.endpointLabel}</small>
+          </article>
+          <article>
+            <span>API token</span>
+            <strong>{raiLlmStatus.apiKeyState}</strong>
+            <small>Secret değeri ekranda gösterilmez</small>
+          </article>
+        </div>
+        <div className="rai-llm-runbook">
+          <div>
+            <strong>Sıradaki operasyon</strong>
+            <p>{raiLlmStatus.nextStep}</p>
+          </div>
+          <pre>{raiLlmStatus.testCommand}</pre>
+        </div>
       </section>
 
       <section className="data-panel admin-section">
@@ -664,6 +707,55 @@ function credentialPlaceholder(providerType: string, slug?: string) {
       return "Credential gerekmez"
     default:
       return "RAI_CUSTOM_AI_API_KEY"
+  }
+}
+
+function buildRaiLlmStatus(provider: AiProviderRow | null) {
+  const endpoint = process.env.RAI_LLM_ENDPOINT?.trim() || ""
+  const apiKeyReady = Boolean(process.env.RAI_LLM_API_KEY?.trim())
+  const endpointMode = process.env.RAI_LLM_ENDPOINT_MODE?.trim() || "openai-compatible"
+  const model = provider?.default_model || process.env.RAI_LLM_MODEL_ID || "Qwen/Qwen2.5-VL-7B-Instruct"
+  const endpointReady = Boolean(endpoint)
+  const providerActive = provider?.is_active === true
+  const ready = Boolean(provider && providerActive && endpointReady)
+  const endpointLabel = endpointReady ? safeEndpointLabel(endpoint) : "RAI_LLM_ENDPOINT tanımlı değil"
+  const providerState = provider
+    ? providerActive
+      ? "Admin AI Servisleri içinde aktif"
+      : "Provider var, aktif değil"
+    : "Provider otomatik seed bekliyor"
+
+  return {
+    apiKeyState: apiKeyReady ? "Tanımlı" : "Opsiyonel / eksik",
+    endpointLabel,
+    endpointState: endpointReady ? endpointMode : "Eksik",
+    model,
+    nextStep: ready
+      ? "RAI Viewer içinde RAI LLM provider seçilerek ön rapor testi yapılabilir."
+      : "GPU endpoint ayağa kaldırılıp Vercel ortamında RAI_LLM_ENDPOINT tanımlandıktan sonra provider aktif edilmelidir.",
+    providerLabel: provider?.name || "RAI LLM",
+    providerState,
+    ready,
+    testCommand: endpointReady
+      ? [
+          "RAI_LLM_ENDPOINT=<masked-endpoint>",
+          apiKeyReady ? "RAI_LLM_API_KEY=<defined-secret>" : "RAI_LLM_API_KEY=<optional-token>",
+          "npm run test:rai-llm",
+        ].join(" \\\n")
+      : [
+          "RAI_LLM_ENDPOINT=https://<rai-llm-host>/v1/chat/completions",
+          "RAI_LLM_API_KEY=<strong-random-token>",
+          "npm run test:rai-llm",
+        ].join(" \\\n"),
+  }
+}
+
+function safeEndpointLabel(value: string) {
+  try {
+    const url = new URL(value)
+    return `${url.protocol}//${url.host}${url.pathname}`
+  } catch {
+    return "Endpoint formatı okunamadı"
   }
 }
 

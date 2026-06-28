@@ -36,6 +36,11 @@ Gerekli secret'lar:
 - `RAI_LLM_API_KEY`: Endpoint bearer token istiyorsa kullanilir.
 - `RAI_LLM_ENDPOINT_MODE`: Varsayilan `openai-compatible`.
 
+Admin > AI Servisleri ekraninda RAI LLM operasyon durumu ayrica gosterilir.
+Bu panel provider aktif mi, endpoint env tanimli mi, API token var mi ve hangi
+test komutunun calistirilacagini gosterir. Secret degerleri UI'da acik olarak
+gosterilmez.
+
 ## Servis
 
 Servis kodu `services/rai-llm` altindadir. `POST /v1/chat/completions`

@@ -2282,6 +2282,81 @@ td span {
   line-height: 1.35;
 }
 
+.rai-llm-status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--border);
+}
+
+.rai-llm-status-grid article {
+  min-height: 116px;
+  padding: 16px;
+  background: var(--surface);
+}
+
+.rai-llm-status-grid span,
+.rai-llm-status-grid strong,
+.rai-llm-status-grid small {
+  display: block;
+}
+
+.rai-llm-status-grid span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.rai-llm-status-grid strong {
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.rai-llm-status-grid small {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.rai-llm-runbook {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.75fr) minmax(0, 1.25fr);
+  gap: 16px;
+  padding: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.rai-llm-runbook strong {
+  display: block;
+  font-size: 15px;
+}
+
+.rai-llm-runbook p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.rai-llm-runbook pre {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: #0f172a;
+  color: #e5f4ff;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .form-help {
   margin: 0;
   color: var(--muted);
@@ -3828,8 +3903,13 @@ td span {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .ai-usage-summary-grid {
+  .ai-usage-summary-grid,
+  .rai-llm-status-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rai-llm-runbook {
+    grid-template-columns: 1fr;
   }
 
   .admin-filter-form {
@@ -3883,6 +3963,7 @@ td span {
   .admin-user-metrics,
   .admin-filter-form,
   .ai-usage-summary-grid,
+  .rai-llm-status-grid,
   .compact-admin-form,
   .ai-provider-card-header,
   .group-card,
