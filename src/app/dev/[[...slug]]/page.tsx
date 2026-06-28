@@ -135,6 +135,7 @@ const changelog = [
     title: "RAI LLM self-hosted model hatti baslatildi",
     items: [
       "RAI LLM provider seed'i ve RAI_LLM_ENDPOINT entegrasyonu eklendi.",
+      "Admin AI Servisleri sayfasi RAI LLM provider eksikse otomatik olusturur.",
       "Qwen/Qwen2.5-VL-7B-Instruct tabanli OpenAI-compatible inference servisi hazirlandi.",
       "RAI LLM modeli ileride RAI radyoloji veri setleriyle fine-tune edilebilir hat olarak konumlandi.",
     ],

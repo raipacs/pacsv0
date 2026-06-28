@@ -25,6 +25,11 @@ Supabase seed:
 - `default_model`: `Qwen/Qwen2.5-VL-7B-Instruct`
 - `credential_reference`: `RAI_LLM_ENDPOINT`
 
+Admin AI Servisleri sayfasi acildiginda `rai-llm` provider kaydi yoksa
+otomatik olarak olusturulur. Bu davranis migration uygulanmamis ortamlarda
+canli UI'in eksik provider ile kalmasini engeller; mevcut provider ayarlari
+varsa aktiflik, varsayilan ve credential alanlari ezilmez.
+
 Gerekli secret'lar:
 
 - `RAI_LLM_ENDPOINT`: OpenAI-compatible endpoint URL'i.
