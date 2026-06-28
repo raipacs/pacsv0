@@ -88,6 +88,8 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
   const supabase = await createClient()
   const range = parseUsageRange(query)
 
+  await ensureRaiLlmProvider(supabase, user.organizationId, user.id)
+
   const [providersResult, jobsResult, draftsResult, usageResult] = await Promise.all([
     supabase
       .from("ai_service_providers")
@@ -662,6 +664,54 @@ function credentialPlaceholder(providerType: string, slug?: string) {
       return "Credential gerekmez"
     default:
       return "RAI_CUSTOM_AI_API_KEY"
+  }
+}
+
+async function ensureRaiLlmProvider(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  userId: string
+) {
+  const { data: existing, error: existingError } = await supabase
+    .from("ai_service_providers")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("slug", "rai-llm")
+    .maybeSingle()
+
+  if (existing) return
+  if (existingError) {
+    if (isMissingAiTableError(existingError)) return
+    throw new Error(`RAI LLM sağlayıcı kontrolü yapılamadı: ${existingError.message}`)
+  }
+
+  const { error } = await supabase.from("ai_service_providers").insert({
+    organization_id: organizationId,
+    created_by: userId,
+    credential_reference: "RAI_LLM_ENDPOINT",
+    default_model: "Qwen/Qwen2.5-VL-7B-Instruct",
+    is_active: false,
+    is_default: false,
+    name: "RAI LLM",
+    provider_type: "custom",
+    requires_credentials: true,
+    settings: {
+      apiKeyEnv: "RAI_LLM_API_KEY",
+      baseLicense: "apache-2.0",
+      baseModel: "Qwen/Qwen2.5-VL-7B-Instruct",
+      deployment: "self-hosted-openai-compatible-endpoint",
+      endpointEnv: "RAI_LLM_ENDPOINT",
+      endpointModeEnv: "RAI_LLM_ENDPOINT_MODE",
+      family: "rai-llm",
+      modalities: ["DX", "CT", "MR", "US", "SR"],
+      purpose: "rai-owned-medical-vlm-report-draft",
+      supportedEndpointModes: ["openai-compatible", "rai-adapter"],
+    },
+    slug: "rai-llm",
+  })
+
+  if (error && error.code !== "23505") {
+    throw new Error(`RAI LLM sağlayıcısı oluşturulamadı: ${error.message}`)
   }
 }
 
