@@ -11,6 +11,7 @@
     "import:orthanc-pending": "node scripts/import-orthanc-pending-studies.mjs",
     "sync:orthanc-logs": "node scripts/sync-orthanc-container-logs.mjs",
     "sync:orthanc-events": "node scripts/sync-orthanc-events.mjs",
+    "test:rai-llm": "node scripts/test-rai-llm-endpoint.mjs",
     "lint": "eslint"
   },
   "dependencies": {

@@ -131,6 +131,16 @@ const searchItems = [
 const changelog = [
   {
     date: "2026-06-28",
+    version: "0.2.0-dev.9",
+    title: "RAI LLM endpoint test ve operasyon runbook'u eklendi",
+    items: [
+      "RAI LLM OpenAI-compatible endpoint icin npm run test:rai-llm smoke-test komutu eklendi.",
+      "GPU endpoint kurulumu, Vercel env tanimlari ve canli test adimlari dokumante edildi.",
+      "Endpoint hazir oldugunda RAI Viewer AI akisi ayni provider uzerinden test edilebilir hale geldi.",
+    ],
+  },
+  {
+    date: "2026-06-28",
     version: "0.2.0-dev.8",
     title: "RAI LLM self-hosted model hatti baslatildi",
     items: [

@@ -44,6 +44,43 @@ Health check:
 curl http://localhost:8000/health
 ```
 
+OpenAI-compatible smoke test:
+
+```bash
+RAI_LLM_ENDPOINT=http://localhost:8000/v1/chat/completions \
+RAI_LLM_API_KEY=local-test-token \
+npm run test:rai-llm
+```
+
+## GPU endpoint kurulumu
+
+Ilk canli kurulum icin pratik yol, NVIDIA L4 GPU'lu bir VM veya managed GPU
+endpoint uzerinde bu Docker imajini calistirmaktir.
+
+Onerilen minimum:
+
+- GPU: NVIDIA L4 24 GB VRAM
+- Disk: 120 GB veya uzeri
+- RAM: 32 GB veya uzeri
+- Port: 8000 yalnizca HTTPS reverse proxy veya internal load balancer arkasindan
+  acilmali
+
+Canli RAI PACS tarafinda Vercel env:
+
+```bash
+RAI_LLM_ENDPOINT=https://<rai-llm-host>/v1/chat/completions
+RAI_LLM_API_KEY=<strong-random-token>
+RAI_LLM_ENDPOINT_MODE=openai-compatible
+```
+
+Endpoint acildiktan sonra:
+
+```bash
+RAI_LLM_ENDPOINT=https://<rai-llm-host>/v1/chat/completions \
+RAI_LLM_API_KEY=<strong-random-token> \
+npm run test:rai-llm
+```
+
 ## Klinik not
 
 RAI LLM ciktilari tanisal karar degildir. Hekim tarafindan duzenlenip

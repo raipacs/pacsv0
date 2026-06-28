@@ -42,6 +42,14 @@ Servis kodu `services/rai-llm` altindadir. `POST /v1/chat/completions`
 endpoint'i OpenAI-compatible yanit verir. RAI PACS, DICOM'dan uretilmis PNG
 preview'leri ve tetkik metadata bilgisini bu endpoint'e gonderir.
 
+Endpoint ayakta oldugunda smoke test:
+
+```bash
+RAI_LLM_ENDPOINT=https://<rai-llm-host>/v1/chat/completions \
+RAI_LLM_API_KEY=<strong-random-token> \
+npm run test:rai-llm
+```
+
 Kurulum icin GPU onerisi:
 
 - MVP test: NVIDIA L4 / 24 GB VRAM.
