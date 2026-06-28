@@ -10,6 +10,11 @@ import {
   estimateTokenUsage,
   isMissingAiTableError,
 } from "@/lib/ai-reporting"
+import {
+  createAiImagePreviewsFromDicom,
+  type AiDicomImageSource,
+  type AiImagePreview,
+} from "@/lib/ai-image-previews"
 import { requireUser } from "@/lib/auth"
 import { isSupabaseConfigured } from "@/lib/config"
 import { createClient } from "@/lib/supabase/server"
@@ -196,8 +201,19 @@ export async function startAiPreReport(formData: FormData) {
 
   if (canRunOpenAi && openAiApiKey) {
     try {
+      const visualContext = await loadAiVisualContext({
+        organizationId: user.organizationId,
+        studyId,
+        supabase,
+      })
+      assertImagePreviewsReady({
+        errors: visualContext.imagePreviewErrors,
+        imagePreviews: visualContext.imagePreviews,
+      })
       const draft = await createOpenAiRadiologyDraft({
         apiKey: openAiApiKey,
+        imagePreviewErrors: visualContext.imagePreviewErrors,
+        imagePreviews: visualContext.imagePreviews,
         inputContext,
         model: provider.default_model || "gpt-5.1",
         patientName: patient ? `${patient.first_name} ${patient.last_name}` : "",
@@ -245,6 +261,8 @@ export async function startAiPreReport(formData: FormData) {
         pricing_snapshot: cost.pricingSnapshot,
         metadata: {
           accessionNumber: study.accession_number,
+          dicomReferenceCount: visualContext.dicomReferences.length,
+          imagePreviewCount: visualContext.imagePreviews.length,
           modality: study.modality,
           estimated: !draft.usage,
           responseId: draft.responseId,
@@ -280,8 +298,19 @@ export async function startAiPreReport(formData: FormData) {
 
   if (canRunAnthropic && anthropicApiKey) {
     try {
+      const visualContext = await loadAiVisualContext({
+        organizationId: user.organizationId,
+        studyId,
+        supabase,
+      })
+      assertImagePreviewsReady({
+        errors: visualContext.imagePreviewErrors,
+        imagePreviews: visualContext.imagePreviews,
+      })
       const draft = await createAnthropicRadiologyDraft({
         apiKey: anthropicApiKey,
+        imagePreviewErrors: visualContext.imagePreviewErrors,
+        imagePreviews: visualContext.imagePreviews,
         inputContext,
         model: provider.default_model || "claude-sonnet-4-6",
         patientName: patient ? `${patient.first_name} ${patient.last_name}` : "",
@@ -329,6 +358,8 @@ export async function startAiPreReport(formData: FormData) {
         pricing_snapshot: cost.pricingSnapshot,
         metadata: {
           accessionNumber: study.accession_number,
+          dicomReferenceCount: visualContext.dicomReferences.length,
+          imagePreviewCount: visualContext.imagePreviews.length,
           modality: study.modality,
           estimated: !draft.usage,
           responseId: draft.responseId,
@@ -364,8 +395,19 @@ export async function startAiPreReport(formData: FormData) {
 
   if (canRunGemini && googleApiKey) {
     try {
+      const visualContext = await loadAiVisualContext({
+        organizationId: user.organizationId,
+        studyId,
+        supabase,
+      })
+      assertImagePreviewsReady({
+        errors: visualContext.imagePreviewErrors,
+        imagePreviews: visualContext.imagePreviews,
+      })
       const draft = await createGeminiRadiologyDraft({
         apiKey: googleApiKey,
+        imagePreviewErrors: visualContext.imagePreviewErrors,
+        imagePreviews: visualContext.imagePreviews,
         inputContext,
         model: provider.default_model || "gemini-3.5-flash",
         patientName: patient ? `${patient.first_name} ${patient.last_name}` : "",
@@ -413,6 +455,8 @@ export async function startAiPreReport(formData: FormData) {
         pricing_snapshot: cost.pricingSnapshot,
         metadata: {
           accessionNumber: study.accession_number,
+          dicomReferenceCount: visualContext.dicomReferences.length,
+          imagePreviewCount: visualContext.imagePreviews.length,
           modality: study.modality,
           estimated: !draft.usage,
           responseId: draft.responseId,
@@ -448,16 +492,22 @@ export async function startAiPreReport(formData: FormData) {
 
   if (canRunMedGemma && medGemmaConfig) {
     try {
-      const dicomReferences = await loadAiDicomReferences({
+      const visualContext = await loadAiVisualContext({
         organizationId: user.organizationId,
         studyId,
         supabase,
       })
+      assertImagePreviewsReady({
+        errors: visualContext.imagePreviewErrors,
+        imagePreviews: visualContext.imagePreviews,
+      })
       const draft = await createMedGemmaRadiologyDraft({
         apiKey: medGemmaConfig.apiKey,
-        dicomReferences,
+        dicomReferences: visualContext.dicomReferences,
         endpoint: medGemmaConfig.endpoint,
         endpointMode: medGemmaConfig.endpointMode,
+        imagePreviewErrors: visualContext.imagePreviewErrors,
+        imagePreviews: visualContext.imagePreviews,
         inputContext,
         model: provider.default_model || "medgemma-4b-it",
         patientName: patient ? `${patient.first_name} ${patient.last_name}` : "",
@@ -505,7 +555,8 @@ export async function startAiPreReport(formData: FormData) {
         pricing_snapshot: cost.pricingSnapshot,
         metadata: {
           accessionNumber: study.accession_number,
-          dicomReferenceCount: dicomReferences.length,
+          dicomReferenceCount: visualContext.dicomReferences.length,
+          imagePreviewCount: visualContext.imagePreviews.length,
           modality: study.modality,
           estimated: !draft.usage,
           responseId: draft.responseId,
@@ -623,14 +674,6 @@ type GeminiResponse = {
   }
 }
 
-type AiDicomReference = {
-  id: string
-  instanceNumber: number | null
-  signedUrl: string
-  sizeBytes: number
-  sopInstanceUid: string
-}
-
 type MedGemmaEndpointMode = "openai-compatible" | "rai-adapter"
 
 type MedGemmaResponse = {
@@ -691,8 +734,8 @@ async function loadAiDicomReferences({
     .order("instance_number", { ascending: true })
     .limit(8)
 
-  if (error) throw new Error(`MedGemma DICOM referansları alınamadı: ${error.message}`)
-  if (!instances?.length) return [] satisfies AiDicomReference[]
+  if (error) throw new Error(`AI DICOM referansları alınamadı: ${error.message}`)
+  if (!instances?.length) return [] satisfies AiDicomImageSource[]
 
   const signedUrls = new Map<string, string>()
   const instancesByBucket = instances.reduce((groups, instance) => {
@@ -712,7 +755,7 @@ async function loadAiDicomReferences({
       )
 
     if (signedUrlError) {
-      throw new Error(`MedGemma DICOM imzalı URL üretilemedi: ${signedUrlError.message}`)
+      throw new Error(`AI DICOM imzalı URL üretilemedi: ${signedUrlError.message}`)
     }
 
     data.forEach((signedUrl, index) => {
@@ -729,7 +772,60 @@ async function loadAiDicomReferences({
       sizeBytes: Number(instance.size_bytes ?? 0),
       sopInstanceUid: instance.sop_instance_uid,
     }))
-    .filter((instance) => instance.signedUrl)
+    .filter((instance) => instance.signedUrl) satisfies AiDicomImageSource[]
+}
+
+async function loadAiVisualContext({
+  organizationId,
+  studyId,
+  supabase,
+}: {
+  organizationId: string
+  studyId: string
+  supabase: Awaited<ReturnType<typeof createClient>>
+}) {
+  const dicomReferences = await loadAiDicomReferences({
+    organizationId,
+    studyId,
+    supabase,
+  })
+  const { errors: imagePreviewErrors, previews: imagePreviews } =
+    await createAiImagePreviewsFromDicom({
+      sources: dicomReferences,
+    })
+
+  return { dicomReferences, imagePreviewErrors, imagePreviews }
+}
+
+function assertImagePreviewsReady({
+  errors,
+  imagePreviews,
+}: {
+  errors: string[]
+  imagePreviews: AiImagePreview[]
+}) {
+  if (imagePreviews.length > 0) return
+
+  throw new Error(
+    [
+      "AI görüntü işleme başlatılamadı: DICOM görüntülerinden PNG önizleme üretilemedi.",
+      errors.length ? `Detay: ${errors.slice(0, 3).join(" | ")}` : "Storage üzerinde okunabilir DICOM instance bulunamadı.",
+    ].join(" ")
+  )
+}
+
+function imagePreviewSummary(imagePreviews: AiImagePreview[], errors: string[]) {
+  return {
+    imagePreviewCount: imagePreviews.length,
+    imagePreviewErrors: errors.slice(0, 5),
+    imagePreviews: imagePreviews.map((preview) => ({
+      columns: preview.columns,
+      instanceNumber: preview.instanceNumber,
+      label: preview.label,
+      rows: preview.rows,
+      sopInstanceUid: preview.sopInstanceUid,
+    })),
+  }
 }
 
 function resolveMedGemmaConfig(slug: string, credentialReference: string | null) {
@@ -753,11 +849,15 @@ function resolveMedGemmaConfig(slug: string, credentialReference: string | null)
 
 async function createOpenAiRadiologyDraft({
   apiKey,
+  imagePreviewErrors,
+  imagePreviews,
   inputContext,
   model,
   patientName,
 }: {
   apiKey: string
+  imagePreviewErrors: string[]
+  imagePreviews: AiImagePreview[]
   inputContext: Record<string, unknown>
   model: string
   patientName: string
@@ -773,21 +873,38 @@ async function createOpenAiRadiologyDraft({
       instructions: [
         "Sen radyoloji ön rapor asistanısın.",
         "Tanı koymazsın; yalnızca hekimin düzenleyip onaylayacağı Türkçe bir ön rapor taslağı hazırlarsın.",
-        "Elinde şu an görüntü pikselleri değil DICOM metadata ve tetkik bağlamı var; belirsizlikleri açıkça belirt.",
+        "DICOM görüntülerinden üretilmiş PNG önizlemelerini ve tetkik metadata bilgisini birlikte değerlendir.",
+        "Yalnızca görüntüde ve metadata bağlamında desteklenen bulguları yaz; belirsizlikleri açıkça belirt.",
         "Sadece JSON döndür. Markdown, açıklama veya kod bloğu kullanma.",
       ].join(" "),
-      input: JSON.stringify({
-        task: "radiology_pre_report",
-        patientName,
-        study: inputContext,
-        expectedJson: {
-          findings: "string",
-          impression: "string",
-          recommendations: "string",
-          confidenceScore: "number 0..1",
-          criticality: "none | low | medium | high",
+      input: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: JSON.stringify({
+                task: "radiology_pre_report",
+                patientName,
+                study: inputContext,
+                visualContext: imagePreviewSummary(imagePreviews, imagePreviewErrors),
+                expectedJson: {
+                  findings: "string",
+                  impression: "string",
+                  recommendations: "string",
+                  confidenceScore: "number 0..1",
+                  criticality: "none | low | medium | high",
+                },
+              }),
+            },
+            ...imagePreviews.map((preview) => ({
+              detail: "high",
+              image_url: preview.dataUrl,
+              type: "input_image",
+            })),
+          ],
         },
-      }),
+      ],
     }),
   })
 
@@ -812,6 +929,7 @@ async function createOpenAiRadiologyDraft({
     criticality: parsed.criticality,
     sourceSummary: {
       generator: "openai-responses",
+      imagePreviewCount: imagePreviews.length,
       model,
       inputContext,
     },
@@ -829,11 +947,15 @@ async function createOpenAiRadiologyDraft({
 
 async function createAnthropicRadiologyDraft({
   apiKey,
+  imagePreviewErrors,
+  imagePreviews,
   inputContext,
   model,
   patientName,
 }: {
   apiKey: string
+  imagePreviewErrors: string[]
+  imagePreviews: AiImagePreview[]
   inputContext: Record<string, unknown>
   model: string
   patientName: string
@@ -850,25 +972,40 @@ async function createAnthropicRadiologyDraft({
       messages: [
         {
           role: "user",
-          content: JSON.stringify({
-            task: "radiology_pre_report",
-            patientName,
-            study: inputContext,
-            expectedJson: {
-              findings: "string",
-              impression: "string",
-              recommendations: "string",
-              confidenceScore: "number 0..1",
-              criticality: "none | low | medium | high",
+          content: [
+            ...imagePreviews.map((preview) => ({
+              source: {
+                data: preview.base64,
+                media_type: preview.mimeType,
+                type: "base64",
+              },
+              type: "image",
+            })),
+            {
+              text: JSON.stringify({
+                task: "radiology_pre_report",
+                patientName,
+                study: inputContext,
+                visualContext: imagePreviewSummary(imagePreviews, imagePreviewErrors),
+                expectedJson: {
+                  findings: "string",
+                  impression: "string",
+                  recommendations: "string",
+                  confidenceScore: "number 0..1",
+                  criticality: "none | low | medium | high",
+                },
+              }),
+              type: "text",
             },
-          }),
+          ],
         },
       ],
       model,
       system: [
         "Sen radyoloji ön rapor asistanısın.",
         "Tanı koymazsın; yalnızca hekimin düzenleyip onaylayacağı Türkçe bir ön rapor taslağı hazırlarsın.",
-        "Elinde şu an görüntü pikselleri değil DICOM metadata ve tetkik bağlamı var; belirsizlikleri açıkça belirt.",
+        "DICOM görüntülerinden üretilmiş PNG önizlemelerini ve tetkik metadata bilgisini birlikte değerlendir.",
+        "Yalnızca görüntüde ve metadata bağlamında desteklenen bulguları yaz; belirsizlikleri açıkça belirt.",
         "Sadece JSON döndür. Markdown, açıklama veya kod bloğu kullanma.",
       ].join(" "),
     }),
@@ -898,6 +1035,7 @@ async function createAnthropicRadiologyDraft({
     criticality: parsed.criticality,
     sourceSummary: {
       generator: "anthropic-messages",
+      imagePreviewCount: imagePreviews.length,
       model,
       inputContext,
     },
@@ -926,11 +1064,15 @@ function extractAnthropicOutputText(payload: AnthropicResponse) {
 
 async function createGeminiRadiologyDraft({
   apiKey,
+  imagePreviewErrors,
+  imagePreviews,
   inputContext,
   model,
   patientName,
 }: {
   apiKey: string
+  imagePreviewErrors: string[]
+  imagePreviews: AiImagePreview[]
   inputContext: Record<string, unknown>
   model: string
   patientName: string
@@ -953,13 +1095,15 @@ async function createGeminiRadiologyDraft({
                 text: [
                   "Sen radyoloji ön rapor asistanısın.",
                   "Tanı koymazsın; yalnızca hekimin düzenleyip onaylayacağı Türkçe bir ön rapor taslağı hazırlarsın.",
-                  "Elinde şu an görüntü pikselleri değil DICOM metadata ve tetkik bağlamı var; belirsizlikleri açıkça belirt.",
+                  "DICOM görüntülerinden üretilmiş PNG önizlemelerini ve tetkik metadata bilgisini birlikte değerlendir.",
+                  "Yalnızca görüntüde ve metadata bağlamında desteklenen bulguları yaz; belirsizlikleri açıkça belirt.",
                   "Bulgular ve izlenim alanlarını kısa tut; her biri en fazla 3 cümle olsun.",
                   "Sadece JSON döndür. Markdown, açıklama veya kod bloğu kullanma.",
                   JSON.stringify({
                     task: "radiology_pre_report",
                     patientName,
                     study: inputContext,
+                    visualContext: imagePreviewSummary(imagePreviews, imagePreviewErrors),
                     expectedJson: {
                       findings: "string",
                       impression: "string",
@@ -970,6 +1114,12 @@ async function createGeminiRadiologyDraft({
                   }),
                 ].join("\n"),
               },
+              ...imagePreviews.map((preview) => ({
+                inlineData: {
+                  data: preview.base64,
+                  mimeType: preview.mimeType,
+                },
+              })),
             ],
           },
         ],
@@ -1013,6 +1163,7 @@ async function createGeminiRadiologyDraft({
     criticality: parsed.criticality,
     sourceSummary: {
       generator: "google-gemini-generate-content",
+      imagePreviewCount: imagePreviews.length,
       model,
       modelVersion: payload?.modelVersion,
       inputContext,
@@ -1045,14 +1196,18 @@ async function createMedGemmaRadiologyDraft({
   dicomReferences,
   endpoint,
   endpointMode,
+  imagePreviewErrors,
+  imagePreviews,
   inputContext,
   model,
   patientName,
 }: {
   apiKey?: string
-  dicomReferences: AiDicomReference[]
+  dicomReferences: AiDicomImageSource[]
   endpoint: string
   endpointMode: MedGemmaEndpointMode
+  imagePreviewErrors: string[]
+  imagePreviews: AiImagePreview[]
   inputContext: Record<string, unknown>
   model: string
   patientName: string
@@ -1062,7 +1217,8 @@ async function createMedGemmaRadiologyDraft({
   const instructions = [
     "Sen radyoloji ön rapor asistanısın.",
     "Tanı koymazsın; yalnızca hekimin düzenleyip onaylayacağı Türkçe bir ön rapor taslağı hazırlarsın.",
-    "DICOM görüntü referansları kısa süreli signed URL olarak verilebilir; görüntüye erişemiyorsan metadata sınırını açıkça belirt.",
+    "DICOM görüntülerinden üretilmiş PNG önizlemelerini ve tetkik metadata bilgisini birlikte değerlendir.",
+    "Yalnızca görüntüde ve metadata bağlamında desteklenen bulguları yaz; belirsizlikleri açıkça belirt.",
     "Bulgular ve izlenim alanlarını kısa tut; her biri en fazla 3 cümle olsun.",
     "Sadece JSON döndür. Markdown, açıklama veya kod bloğu kullanma.",
   ]
@@ -1076,9 +1232,18 @@ async function createMedGemmaRadiologyDraft({
   const taskPayload = {
     dicomReferences,
     expectedJson,
+    imagePreviewErrors,
+    imagePreviews: imagePreviews.map((preview) => ({
+      data: preview.base64,
+      instanceNumber: preview.instanceNumber,
+      label: preview.label,
+      mimeType: preview.mimeType,
+      sopInstanceUid: preview.sopInstanceUid,
+    })),
     patientName,
     study: inputContext,
     task: "radiology_pre_report",
+    visualContext: imagePreviewSummary(imagePreviews, imagePreviewErrors),
   }
   const body =
     endpointMode === "openai-compatible"
@@ -1086,7 +1251,16 @@ async function createMedGemmaRadiologyDraft({
           model: endpointModel,
           messages: [
             { content: instructions.join(" "), role: "system" },
-            { content: JSON.stringify(taskPayload), role: "user" },
+            {
+              content: [
+                { text: JSON.stringify(taskPayload), type: "text" },
+                ...imagePreviews.map((preview) => ({
+                  image_url: { url: preview.dataUrl },
+                  type: "image_url",
+                })),
+              ],
+              role: "user",
+            },
           ],
           response_format: { type: "json_object" },
           temperature: 0.2,
@@ -1120,6 +1294,7 @@ async function createMedGemmaRadiologyDraft({
         endpoint: safeEndpointLabel(endpoint),
         endpointMode,
         generator: "medgemma-endpoint",
+        imagePreviewCount: imagePreviews.length,
         inputContext,
         model: endpointModel,
         requestAttempts: result.attemptCount,

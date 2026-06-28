@@ -39,9 +39,9 @@ export function createMockRadiologyDraft(input: MockAiDraftInput) {
 
   return {
     findings: [
-      `AI ön değerlendirme ${modality} tetkiki için hazırlanmıştır.`,
-      `${studyName} çalışmasında ${countText} metadata üzerinden incelenmek üzere kuyruğa alınmıştır.`,
-      "Bu MVP çıktısı görüntü tabanlı tanı koymaz; DICOM serileri, tetkik açıklaması ve klinik rapor taslak akışını doğrulamak için üretilmiştir.",
+      `RAI Mock AI ${modality} tetkiki için yalnızca geliştirme/test taslağı üretmiştir.`,
+      `${studyName} çalışmasında ${countText} kayıt metadata üzerinden doğrulanmıştır.`,
+      "Bu sağlayıcı gerçek görüntü analizi yapmaz; görüntü tabanlı ön rapor için OpenAI, Gemini, Claude veya MedGemma gibi canlı bir AI servisi seçilmelidir.",
       "Görüntüler radyolog tarafından viewer üzerinde klinik bağlamla birlikte değerlendirilmelidir.",
     ].join("\n"),
     impression: [
@@ -59,7 +59,7 @@ export function createMockRadiologyDraft(input: MockAiDraftInput) {
       studyAt: input.studyAt,
       instanceCount: input.instanceCount,
       seriesCount: input.seriesCount,
-      generator: "rai-mock-radiology-v0",
+      generator: "rai-mock-radiology-v1-metadata-only",
     },
   }
 }
