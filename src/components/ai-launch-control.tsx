@@ -74,11 +74,8 @@ function AiLaunchFields({
 }) {
   const { pending } = useFormStatus()
   const isDisabled = disabled || pending
-  const selectedProviderLabel = selectedProvider
-    ? `${selectedProvider.name}${selectedProvider.defaultModel ? ` · ${selectedProvider.defaultModel}` : ""}`
-    : "AI servisi yok"
   const statusText = pending
-    ? `${selectedProviderLabel} çalışıyor...`
+    ? formatPendingAiJob(selectedProvider)
     : unavailableReason || formatLatestAiJob(latestJob)
 
   return (
@@ -117,6 +114,17 @@ function AiLaunchFields({
       </span>
     </>
   )
+}
+
+function formatPendingAiJob(provider: AiProviderOption | null) {
+  if (!provider) return "AI çalışıyor..."
+
+  const label = `${provider.name}${provider.defaultModel ? ` · ${provider.defaultModel}` : ""}`
+  if (provider.slug === "medgemma") {
+    return `${label} çalışıyor... Endpoint uyanıyorsa 1-2 dk sürebilir.`
+  }
+
+  return `${label} çalışıyor...`
 }
 
 function formatLatestAiJob(job: AiLaunchJobStatus | null) {

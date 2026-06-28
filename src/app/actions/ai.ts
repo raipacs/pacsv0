@@ -669,8 +669,9 @@ type MedGemmaResponse = {
 }
 
 const MEDGEMMA_REQUEST_TIMEOUT_MS = readPositiveIntegerEnv("RAI_MEDGEMMA_TIMEOUT_MS", 90_000)
-const MEDGEMMA_MAX_ATTEMPTS = readPositiveIntegerEnv("RAI_MEDGEMMA_MAX_ATTEMPTS", 3)
-const MEDGEMMA_RETRY_BASE_DELAY_MS = readPositiveIntegerEnv("RAI_MEDGEMMA_RETRY_DELAY_MS", 8_000)
+const MEDGEMMA_MAX_ATTEMPTS = readPositiveIntegerEnv("RAI_MEDGEMMA_MAX_ATTEMPTS", 5)
+const MEDGEMMA_RETRY_BASE_DELAY_MS = readPositiveIntegerEnv("RAI_MEDGEMMA_RETRY_DELAY_MS", 15_000)
+const MEDGEMMA_RETRY_MAX_DELAY_MS = readPositiveIntegerEnv("RAI_MEDGEMMA_RETRY_MAX_DELAY_MS", 30_000)
 const MEDGEMMA_RETRYABLE_STATUS_CODES = new Set([408, 409, 425, 429, 500, 502, 503, 504])
 
 async function loadAiDicomReferences({
@@ -1226,6 +1227,12 @@ function addMedGemmaAttemptContext(error: Error, attemptCount: number) {
     )
   }
 
+  if (isMedGemmaServiceUnavailable(error)) {
+    return new Error(
+      `MedGemma endpoint ${attemptCount} deneme sonunda hazır hale gelemedi. Hugging Face endpoint uykudan uyanıyor veya geçici olarak servis veremiyor. Birkaç dakika sonra tekrar deneyin.`
+    )
+  }
+
   return new Error(
     `MedGemma endpoint ${attemptCount} deneme sonunda yanıt veremedi. Son hata: ${error.message}`
   )
@@ -1240,8 +1247,12 @@ function normalizeMedGemmaError(error: unknown) {
 async function waitForMedGemmaRetryDelay(attemptIndex: number, retryAfterHeader?: string | null) {
   const retryAfterMs = parseRetryAfterMs(retryAfterHeader)
   const exponentialDelayMs = MEDGEMMA_RETRY_BASE_DELAY_MS * 2 ** attemptIndex
-  const delayMs = Math.min(retryAfterMs ?? exponentialDelayMs, 15_000)
+  const delayMs = Math.min(retryAfterMs ?? exponentialDelayMs, MEDGEMMA_RETRY_MAX_DELAY_MS)
   await new Promise<void>((resolve) => setTimeout(resolve, delayMs))
+}
+
+function isMedGemmaServiceUnavailable(error: Error) {
+  return error.message.includes("503") || error.message.includes("SERVICE_UNAVAILABLE")
 }
 
 function parseRetryAfterMs(value?: string | null) {

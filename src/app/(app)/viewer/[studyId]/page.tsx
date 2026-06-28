@@ -19,6 +19,7 @@ import { createOhifDicomJsonViewerUrl } from "@/lib/ohif-viewer"
 import { createClient } from "@/lib/supabase/server"
 
 export const metadata = { title: "RAI Viewer" }
+export const maxDuration = 240
 
 export default async function RaiViewerPage({
   params,
