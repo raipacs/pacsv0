@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react"
 
 import { createExternalStudyShareUrl } from "@/app/actions/storage"
+import { CopyErrorButton } from "@/components/copy-error-button"
 
 const SHARE_OPTIONS = [
   { label: "1 saat", value: 60 * 60 },
@@ -97,7 +98,12 @@ export function ExternalShareButton({ studyId }: { studyId: string }) {
               </span>
             </div>
           ) : null}
-          {error ? <p className="inline-error">{error}</p> : null}
+          {error ? (
+            <div className="inline-error-with-copy">
+              <p className="inline-error">{error}</p>
+              <CopyErrorButton text={error} />
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

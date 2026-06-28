@@ -6,6 +6,7 @@ import {
   createDicomSignedUrls,
   createSharedDicomSignedUrls,
 } from "@/app/actions/storage"
+import { CopyErrorButton } from "@/components/copy-error-button"
 import { usePrivacyMode } from "@/components/privacy-mode"
 import {
   decodeDicomPreview,
@@ -1102,7 +1103,12 @@ export function RaiDicomViewer({
             →
           </button>
         </div>
-        {error ? <p className="inline-error">{error}</p> : null}
+        {error ? (
+          <div className="inline-error-with-copy">
+            <p className="inline-error">{error}</p>
+            <CopyErrorButton text={error} />
+          </div>
+        ) : null}
         <div className="viewer-tools">
           <button className="button subtle small" type="button" onClick={resetViewer}>
             Sıfırla

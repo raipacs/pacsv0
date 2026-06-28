@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { useFormStatus } from "react-dom"
 
 import { startAiPreReport } from "@/app/actions/ai"
+import { CopyErrorButton } from "@/components/copy-error-button"
 import type { AiProviderOption } from "@/lib/ai-reporting"
 
 type AiLaunchJobStatus = {
@@ -112,6 +113,9 @@ function AiLaunchFields({
       >
         {statusText}
       </span>
+      {!pending && latestJob?.status === "failed" && latestJob.errorMessage ? (
+        <CopyErrorButton text={statusText} />
+      ) : null}
     </>
   )
 }

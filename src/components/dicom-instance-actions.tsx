@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 
 import { createDicomSignedUrl, createOhifViewerLaunchUrl } from "@/app/actions/storage"
+import { CopyErrorButton } from "@/components/copy-error-button"
 import { usePrivacyMode } from "@/components/privacy-mode"
 import {
   decodeDicomPreview,
@@ -260,7 +261,12 @@ export function DicomInstanceActions({
             Signed URL
           </button>
         ) : null}
-        {error ? <span className="inline-error">{error}</span> : null}
+        {error ? (
+          <span className="inline-error-with-copy">
+            <span className="inline-error">{error}</span>
+            <CopyErrorButton text={error} />
+          </span>
+        ) : null}
       </span>
 
       {isViewerOpen ? (

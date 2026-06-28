@@ -3,6 +3,7 @@ import type { ReactNode } from "react"
 
 import { upsertDicomModality } from "@/app/actions/admin"
 import { BranchFilter } from "@/components/branch-filter"
+import { CopyErrorButton } from "@/components/copy-error-button"
 import { requireAdmin } from "@/lib/auth"
 import { resolveSelectedBranch, type BranchOption } from "@/lib/branches"
 import {
@@ -769,7 +770,10 @@ function FailedJobRow({ job }: { job: ImportJobSummary }) {
       </td>
       <td>{formatDateTime(job.lastSeenAt)}</td>
       <td>
-        <span className="table-note">{job.errorMessage || "Import hata aldı"}</span>
+        <span className="inline-error-with-copy">
+          <span className="table-note">{job.errorMessage || "Import hata aldı"}</span>
+          <CopyErrorButton text={job.errorMessage || "Import hata aldı"} />
+        </span>
       </td>
     </tr>
   )
@@ -855,7 +859,12 @@ function ImportJobRow({
         <span className={`health-badge ${jobStatusClass(job.status)}`}>
           {jobStatusLabel(job.status)}
         </span>
-        {job.errorMessage ? <span className="table-note">{job.errorMessage}</span> : null}
+        {job.errorMessage ? (
+          <span className="inline-error-with-copy">
+            <span className="table-note">{job.errorMessage}</span>
+            <CopyErrorButton text={job.errorMessage} />
+          </span>
+        ) : null}
       </td>
     </tr>
   )

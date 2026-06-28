@@ -1,3 +1,4 @@
+import { CopyErrorButton } from "@/components/copy-error-button"
 import { getShareViewerData, type ShareViewerData } from "@/lib/share-response"
 
 export const metadata = { title: "RAI PACS Paylaşım" }
@@ -60,7 +61,10 @@ function ShareError({ message }: { message: string }) {
         <div className="panel-heading">
           <h1>Paylaşım açılamadı</h1>
         </div>
-        <p className="empty-state">{message}</p>
+        <div className="empty-state-with-copy">
+          <p className="empty-state">{message}</p>
+          <CopyErrorButton text={message} />
+        </div>
       </section>
     </main>
   )

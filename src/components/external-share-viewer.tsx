@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 
+import { CopyErrorButton } from "@/components/copy-error-button"
 import { RaiDicomViewer } from "@/components/rai-dicom-viewer"
 
 type SharedViewerData = {
@@ -90,7 +91,10 @@ export function ExternalShareViewer({ token: initialToken = "" }: { token?: stri
           <div className="panel-heading">
             <h1>Paylaşım açılamadı</h1>
           </div>
-          <p className="empty-state">{error || "Paylaşım linki geçersiz."}</p>
+          <div className="empty-state-with-copy">
+            <p className="empty-state">{error || "Paylaşım linki geçersiz."}</p>
+            <CopyErrorButton text={error || "Paylaşım linki geçersiz."} />
+          </div>
         </section>
       </main>
     )

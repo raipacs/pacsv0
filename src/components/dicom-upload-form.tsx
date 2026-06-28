@@ -14,6 +14,7 @@ import {
   DICOM_STORAGE_BUCKET,
   MAX_BROWSER_DICOM_UPLOAD_BYTES,
 } from "@/lib/dicom-storage"
+import { CopyErrorButton } from "@/components/copy-error-button"
 import {
   isDicomInstanceMetadata,
   parseDicomMetadata,
@@ -253,14 +254,22 @@ export function DicomUploadForm({
           </label>
         </div>
       </fieldset>
-      {status.message ? (
+      {status.message && status.type === "error" ? (
+        <div className="form-status-with-copy">
+          <p className={`form-status ${status.type}`}>{status.message}</p>
+          <CopyErrorButton text={status.message} />
+        </div>
+      ) : status.message ? (
         <p className={`form-status ${status.type}`}>{status.message}</p>
       ) : null}
       {!supabaseConfigured ? (
-        <p className="form-status error">
-          Demo modda dosya yüklenmez. Vercel ortam değişkenleri ve Supabase
-          projesi bağlanınca Storage aktif olur.
-        </p>
+        <div className="form-status-with-copy">
+          <p className="form-status error">
+            Demo modda dosya yüklenmez. Vercel ortam değişkenleri ve Supabase
+            projesi bağlanınca Storage aktif olur.
+          </p>
+          <CopyErrorButton text="Demo modda dosya yüklenmez. Vercel ortam değişkenleri ve Supabase projesi bağlanınca Storage aktif olur." />
+        </div>
       ) : null}
       <button
         className="button primary"
@@ -622,7 +631,12 @@ export function DicomExportImportForm({
           </label>
         </div>
       </fieldset>
-      {status.message ? (
+      {status.message && status.type === "error" ? (
+        <div className="form-status-with-copy">
+          <p className={`form-status ${status.type}`}>{status.message}</p>
+          <CopyErrorButton text={status.message} />
+        </div>
+      ) : status.message ? (
         <p className={`form-status ${status.type}`}>{status.message}</p>
       ) : null}
       {importProgress ? (
@@ -643,10 +657,13 @@ export function DicomExportImportForm({
         </details>
       ) : null}
       {!supabaseConfigured ? (
-        <p className="form-status error">
-          Demo modda dosya yüklenmez. Vercel ortam değişkenleri ve Supabase
-          projesi bağlanınca Storage aktif olur.
-        </p>
+        <div className="form-status-with-copy">
+          <p className="form-status error">
+            Demo modda dosya yüklenmez. Vercel ortam değişkenleri ve Supabase
+            projesi bağlanınca Storage aktif olur.
+          </p>
+          <CopyErrorButton text="Demo modda dosya yüklenmez. Vercel ortam değişkenleri ve Supabase projesi bağlanınca Storage aktif olur." />
+        </div>
       ) : null}
       <button
         className="button primary"

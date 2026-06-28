@@ -3,6 +3,7 @@
 import { useActionState } from "react"
 
 import { createPatient, type PatientFormState } from "@/app/actions/patients"
+import { CopyErrorButton } from "@/components/copy-error-button"
 
 const initialState: PatientFormState = {}
 
@@ -80,7 +81,12 @@ export function PatientForm() {
           </label>
         </div>
       </fieldset>
-      {state.error ? <p className="form-status error">{state.error}</p> : null}
+      {state.error ? (
+        <div className="form-status-with-copy">
+          <p className="form-status error">{state.error}</p>
+          <CopyErrorButton text={state.error} />
+        </div>
+      ) : null}
       <button className="button primary" type="submit" disabled={pending}>
         {pending ? "Kaydediliyor..." : "Hastayı kaydet"}
       </button>

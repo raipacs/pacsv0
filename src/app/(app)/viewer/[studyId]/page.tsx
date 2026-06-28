@@ -3,6 +3,7 @@ import { headers } from "next/headers"
 import { notFound } from "next/navigation"
 
 import { finalizeReport, saveReportDraft } from "@/app/actions/reports"
+import { CopyErrorButton } from "@/components/copy-error-button"
 import {
   MaskedPatientId,
   MaskedPatientName,
@@ -117,6 +118,17 @@ export default async function RaiViewerPage({
     : `/viewer/${studyId}`
 
   const seriesById = new Map((series ?? []).map((item) => [item.id, item]))
+  const latestJobErrorText =
+    aiViewerState.latestJob?.status === "failed"
+      ? [
+          aiViewerState.latestJob.providerName,
+          aiViewerState.latestJob.modelName,
+          "Ön rapor üretimi başarısız.",
+          aiViewerState.latestJob.errorMessage || "AI sağlayıcı hatası kaydedildi.",
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : ""
 
   return (
     <section className="rai-viewer-page">
@@ -173,6 +185,7 @@ export default async function RaiViewerPage({
             {aiViewerState.latestJob.modelName || "model seçilmedi"} · Ön rapor üretimi başarısız.
           </span>
           <small>{aiViewerState.latestJob.errorMessage || "AI sağlayıcı hatası kaydedildi."}</small>
+          <CopyErrorButton text={latestJobErrorText} />
         </section>
       ) : null}
       <ReportEditorPanel
@@ -486,7 +499,10 @@ function ViewerError({ message }: { message: string }) {
       <div className="panel-heading">
         <h1>Viewer açılamadı</h1>
       </div>
-      <p className="empty-state">{message}</p>
+      <div className="empty-state-with-copy">
+        <p className="empty-state">{message}</p>
+        <CopyErrorButton text={message} />
+      </div>
       <div className="form-actions">
         <Link className="button primary" href="/worklist">
           Worklist&apos;e dön

@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react"
 
 import { signIn, type LoginState } from "@/app/actions/auth"
+import { CopyErrorButton } from "@/components/copy-error-button"
 import type { LoginCaptchaChallenge } from "@/lib/login-captcha"
 
 const initialState: LoginState = {}
@@ -74,7 +75,12 @@ export function LoginForm({
           required
         />
       </label>
-      {state.error ? <p className="form-error">{state.error}</p> : null}
+      {state.error ? (
+        <div className="form-status-with-copy">
+          <p className="form-error">{state.error}</p>
+          <CopyErrorButton text={state.error} />
+        </div>
+      ) : null}
       <button type="submit" className="button primary" disabled={pending}>
         {pending ? "Giriş yapılıyor..." : demoMode ? "Demo panele gir" : "Giriş yap"}
       </button>
