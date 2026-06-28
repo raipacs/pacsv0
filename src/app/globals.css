@@ -786,7 +786,7 @@ body:has(.rai-viewer-page) .app-header {
 
 .report-editor-strip {
   grid-row: 3;
-  max-height: 236px;
+  max-height: 292px;
   min-height: 0;
   overflow: auto;
   border-bottom: 1px solid #123366;
@@ -840,11 +840,62 @@ body:has(.rai-viewer-page) .app-header {
   flex: 0 0 auto;
 }
 
+.report-editor-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.28fr) minmax(0, 1fr);
+  gap: 12px;
+  padding: 0 clamp(10px, 1.5vw, 18px) 12px;
+}
+
+.report-source-list {
+  display: grid;
+  max-height: 206px;
+  align-content: start;
+  gap: 6px;
+  overflow: auto;
+}
+
+.report-source-card {
+  display: grid;
+  width: 100%;
+  min-height: 52px;
+  border: 1px solid #1e3a5f;
+  border-radius: 8px;
+  padding: 8px;
+  color: #cbd5e1;
+  background: #0b1730;
+  text-align: left;
+  cursor: pointer;
+}
+
+.report-source-card.active {
+  border-color: #22d3ee;
+  color: #ecfeff;
+  background: #083344;
+}
+
+.report-source-card strong,
+.report-source-card span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-source-card strong {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.report-source-card span {
+  color: #93c5fd;
+  font-size: 11px;
+  font-weight: 750;
+}
+
 .report-editor-form {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr) minmax(230px, 0.4fr);
   gap: 10px;
-  padding: 0 clamp(10px, 1.5vw, 18px) 12px;
 }
 
 .report-editor-form label {
@@ -3102,6 +3153,14 @@ td span {
 
   .report-editor-form {
     grid-template-columns: 1fr;
+  }
+
+  .report-editor-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .report-source-list {
+    max-height: 150px;
   }
 
   .external-share-panel {

@@ -2,7 +2,6 @@ import Link from "next/link"
 import { headers } from "next/headers"
 import { notFound } from "next/navigation"
 
-import { finalizeReport, saveReportDraft } from "@/app/actions/reports"
 import { CopyErrorButton } from "@/components/copy-error-button"
 import {
   MaskedPatientId,
@@ -12,7 +11,12 @@ import {
 import { AiLaunchControl } from "@/components/ai-launch-control"
 import { ExternalShareButton } from "@/components/external-share-button"
 import { RaiDicomViewer } from "@/components/rai-dicom-viewer"
-import { aiJobStatusLabel, isMissingAiTableError, type AiProviderOption } from "@/lib/ai-reporting"
+import {
+  ReportEditorPanel,
+  type ReportEditorAiDraft,
+  type ReportEditorReport,
+} from "@/components/report-editor-panel"
+import { isMissingAiTableError, type AiProviderOption } from "@/lib/ai-reporting"
 import { requireUser } from "@/lib/auth"
 import { isSupabaseConfigured } from "@/lib/config"
 import { hasOhifLaunchSecret } from "@/lib/ohif-launch"
@@ -27,7 +31,7 @@ export default async function RaiViewerPage({
   searchParams,
 }: {
   params: Promise<{ studyId: string }>
-  searchParams: Promise<{ aiJob?: string; patientId?: string }>
+  searchParams: Promise<{ aiJob?: string; patientId?: string; reportId?: string }>
 }) {
   const [{ studyId }, query, user] = await Promise.all([
     params,
@@ -60,7 +64,7 @@ export default async function RaiViewerPage({
     { data: series, error: seriesError },
     { data: instances, error: instancesError },
     aiViewerState,
-    { data: latestReport, error: latestReportError },
+    { data: reports, error: reportsError },
   ] = await Promise.all([
       supabase
         .from("series")
@@ -81,8 +85,7 @@ export default async function RaiViewerPage({
         .eq("organization_id", user.organizationId)
         .eq("study_id", study.id)
         .order("version", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+        .limit(12),
     ])
 
   if (seriesError) {
@@ -93,8 +96,8 @@ export default async function RaiViewerPage({
     throw new Error(`Viewer instance listesi alınamadı: ${instancesError.message}`)
   }
 
-  if (latestReportError) {
-    throw new Error(`Rapor bilgisi alınamadı: ${latestReportError.message}`)
+  if (reportsError) {
+    throw new Error(`Rapor bilgisi alınamadı: ${reportsError.message}`)
   }
 
   const patient = Array.isArray(study.patients) ? study.patients[0] : study.patients
@@ -189,11 +192,21 @@ export default async function RaiViewerPage({
         </section>
       ) : null}
       <ReportEditorPanel
+        aiDrafts={aiViewerState.drafts}
+        initialSourceId={resolveInitialReportSourceId(
+          query.reportId,
+          reports ?? [],
+          aiViewerState.drafts
+        )}
         isNewAiDraft={Boolean(query.aiJob && query.aiJob === aiViewerState.latestDraft?.jobId)}
-        latestDraft={aiViewerState.latestDraft}
-        report={latestReport}
+        reports={mapReportsForEditor(reports ?? [])}
         returnTo={returnTo}
         studyId={studyId}
+        template={createRadiologyReportTemplate({
+          accessionNumber: study.accession_number,
+          description: study.description,
+          modality: study.modality,
+        })}
       />
       <RaiDicomViewer
         studyId={studyId}
@@ -227,103 +240,13 @@ type ReportRow = {
   status: string
   updated_at: string
   version: number
-} | null
-
-function ReportEditorPanel({
-  isNewAiDraft,
-  latestDraft,
-  report,
-  returnTo,
-  studyId,
-}: {
-  isNewAiDraft: boolean
-  latestDraft: AiDraftView | null
-  report: ReportRow
-  returnTo: string
-  studyId: string
-}) {
-  const defaultFindings = report?.findings || latestDraft?.findings || ""
-  const defaultImpression = report?.impression || latestDraft?.impression || ""
-  const isFinal = report?.status === "final"
-
-  return (
-    <details className="report-editor-strip" open={Boolean(latestDraft || report)}>
-      <summary>
-        <span>Rapor</span>
-        <strong>
-          {report
-            ? `${report.status === "final" ? "Nihai rapor" : "Taslak rapor"} v${report.version}`
-            : latestDraft
-              ? "AI ön rapordan taslak"
-              : "Manuel rapor"}
-        </strong>
-        {latestDraft ? (
-          <small>
-            <span className="health-badge ok">
-              {isNewAiDraft ? "Yeni ön rapor hazır" : aiJobStatusLabel(latestDraft.jobStatus)}
-            </span>
-            {latestDraft.providerName} · {latestDraft.modelName || "model seçilmedi"} · Güven skoru{" "}
-            {formatConfidence(latestDraft.confidenceScore)}
-          </small>
-        ) : null}
-      </summary>
-      <form className="report-editor-form">
-        <input name="studyId" type="hidden" value={studyId} />
-        <input name="reportId" type="hidden" value={report?.id ?? ""} />
-        <input name="returnTo" type="hidden" value={returnTo} />
-        <label>
-          Bulgular
-          <textarea
-            defaultValue={defaultFindings}
-            name="findings"
-            placeholder="Bulgular..."
-            readOnly={isFinal}
-            rows={5}
-            required
-          />
-        </label>
-        <label>
-          İzlenim
-          <textarea
-            defaultValue={defaultImpression}
-            name="impression"
-            placeholder="İzlenim..."
-            readOnly={isFinal}
-            rows={3}
-            required
-          />
-        </label>
-        <div className="report-editor-actions">
-          <small>
-            {isFinal
-              ? `Onaylandı: ${formatDateTime(report.finalized_at)}`
-              : "AI taslağı hekim tarafından düzenlenip onaylanınca nihai rapora dönüşür."}
-          </small>
-          <button
-            className="button subtle"
-            disabled={isFinal}
-            formAction={saveReportDraft}
-            type="submit"
-          >
-            Taslak kaydet
-          </button>
-          <button
-            className="button primary"
-            disabled={isFinal}
-            formAction={finalizeReport}
-            type="submit"
-          >
-            Nihai rapor onayla
-          </button>
-        </div>
-      </form>
-    </details>
-  )
 }
 
 type AiDraftView = {
   confidenceScore: number | null
+  createdAt: string
   findings: string
+  id: string
   impression: string
   jobStatus: string
   jobId: string
@@ -345,6 +268,7 @@ async function loadAiViewerState(
   organizationId: string,
   studyId: string
 ): Promise<{
+  drafts: AiDraftView[]
   latestJob: AiJobView | null
   latestDraft: AiDraftView | null
   providers: AiProviderOption[]
@@ -360,6 +284,7 @@ async function loadAiViewerState(
   if (providersError) {
     if (isMissingAiTableError(providersError)) {
       return {
+        drafts: [],
         latestJob: null,
         latestDraft: null,
         providers: [],
@@ -370,18 +295,20 @@ async function loadAiViewerState(
     throw new Error(`AI servisleri alınamadı: ${providersError.message}`)
   }
 
-  const { data: latestDraft, error: draftError } = await supabase
+  const { data: aiDrafts, error: draftError } = await supabase
     .from("ai_report_drafts")
-    .select("id, job_id, findings, impression, confidence_score, created_at")
+    .select(
+      "id, job_id, findings, impression, confidence_score, created_at, ai_jobs(status, provider_slug, model_name, ai_service_providers(name))"
+    )
     .eq("organization_id", organizationId)
     .eq("study_id", studyId)
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
+    .limit(8)
 
   if (draftError) {
     if (isMissingAiTableError(draftError)) {
       return {
+        drafts: [],
         latestJob: null,
         latestDraft: null,
         providers: mapAiProviders(providers ?? []),
@@ -393,39 +320,12 @@ async function loadAiViewerState(
   }
 
   const latestJob = await loadLatestAiJob(supabase, organizationId, studyId)
-
-  if (!latestDraft) {
-    return {
-      latestJob,
-      latestDraft: null,
-      providers: mapAiProviders(providers ?? []),
-    }
-  }
-
-  const { data: job, error: jobError } = await supabase
-    .from("ai_jobs")
-    .select("status, provider_slug, model_name, ai_service_providers(name)")
-    .eq("id", latestDraft.job_id)
-    .eq("organization_id", organizationId)
-    .maybeSingle()
-
-  if (jobError) throw new Error(`AI iş bilgisi alınamadı: ${jobError.message}`)
-
-  const provider = Array.isArray(job?.ai_service_providers)
-    ? job?.ai_service_providers[0]
-    : job?.ai_service_providers
+  const drafts = mapAiDraftsForEditor(aiDrafts ?? [])
 
   return {
+    drafts,
     latestJob,
-    latestDraft: {
-      confidenceScore: latestDraft.confidence_score,
-      findings: latestDraft.findings,
-      impression: latestDraft.impression,
-      jobStatus: job?.status ?? "draft_ready",
-      jobId: latestDraft.job_id,
-      modelName: job?.model_name ?? null,
-      providerName: provider?.name ?? job?.provider_slug ?? "AI",
-    },
+    latestDraft: drafts[0] ?? null,
     providers: mapAiProviders(providers ?? []),
   }
 }
@@ -480,17 +380,94 @@ function mapAiProviders(rows: Array<Record<string, unknown>>): AiProviderOption[
   }))
 }
 
-function formatConfidence(value: number | null) {
-  if (typeof value !== "number") return "-"
-  return `%${Math.round(value * 100)}`
+function mapReportsForEditor(rows: ReportRow[]): ReportEditorReport[] {
+  return rows.map((row) => ({
+    finalizedAt: row.finalized_at,
+    findings: row.findings ?? "",
+    id: row.id,
+    impression: row.impression ?? "",
+    status: row.status,
+    updatedAt: row.updated_at,
+    version: row.version,
+  }))
 }
 
-function formatDateTime(value: string | null) {
-  if (!value) return "-"
-  return new Intl.DateTimeFormat("tr-TR", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date(value))
+function mapAiDraftsForEditor(rows: Array<Record<string, unknown>>): ReportEditorAiDraft[] {
+  return rows.map((row) => {
+    const job = firstRelation(row.ai_jobs as Record<string, unknown> | Record<string, unknown>[] | null)
+    const provider = firstRelation(
+      job?.ai_service_providers as Record<string, unknown> | Record<string, unknown>[] | null
+    )
+
+    return {
+      confidenceScore:
+        typeof row.confidence_score === "number"
+          ? row.confidence_score
+          : row.confidence_score
+            ? Number(row.confidence_score)
+            : null,
+      createdAt: String(row.created_at ?? ""),
+      findings: String(row.findings ?? ""),
+      id: String(row.id),
+      impression: String(row.impression ?? ""),
+      jobId: String(row.job_id ?? ""),
+      jobStatus: String(job?.status ?? "draft_ready"),
+      modelName: String(job?.model_name ?? "") || null,
+      providerName: String(provider?.name ?? job?.provider_slug ?? "AI"),
+    }
+  })
+}
+
+function firstRelation<T>(value: T | T[] | null | undefined) {
+  return Array.isArray(value) ? value[0] : value
+}
+
+function resolveInitialReportSourceId(
+  reportId: string | undefined,
+  reports: ReportRow[],
+  aiDrafts: ReportEditorAiDraft[]
+) {
+  if (reportId && reports.some((report) => report.id === reportId)) return `report:${reportId}`
+
+  const latestDraft = reports.find((report) => report.status === "draft")
+  if (latestDraft) return `report:${latestDraft.id}`
+
+  if (aiDrafts[0]) return `ai:${aiDrafts[0].id}`
+
+  const latestReport = reports[0]
+  if (latestReport) return `report:${latestReport.id}`
+
+  return "template:new"
+}
+
+function createRadiologyReportTemplate({
+  accessionNumber,
+  description,
+  modality,
+}: {
+  accessionNumber: string
+  description: string | null
+  modality: string
+}) {
+  const studyName = description || `${modality} tetkiki`
+
+  return {
+    findings: [
+      `Tetkik: ${studyName}`,
+      `Accession: ${accessionNumber || "-"}`,
+      "Teknik: DICOM görüntüleri klinik endikasyon doğrultusunda incelendi.",
+      "Karşılaştırma: Önceki tetkik mevcutsa karşılaştırıldı.",
+      "",
+      "Bulgular:",
+      "- İnceleme alanına giren anatomik yapılar sistematik olarak değerlendirildi.",
+      "- Patolojik bulgu, ölçüm ve lokalizasyon bilgileri bu alana yazılacaktır.",
+    ].join("\n"),
+    impression: [
+      "Sonuç:",
+      "1. Klinik ve görüntüleme bulguları birlikte değerlendirilerek nihai izlenim yazılacaktır.",
+      "2. Gerekirse takip/ek inceleme önerisi bu alana eklenecektir.",
+    ].join("\n"),
+  }
 }
 
 function ViewerError({ message }: { message: string }) {
