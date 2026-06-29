@@ -17,12 +17,14 @@ type AiLaunchJobStatus = {
 }
 
 export function AiLaunchControl({
+  initialProviderId,
   latestJob,
   providers,
   returnTo,
   studyId,
   unavailableReason,
 }: {
+  initialProviderId?: string
   latestJob: AiLaunchJobStatus | null
   providers: AiProviderOption[]
   returnTo: string
@@ -32,8 +34,10 @@ export function AiLaunchControl({
   const activeProviders = providers.filter((provider) => provider.isActive)
   const defaultProvider =
     activeProviders.find((provider) => provider.isDefault) ?? activeProviders[0] ?? null
+  const initialProvider =
+    activeProviders.find((provider) => provider.id === initialProviderId) ?? defaultProvider
   const disabled = Boolean(unavailableReason) || !defaultProvider
-  const [selectedProviderId, setSelectedProviderId] = useState(defaultProvider?.id ?? "")
+  const [selectedProviderId, setSelectedProviderId] = useState(initialProvider?.id ?? "")
   const selectedProvider = useMemo(
     () => providers.find((provider) => provider.id === selectedProviderId) ?? defaultProvider,
     [defaultProvider, providers, selectedProviderId]

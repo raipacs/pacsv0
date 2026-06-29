@@ -31,7 +31,7 @@ export default async function RaiViewerPage({
   searchParams,
 }: {
   params: Promise<{ studyId: string }>
-  searchParams: Promise<{ aiJob?: string; patientId?: string; reportId?: string }>
+  searchParams: Promise<{ aiJob?: string; aiProvider?: string; patientId?: string; reportId?: string }>
 }) {
   const [{ studyId }, query, user] = await Promise.all([
     params,
@@ -156,6 +156,7 @@ export default async function RaiViewerPage({
         <nav aria-label="Viewer navigasyonu">
           <PrivacyToggle />
           <AiLaunchControl
+            initialProviderId={query.aiProvider}
             latestJob={aiViewerState.latestJob}
             providers={aiViewerState.providers}
             returnTo={returnTo}

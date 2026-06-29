@@ -87,7 +87,10 @@ export async function startAiPreReport(formData: FormData) {
     const routedFormData = new FormData()
     routedFormData.set("studyId", studyId)
     routedFormData.set("providerId", routedProvider.id)
-    routedFormData.set("returnTo", appendQuery(returnTo, "orchestrator", routedProvider.slug))
+    routedFormData.set(
+      "returnTo",
+      appendQuery(appendQueryIfMissing(returnTo, "aiProvider", provider.id), "orchestrator", routedProvider.slug)
+    )
     return startAiPreReport(routedFormData)
   }
 
@@ -731,12 +734,22 @@ export async function startAiPreReport(formData: FormData) {
   })
 
   revalidatePath(`/viewer/${studyId}`)
-  redirect(appendQuery(returnTo, "aiJob", job.id))
+  redirect(appendQuery(appendQueryIfMissing(returnTo, "aiProvider", provider.id), "aiJob", job.id))
 }
 
 function appendQuery(path: string, key: string, value: string) {
   const separator = path.includes("?") ? "&" : "?"
   return `${path}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+}
+
+function appendQueryIfMissing(path: string, key: string, value: string) {
+  const [pathname, queryString] = path.split("?")
+  if (!queryString) return appendQuery(path, key, value)
+
+  const params = new URLSearchParams(queryString)
+  if (params.has(key)) return path
+  params.set(key, value)
+  return `${pathname}?${params.toString()}`
 }
 
 type OpenAiDraft = {
