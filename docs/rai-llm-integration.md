@@ -74,6 +74,12 @@ Bu komut Artifact Registry image build eder, Cloud Run Gen2 uzerinde NVIDIA L4
 GPU'lu public HTTPS endpoint acicak sekilde deploy eder. Endpoint public olur;
 erisimi uygulama icindeki Bearer token kontroluyle sinirlanir.
 
+Cloud Run icin ilgili bolgede en az 1 adet
+`run.googleapis.com/nvidia_l4_gpu_allocation_no_zonal_redundancy` kotasi
+gereklidir. `rai-pacs` projesinde kota 0 ise Cloud Run deploy tamamlanmaz; once
+Google Cloud Console uzerinden Cloud Run NVIDIA L4 GPU quota talebi
+acilmalidir.
+
 Deploy script'i endpoint ve token iceren `rai-llm-vercel.env` dosyasini uretir.
 Bu dosya Cloud Shell veya deploy ortami disina tasinmamalidir. Vercel production
 env degerlerini ayni dosyadan yazmak icin:

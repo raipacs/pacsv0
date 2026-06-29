@@ -83,12 +83,18 @@ SERVICE_NAME=rai-llm \
 npm run deploy:rai-llm:cloud-run
 ```
 
+On kosul: Cloud Run icin ilgili bolgede en az 1 adet
+`run.googleapis.com/nvidia_l4_gpu_allocation_no_zonal_redundancy` kotasi
+gerekir. Kota 0 ise deploy `consumer override value can only be set between 0
+to 0` veya GPU quota hatasiyla durur; Google Cloud Console uzerinden Cloud Run
+NVIDIA L4 GPU quota talebi acilmalidir.
+
 Script su islemleri yapar:
 
 - Artifact Registry repository olusturur veya mevcut repository'yi kullanir.
 - `services/rai-llm` Docker imajini Cloud Build ile build eder.
 - Cloud Run Gen2 uzerinde 1 adet NVIDIA L4 GPU, 8 CPU, 32 GiB RAM ve
-  concurrency 1 ile servis deploy eder.
+  concurrency 1 ile no-zonal-redundancy modunda servis deploy eder.
 - Public HTTPS endpoint olusturur; uygulama icinde Bearer token kontrolu devam
   eder.
 

@@ -131,6 +131,16 @@ const searchItems = [
 const changelog = [
   {
     date: "2026-06-29",
+    version: "0.2.0-dev.13",
+    title: "RAI LLM GPU quota on kosulu netlestirildi",
+    items: [
+      "Cloud Run L4 GPU deploy script'i no-zonal-redundancy parametresiyle kalici hale getirildi.",
+      "Google Cloud Run NVIDIA L4 GPU kotasi 0 oldugunda deploy'un duracagi ve quota talebi gerektigi dokumante edildi.",
+      "RAI LLM runbook'u Cloud Run GPU quota kontrolu ve Vercel aktivasyon adimlariyla guncellendi.",
+    ],
+  },
+  {
+    date: "2026-06-29",
     version: "0.2.0-dev.12",
     title: "RAI LLM Vercel aktivasyon script'i eklendi",
     items: [

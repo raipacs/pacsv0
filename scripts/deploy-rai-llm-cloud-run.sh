@@ -58,6 +58,7 @@ gcloud run deploy "${SERVICE_NAME}" \
   --execution-environment gen2 \
   --gpu 1 \
   --gpu-type nvidia-l4 \
+  --no-gpu-zonal-redundancy \
   --cpu 8 \
   --memory 32Gi \
   --concurrency 1 \
