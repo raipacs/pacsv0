@@ -131,6 +131,16 @@ const searchItems = [
 const changelog = [
   {
     date: "2026-06-29",
+    version: "0.2.0-dev.12",
+    title: "RAI LLM Vercel aktivasyon script'i eklendi",
+    items: [
+      "Cloud Run deploy sonrasinda endpoint ve token degerlerini rai-llm-vercel.env dosyasina yazan akis eklendi.",
+      "RAI LLM production env degerlerini Vercel'e tek komutla gecmek icin npm run configure:rai-llm:vercel script'i eklendi.",
+      "RAI LLM canli kullanim icin Cloud Run GPU endpoint, Vercel env ve Admin canli test adimlari netlestirildi.",
+    ],
+  },
+  {
+    date: "2026-06-29",
     version: "0.2.0-dev.11",
     title: "RAI LLM Cloud Run GPU deploy script'i eklendi",
     items: [

@@ -74,6 +74,15 @@ SERVICE_URL="$(gcloud run services describe "${SERVICE_NAME}" \
   --project "${PROJECT_ID}" \
   --format 'value(status.url)')"
 
+ENV_FILE="rai-llm-vercel.env"
+cat > "${ENV_FILE}" <<EOF
+RAI_LLM_ENDPOINT=${SERVICE_URL}/v1/chat/completions
+RAI_LLM_API_KEY=${API_KEY}
+RAI_LLM_ENDPOINT_MODE=openai-compatible
+RAI_LLM_MODEL_ID=${MODEL_ID}
+EOF
+chmod 600 "${ENV_FILE}"
+
 cat <<EOF
 
 RAI LLM Cloud Run deployment hazır.
@@ -91,7 +100,11 @@ RAI_LLM_ENDPOINT=${SERVICE_URL}/v1/chat/completions
 RAI_LLM_API_KEY=<token>
 RAI_LLM_ENDPOINT_MODE=openai-compatible
 
-Not: API token güvenlik nedeniyle burada maskelenmiştir. Script içinde RAI_LLM_API_KEY
-env ile verdiğiniz token kullanılır. Aynı token Vercel production env tarafına
-RAI_LLM_API_KEY olarak eklenmelidir.
+Env dosyası:
+${ENV_FILE}
+
+Bu dosya chmod 600 ile oluşturuldu ve token içerir. Aynı Cloud Shell oturumunda:
+npm run configure:rai-llm:vercel
+
+komutu Vercel production env değerlerini günceller.
 EOF

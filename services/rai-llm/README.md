@@ -100,6 +100,18 @@ RAI_LLM_API_KEY=<strong-random-token> \
 npm run test:rai-llm
 ```
 
+Cloud Run script'i `rai-llm-vercel.env` dosyasini uretir. Bu dosya token
+icerir ve `chmod 600` ile korunur. Ayni ortamda Vercel production env
+degerlerini yazmak icin:
+
+```bash
+npm run configure:rai-llm:vercel
+npx vercel --prod
+```
+
+Son dogrulama Admin > AI Servisleri ekranindaki `Canli test et` butonuyla
+yapilir.
+
 ## Klinik not
 
 RAI LLM ciktilari tanisal karar degildir. Hekim tarafindan duzenlenip

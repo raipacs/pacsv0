@@ -74,6 +74,19 @@ Bu komut Artifact Registry image build eder, Cloud Run Gen2 uzerinde NVIDIA L4
 GPU'lu public HTTPS endpoint acicak sekilde deploy eder. Endpoint public olur;
 erisimi uygulama icindeki Bearer token kontroluyle sinirlanir.
 
+Deploy script'i endpoint ve token iceren `rai-llm-vercel.env` dosyasini uretir.
+Bu dosya Cloud Shell veya deploy ortami disina tasinmamalidir. Vercel production
+env degerlerini ayni dosyadan yazmak icin:
+
+```bash
+npm run configure:rai-llm:vercel
+npx vercel --prod
+```
+
+Canli dogrulama Admin > AI Servisleri ekranindaki `Canli test et` aksiyonuyla
+yapilir. Test basarili olduktan sonra Viewer icinde provider olarak RAI LLM
+secilip on rapor akisi denenir.
+
 ## Gelisim yolu
 
 1. RAI LLM v0: Qwen2.5-VL tabanli self-hosted inference.
