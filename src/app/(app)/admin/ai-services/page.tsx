@@ -237,6 +237,11 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
             <strong>{raiLlmStatus.apiKeyState}</strong>
             <small>Secret değeri ekranda gösterilmez</small>
           </article>
+          <article>
+            <span>Altyapı</span>
+            <strong>{raiLlmStatus.infrastructureState}</strong>
+            <small>{raiLlmStatus.infrastructureLabel}</small>
+          </article>
         </div>
         <div className="rai-llm-runbook">
           <div>
@@ -751,10 +756,14 @@ function buildRaiLlmStatus(provider: AiProviderRow | null) {
     apiKeyState: apiKeyReady ? "Tanımlı" : "Opsiyonel / eksik",
     endpointLabel,
     endpointState: endpointReady ? endpointMode : "Eksik",
+    infrastructureLabel: endpointReady
+      ? "GPU endpoint Vercel env ile bağlı"
+      : "Cloud Run ve Compute GPU kotası onay bekliyor",
+    infrastructureState: endpointReady ? "Hazır" : "GPU quota bekliyor",
     model,
     nextStep: ready
       ? "RAI Viewer içinde RAI LLM provider seçilerek ön rapor testi yapılabilir."
-      : "GPU endpoint ayağa kaldırılıp Vercel ortamında RAI_LLM_ENDPOINT tanımlandıktan sonra provider aktif edilmelidir.",
+      : "Google Cloud üzerinde Cloud Run NVIDIA L4 GPU kotası en az 1 olacak şekilde onaylanmalı. Kota açılınca hazır imaj yeniden deploy edilip Vercel ortamında RAI_LLM_ENDPOINT tanımlanacak.",
     providerLabel: provider?.name || "RAI LLM",
     providerState,
     ready,
@@ -765,6 +774,11 @@ function buildRaiLlmStatus(provider: AiProviderRow | null) {
           "npm run test:rai-llm",
         ].join(" \\\n")
       : [
+          "# Google Cloud kota talebi",
+          "run.googleapis.com/nvidia_l4_gpu_allocation_no_zonal_redundancy",
+          "region=europe-west4 value=1",
+          "",
+          "# Kota onaylanınca",
           "RAI_LLM_ENDPOINT=https://<rai-llm-host>/v1/chat/completions",
           "RAI_LLM_API_KEY=<strong-random-token>",
           "npm run test:rai-llm",
