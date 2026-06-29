@@ -2357,6 +2357,23 @@ td span {
   line-height: 1.5;
 }
 
+.rai-llm-test-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.rai-llm-test-row form {
+  flex: 0 0 auto;
+}
+
+.rai-llm-test-row .form-help,
+.rai-llm-test-row .form-status {
+  margin: 0;
+}
+
 .form-help {
   margin: 0;
   color: var(--muted);
@@ -3910,6 +3927,11 @@ td span {
 
   .rai-llm-runbook {
     grid-template-columns: 1fr;
+  }
+
+  .rai-llm-test-row {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .admin-filter-form {

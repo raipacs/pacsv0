@@ -224,6 +224,116 @@ export async function createAiProvider(formData: FormData) {
   redirect("/admin/ai-services")
 }
 
+export async function testRaiLlmEndpoint() {
+  const user = await requireAdmin()
+  const endpoint = process.env.RAI_LLM_ENDPOINT?.trim()
+  const apiKey = process.env.RAI_LLM_API_KEY?.trim()
+  const model = process.env.RAI_LLM_MODEL_ID?.trim() || "Qwen/Qwen2.5-VL-7B-Instruct"
+  const startedAt = Date.now()
+  let status = "failed"
+  let message = "RAI_LLM_ENDPOINT tanımlı değil."
+  let elapsedMs = 0
+
+  if (endpoint) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 90_000)
+
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        },
+        body: JSON.stringify({
+          max_tokens: 450,
+          messages: [
+            {
+              content:
+                'Sen RAI PACS RAI LLM sağlık kontrolüsün. Sadece JSON döndür: {"findings":"...","impression":"...","recommendations":"...","confidenceScore":0.1,"criticality":"none"}',
+              role: "system",
+            },
+            {
+              content: [
+                {
+                  text: JSON.stringify({
+                    expectedJson: {
+                      confidenceScore: "number 0..1",
+                      criticality: "none | low | medium | high",
+                      findings: "string",
+                      impression: "string",
+                      recommendations: "string",
+                    },
+                    study: {
+                      accessionNumber: "RAI-LLM-ADMIN-SMOKE",
+                      description: "RAI LLM admin endpoint smoke test",
+                      instanceCount: 0,
+                      modality: "SR",
+                      seriesCount: 0,
+                    },
+                    task: "radiology_pre_report_smoke_test",
+                  }),
+                  type: "text",
+                },
+              ],
+              role: "user",
+            },
+          ],
+          model,
+          response_format: { type: "json_object" },
+          temperature: 0,
+        }),
+        signal: controller.signal,
+      })
+
+      const rawText = await response.text()
+      elapsedMs = Date.now() - startedAt
+
+      if (response.ok) {
+        const payload = parseJsonObject(rawText)
+        const content = extractChatCompletionText(payload) || rawText.trim()
+        status = content ? "ok" : "failed"
+        message = content
+          ? `Endpoint yanıt verdi. Model: ${String(payload?.model ?? model)}`
+          : "Endpoint yanıt verdi ancak boş içerik döndürdü."
+      } else {
+        message = `Endpoint ${response.status} döndü: ${clipForQuery(rawText)}`
+      }
+    } catch (error) {
+      elapsedMs = Date.now() - startedAt
+      message =
+        error instanceof Error && error.name === "AbortError"
+          ? "RAI LLM endpoint zaman aşımına uğradı."
+          : `RAI LLM endpoint testi başarısız: ${error instanceof Error ? error.message : String(error)}`
+    } finally {
+      clearTimeout(timeout)
+    }
+  }
+
+  if (isSupabaseConfigured) {
+    const supabase = await createClient()
+    await supabase.from("audit_logs").insert({
+      organization_id: user.organizationId,
+      actor_id: user.id,
+      action: "ai_provider.rai_llm_tested",
+      resource_type: "ai_service_provider",
+      metadata: {
+        elapsedMs,
+        endpointConfigured: Boolean(endpoint),
+        model,
+        status,
+      },
+    })
+  }
+
+  const params = new URLSearchParams({
+    raiLlmMessage: clipForQuery(message),
+    raiLlmMs: String(elapsedMs),
+    raiLlmTest: status,
+  })
+  redirect(`/admin/ai-services?${params.toString()}`)
+}
+
 export async function updateMemberAccess(formData: FormData) {
   const user = await requireAdmin()
   if (!isSupabaseConfigured) redirect("/admin/users")
@@ -981,4 +1091,34 @@ function isMissingBranchAccessTableError(error: { code?: string; message?: strin
     error.code === "42P01" ||
     /organization_member_branches|schema cache|does not exist|relation/i.test(error.message ?? "")
   )
+}
+
+function parseJsonObject(value: string) {
+  try {
+    return JSON.parse(value) as Record<string, unknown>
+  } catch {
+    return null
+  }
+}
+
+function extractChatCompletionText(payload: Record<string, unknown> | null) {
+  const choices = Array.isArray(payload?.choices) ? payload.choices : []
+  return choices
+    .map((choice) => {
+      if (!choice || typeof choice !== "object") return ""
+      const message = "message" in choice ? choice.message : null
+      if (message && typeof message === "object" && "content" in message) {
+        return typeof message.content === "string" ? message.content : ""
+      }
+      if ("text" in choice) return typeof choice.text === "string" ? choice.text : ""
+      return ""
+    })
+    .filter(Boolean)
+    .join("\n")
+    .trim()
+}
+
+function clipForQuery(value: string) {
+  const clean = value.replace(/\s+/g, " ").trim()
+  return clean.length > 180 ? `${clean.slice(0, 177)}...` : clean
 }

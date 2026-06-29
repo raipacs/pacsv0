@@ -1,6 +1,6 @@
 import Link from "next/link"
 
-import { createAiProvider, updateAiProvider } from "@/app/actions/admin"
+import { createAiProvider, testRaiLlmEndpoint, updateAiProvider } from "@/app/actions/admin"
 import { isMissingAiTableError } from "@/lib/ai-reporting"
 import { requireAdmin } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
@@ -79,7 +79,13 @@ type AiUsageRow = {
 }
 
 type AiServicesPageProps = {
-  searchParams: Promise<{ from?: string; to?: string }>
+  searchParams: Promise<{
+    from?: string
+    raiLlmMessage?: string
+    raiLlmMs?: string
+    raiLlmTest?: string
+    to?: string
+  }>
 }
 
 export default async function AiServicesPage({ searchParams }: AiServicesPageProps) {
@@ -147,6 +153,7 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
   )
   const raiLlmProvider = providers.find((provider) => provider.slug === "rai-llm") ?? null
   const raiLlmStatus = buildRaiLlmStatus(raiLlmProvider)
+  const raiLlmTestResult = parseRaiLlmTestResult(query)
   const readyDrafts = drafts.filter((draft) => draft.status === "ready")
   const usageSummary = summarizeUsage(usageRows)
   const totalUsage = usageSummary.reduce(
@@ -237,6 +244,21 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
             <p>{raiLlmStatus.nextStep}</p>
           </div>
           <pre>{raiLlmStatus.testCommand}</pre>
+        </div>
+        <div className="rai-llm-test-row">
+          <form action={testRaiLlmEndpoint}>
+            <button className="button subtle" type="submit">
+              Canlı test et
+            </button>
+          </form>
+          {raiLlmTestResult ? (
+            <p className={`form-status ${raiLlmTestResult.ok ? "success" : "error"}`}>
+              {raiLlmTestResult.message}
+              {raiLlmTestResult.elapsedMs ? ` · ${raiLlmTestResult.elapsedMs} ms` : ""}
+            </p>
+          ) : (
+            <p className="form-help">Endpoint env tanımlandıktan sonra buradan canlı bağlantı testi yapılır.</p>
+          )}
         </div>
       </section>
 
@@ -747,6 +769,15 @@ function buildRaiLlmStatus(provider: AiProviderRow | null) {
           "RAI_LLM_API_KEY=<strong-random-token>",
           "npm run test:rai-llm",
         ].join(" \\\n"),
+  }
+}
+
+function parseRaiLlmTestResult(query: Awaited<AiServicesPageProps["searchParams"]>) {
+  if (!query.raiLlmTest) return null
+  return {
+    elapsedMs: Number(query.raiLlmMs || 0),
+    message: query.raiLlmMessage || "RAI LLM test sonucu alındı.",
+    ok: query.raiLlmTest === "ok",
   }
 }
 
