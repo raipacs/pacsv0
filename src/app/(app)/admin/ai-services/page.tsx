@@ -94,7 +94,10 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
   const supabase = await createClient()
   const range = parseUsageRange(query)
 
-  await ensureRaiLlmProvider(supabase, user.organizationId, user.id)
+  await Promise.all([
+    ensureRaiLlmProvider(supabase, user.organizationId, user.id),
+    ensureRaiAiOrchestratorProvider(supabase, user.organizationId, user.id),
+  ])
 
   const [providersResult, jobsResult, draftsResult, usageResult] = await Promise.all([
     supabase
@@ -249,6 +252,17 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
             <p>{raiLlmStatus.nextStep}</p>
           </div>
           <pre>{raiLlmStatus.testCommand}</pre>
+        </div>
+        <div className="rai-llm-checklist">
+          {raiLlmStatus.setupChecklist.map((item) => (
+            <article key={item.label}>
+              <span className={`health-badge ${item.state}`}>{item.badge}</span>
+              <div>
+                <strong>{item.label}</strong>
+                <p>{item.detail}</p>
+              </div>
+            </article>
+          ))}
         </div>
         <div className="rai-llm-test-row">
           <form action={testRaiLlmEndpoint}>
@@ -702,6 +716,7 @@ function summarizeUsage(rows: AiUsageRow[]) {
 function providerLabel(value: string, slug?: string) {
   if (slug === "medgemma") return "MedGemma"
   if (slug === "rai-llm") return "RAI LLM"
+  if (slug === "rai-orchestrator") return "RAI AI Orchestrator"
   if (slug === "radialog") return "RaDialog"
 
   switch (value) {
@@ -721,6 +736,7 @@ function providerLabel(value: string, slug?: string) {
 function credentialPlaceholder(providerType: string, slug?: string) {
   if (slug === "medgemma") return "RAI_MEDGEMMA_API_KEY veya RAI_MEDGEMMA_ENDPOINT"
   if (slug === "rai-llm") return "RAI_LLM_API_KEY veya RAI_LLM_ENDPOINT"
+  if (slug === "rai-orchestrator") return "Credential gerekmez; aktif providerları route eder"
   if (slug === "radialog") return "RAI_RADIALOG_API_KEY veya RAI_RADIALOG_ENDPOINT"
 
   switch (providerType) {
@@ -751,6 +767,55 @@ function buildRaiLlmStatus(provider: AiProviderRow | null) {
       ? "Admin AI Servisleri içinde aktif"
       : "Provider var, aktif değil"
     : "Provider otomatik seed bekliyor"
+  const setupChecklist = [
+    {
+      badge: provider ? "Hazır" : "Bekliyor",
+      detail: provider
+        ? "RAI LLM provider kaydı organizasyon içinde mevcut."
+        : "Admin AI Servisleri açıldığında provider otomatik oluşturulur.",
+      label: "Provider seed",
+      state: provider ? "ok" : "warning",
+    },
+    {
+      badge: providerActive ? "Aktif" : "Bekliyor",
+      detail: providerActive
+        ? "Viewer içinde seçilebilir durumda."
+        : "GPU endpoint hazır olunca provider aktif hale getirilecek.",
+      label: "Provider aktivasyonu",
+      state: providerActive ? "ok" : "warning",
+    },
+    {
+      badge: "Hazır",
+      detail:
+        "Cloud Build imajı europe-west4 Artifact Registry üzerinde üretildi: rai-llm:20260629104345.",
+      label: "Container image",
+      state: "ok",
+    },
+    {
+      badge: endpointReady ? "Hazır" : "Bekliyor",
+      detail: endpointReady
+        ? "Cloud Run endpoint Vercel ortam değişkenine bağlanmış."
+        : "Cloud Run Admin API kotası bekleniyor: Total Nvidia L4 GPU allocation without zonal redundancy, europe-west4, değer 1.",
+      label: "GPU endpoint",
+      state: endpointReady ? "ok" : "warning",
+    },
+    {
+      badge: endpointReady ? "Hazır" : "Bekliyor",
+      detail: endpointReady
+        ? "RAI_LLM_ENDPOINT tanımlı."
+        : "Kota onayından sonra RAI_LLM_ENDPOINT production env olarak tanımlanacak.",
+      label: "Vercel endpoint env",
+      state: endpointReady ? "ok" : "warning",
+    },
+    {
+      badge: apiKeyReady ? "Hazır" : "Opsiyonel",
+      detail: apiKeyReady
+        ? "RAI_LLM_API_KEY tanımlı."
+        : "Endpoint public kapatılacaksa RAI_LLM_API_KEY güçlü token ile tanımlanacak.",
+      label: "API token",
+      state: apiKeyReady ? "ok" : "unknown",
+    },
+  ]
 
   return {
     apiKeyState: apiKeyReady ? "Tanımlı" : "Opsiyonel / eksik",
@@ -767,6 +832,7 @@ function buildRaiLlmStatus(provider: AiProviderRow | null) {
     providerLabel: provider?.name || "RAI LLM",
     providerState,
     ready,
+    setupChecklist,
     testCommand: endpointReady
       ? [
           "RAI_LLM_ENDPOINT=<masked-endpoint>",
@@ -849,6 +915,49 @@ async function ensureRaiLlmProvider(
 
   if (error && error.code !== "23505") {
     throw new Error(`RAI LLM sağlayıcısı oluşturulamadı: ${error.message}`)
+  }
+}
+
+async function ensureRaiAiOrchestratorProvider(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  userId: string
+) {
+  const { data: existing, error: existingError } = await supabase
+    .from("ai_service_providers")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("slug", "rai-orchestrator")
+    .maybeSingle()
+
+  if (existing) return
+  if (existingError) {
+    if (isMissingAiTableError(existingError)) return
+    throw new Error(`RAI AI Orchestrator sağlayıcı kontrolü yapılamadı: ${existingError.message}`)
+  }
+
+  const { error } = await supabase.from("ai_service_providers").insert({
+    organization_id: organizationId,
+    created_by: userId,
+    credential_reference: null,
+    default_model: "rai-ai-orchestrator-v0",
+    is_active: true,
+    is_default: false,
+    name: "RAI AI Orchestrator",
+    provider_type: "custom",
+    requires_credentials: false,
+    settings: {
+      fallbackPolicy: "first-active-runnable-provider",
+      family: "rai-ai-orchestrator",
+      priority: ["rai-llm", "openai", "gemini-google", "claude", "medgemma", "rai-mock"],
+      purpose: "route-ai-pre-report-to-best-available-provider",
+      routerVersion: "v0",
+    },
+    slug: "rai-orchestrator",
+  })
+
+  if (error && error.code !== "23505") {
+    throw new Error(`RAI AI Orchestrator sağlayıcısı oluşturulamadı: ${error.message}`)
   }
 }
 

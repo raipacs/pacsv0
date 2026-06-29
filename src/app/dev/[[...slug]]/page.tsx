@@ -131,6 +131,16 @@ const searchItems = [
 const changelog = [
   {
     date: "2026-06-29",
+    version: "0.2.0-dev.14",
+    title: "RAI AI Orchestrator ve RAI LLM checklist eklendi",
+    items: [
+      "Admin AI Servisleri ekranina RAI LLM kurulum checklist'i eklendi.",
+      "RAI AI Orchestrator provider'i aktif olarak seed edilir ve manuel AI butonunda secilebilir.",
+      "Orchestrator RAI LLM, OpenAI, Gemini, Claude, MedGemma ve RAI Mock sirasiyla calisabilir provider'a route eder.",
+    ],
+  },
+  {
+    date: "2026-06-29",
     version: "0.2.0-dev.13",
     title: "RAI LLM GPU quota on kosulu netlestirildi",
     items: [
@@ -468,6 +478,7 @@ export default function DevDocsPage() {
               <article>Gemini</article>
               <article>MedGemma endpoint</article>
               <article>RAI LLM self-hosted</article>
+              <article>RAI AI Orchestrator</article>
               <article>RaDialog preset</article>
             </div>
             <p>

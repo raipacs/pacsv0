@@ -127,6 +127,9 @@ function formatPendingAiJob(provider: AiProviderOption | null) {
   if (provider.slug === "medgemma") {
     return `${label} çalışıyor... Endpoint uyanıyorsa 1-2 dk sürebilir.`
   }
+  if (provider.slug === "rai-orchestrator") {
+    return `${label} uygun AI sağlayıcısına yönlendiriliyor...`
+  }
 
   return `${label} çalışıyor...`
 }

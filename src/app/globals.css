@@ -2357,6 +2357,36 @@ td span {
   line-height: 1.5;
 }
 
+.rai-llm-checklist {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  border-top: 1px solid var(--border);
+  background: var(--border);
+}
+
+.rai-llm-checklist article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 14px 16px;
+  background: var(--surface);
+}
+
+.rai-llm-checklist strong {
+  display: block;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.rai-llm-checklist p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .rai-llm-test-row {
   display: flex;
   align-items: center;
@@ -3926,6 +3956,10 @@ td span {
   }
 
   .rai-llm-runbook {
+    grid-template-columns: 1fr;
+  }
+
+  .rai-llm-checklist {
     grid-template-columns: 1fr;
   }
 

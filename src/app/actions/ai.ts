@@ -72,6 +72,25 @@ export async function startAiPreReport(formData: FormData) {
   }
   if (!provider || !provider.is_active) throw new Error("Seçilen AI servisi aktif değil.")
 
+  if (provider.slug === "rai-orchestrator") {
+    const routedProvider = await resolveRaiOrchestratorProvider({
+      organizationId: user.organizationId,
+      supabase,
+    })
+
+    if (!routedProvider) {
+      throw new Error(
+        "RAI AI Orchestrator için çalıştırılabilir aktif provider bulunamadı. OpenAI, Gemini, Claude, MedGemma, RAI LLM veya RAI Mock sağlayıcılarından en az biri aktif ve hazır olmalı."
+      )
+    }
+
+    const routedFormData = new FormData()
+    routedFormData.set("studyId", studyId)
+    routedFormData.set("providerId", routedProvider.id)
+    routedFormData.set("returnTo", appendQuery(returnTo, "orchestrator", routedProvider.slug))
+    return startAiPreReport(routedFormData)
+  }
+
   const { count: seriesCount, error: seriesCountError } = await supabase
     .from("series")
     .select("id", { count: "exact", head: true })
@@ -783,6 +802,14 @@ type GeminiResponse = {
 
 type MedGemmaEndpointMode = "openai-compatible" | "rai-adapter"
 
+type OrchestratorProviderCandidate = {
+  credential_reference: string | null
+  id: string
+  is_active: boolean | null
+  provider_type: string
+  slug: string
+}
+
 type MedGemmaResponse = {
   id?: string
   responseId?: string
@@ -823,6 +850,63 @@ const MEDGEMMA_MAX_ATTEMPTS = readPositiveIntegerEnv("RAI_MEDGEMMA_MAX_ATTEMPTS"
 const MEDGEMMA_RETRY_BASE_DELAY_MS = readPositiveIntegerEnv("RAI_MEDGEMMA_RETRY_DELAY_MS", 15_000)
 const MEDGEMMA_RETRY_MAX_DELAY_MS = readPositiveIntegerEnv("RAI_MEDGEMMA_RETRY_MAX_DELAY_MS", 30_000)
 const MEDGEMMA_RETRYABLE_STATUS_CODES = new Set([408, 409, 425, 429, 500, 502, 503, 504])
+const RAI_ORCHESTRATOR_PRIORITY = ["rai-llm", "openai", "gemini-google", "claude", "medgemma", "rai-mock"]
+
+async function resolveRaiOrchestratorProvider({
+  organizationId,
+  supabase,
+}: {
+  organizationId: string
+  supabase: Awaited<ReturnType<typeof createClient>>
+}) {
+  const { data: providers, error } = await supabase
+    .from("ai_service_providers")
+    .select("id, slug, provider_type, is_active, credential_reference")
+    .eq("organization_id", organizationId)
+    .eq("is_active", true)
+
+  if (error) throw new Error(`RAI AI Orchestrator provider listesi alınamadı: ${error.message}`)
+
+  const runnableProviders = ((providers ?? []) as OrchestratorProviderCandidate[])
+    .filter((provider) => provider.slug !== "rai-orchestrator")
+    .filter(isRunnableOrchestratorProvider)
+    .sort((left, right) => orchestratorProviderRank(left) - orchestratorProviderRank(right))
+
+  return runnableProviders[0] ?? null
+}
+
+function isRunnableOrchestratorProvider(provider: OrchestratorProviderCandidate) {
+  if (!provider.is_active) return false
+  if (provider.provider_type === "mock") return true
+  if (provider.provider_type === "openai") return hasProviderEnvValue(provider)
+  if (provider.provider_type === "anthropic") return hasProviderEnvValue(provider)
+  if (provider.provider_type === "google") return hasProviderEnvValue(provider)
+  if (provider.slug === "medgemma") return Boolean(resolveMedGemmaConfig(provider.slug, provider.credential_reference))
+  if (provider.slug === "rai-llm") return Boolean(resolveRaiLlmConfig(provider.slug, provider.credential_reference))
+  return false
+}
+
+function hasProviderEnvValue(provider: OrchestratorProviderCandidate) {
+  return Boolean(provider.credential_reference && process.env[provider.credential_reference]?.trim())
+}
+
+function orchestratorProviderRank(provider: OrchestratorProviderCandidate) {
+  const slugRank = RAI_ORCHESTRATOR_PRIORITY.indexOf(provider.slug)
+  if (slugRank >= 0) return slugRank
+
+  switch (provider.provider_type) {
+    case "openai":
+      return 20
+    case "google":
+      return 30
+    case "anthropic":
+      return 40
+    case "mock":
+      return 90
+    default:
+      return 80
+  }
+}
 
 async function loadAiDicomReferences({
   organizationId,
