@@ -12,6 +12,7 @@
     "sync:orthanc-logs": "node scripts/sync-orthanc-container-logs.mjs",
     "sync:orthanc-events": "node scripts/sync-orthanc-events.mjs",
     "test:rai-llm": "node scripts/test-rai-llm-endpoint.mjs",
+    "deploy:rai-llm:cloud-run": "bash scripts/deploy-rai-llm-cloud-run.sh",
     "lint": "eslint"
   },
   "dependencies": {

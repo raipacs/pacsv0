@@ -60,6 +60,20 @@ Kurulum icin GPU onerisi:
 - MVP test: NVIDIA L4 / 24 GB VRAM.
 - Daha rahat calisma ve fine-tune hazirligi: NVIDIA A100 / 40 GB veya ustu.
 
+Cloud Run GPU deploy:
+
+```bash
+export RAI_LLM_API_KEY="$(openssl rand -base64 36 | tr -d '\n')"
+PROJECT_ID=rai-pacs \
+REGION=europe-west4 \
+SERVICE_NAME=rai-llm \
+npm run deploy:rai-llm:cloud-run
+```
+
+Bu komut Artifact Registry image build eder, Cloud Run Gen2 uzerinde NVIDIA L4
+GPU'lu public HTTPS endpoint acicak sekilde deploy eder. Endpoint public olur;
+erisimi uygulama icindeki Bearer token kontroluyle sinirlanir.
+
 ## Gelisim yolu
 
 1. RAI LLM v0: Qwen2.5-VL tabanli self-hosted inference.

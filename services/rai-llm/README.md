@@ -73,6 +73,25 @@ RAI_LLM_API_KEY=<strong-random-token>
 RAI_LLM_ENDPOINT_MODE=openai-compatible
 ```
 
+Google Cloud Run GPU deploy:
+
+```bash
+export RAI_LLM_API_KEY="$(openssl rand -base64 36 | tr -d '\n')"
+PROJECT_ID=rai-pacs \
+REGION=europe-west4 \
+SERVICE_NAME=rai-llm \
+npm run deploy:rai-llm:cloud-run
+```
+
+Script su islemleri yapar:
+
+- Artifact Registry repository olusturur veya mevcut repository'yi kullanir.
+- `services/rai-llm` Docker imajini Cloud Build ile build eder.
+- Cloud Run Gen2 uzerinde 1 adet NVIDIA L4 GPU, 8 CPU, 32 GiB RAM ve
+  concurrency 1 ile servis deploy eder.
+- Public HTTPS endpoint olusturur; uygulama icinde Bearer token kontrolu devam
+  eder.
+
 Endpoint acildiktan sonra:
 
 ```bash

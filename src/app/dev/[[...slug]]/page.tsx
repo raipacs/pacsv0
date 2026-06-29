@@ -130,6 +130,16 @@ const searchItems = [
 
 const changelog = [
   {
+    date: "2026-06-29",
+    version: "0.2.0-dev.11",
+    title: "RAI LLM Cloud Run GPU deploy script'i eklendi",
+    items: [
+      "RAI LLM icin Google Cloud Run Gen2 + NVIDIA L4 GPU deploy script'i hazirlandi.",
+      "Artifact Registry build, Cloud Run deploy ve endpoint smoke-test akisi tek runbook'a baglandi.",
+      "Servis public HTTPS endpoint verir; erisim Bearer token ile uygulama icinde sinirlanir.",
+    ],
+  },
+  {
     date: "2026-06-28",
     version: "0.2.0-dev.10",
     title: "RAI LLM operasyon durumu Admin ekranina eklendi",
