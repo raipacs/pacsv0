@@ -2404,6 +2404,43 @@ td span {
   margin: 0;
 }
 
+.ai-provider-management-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+  gap: 16px;
+  padding: 16px;
+}
+
+.ai-provider-management-grid .ai-provider-list {
+  min-width: 0;
+}
+
+.ai-provider-create-panel {
+  align-self: start;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  background: #f8fafc;
+}
+
+.ai-provider-create-panel h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.ai-provider-create-panel p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.ai-provider-create-panel .admin-form {
+  margin-top: 14px;
+}
+
 .form-help {
   margin: 0;
   color: var(--muted);
@@ -3966,6 +4003,10 @@ td span {
   .rai-llm-test-row {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .ai-provider-management-grid {
+    grid-template-columns: 1fr;
   }
 
   .admin-filter-form {

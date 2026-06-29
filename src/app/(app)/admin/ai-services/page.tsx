@@ -393,13 +393,13 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
         )}
       </CollapsiblePanel>
 
-      <section className="ai-admin-grid">
-        <CollapsiblePanel
-          detail={`${providers.length} provider / ${activeProviders.length} aktif`}
-          open={providerWarningCount > 0}
-          title="Servis tanımları"
-          warningCount={providerWarningCount}
-        >
+      <CollapsiblePanel
+        detail={`${providers.length} provider / ${activeProviders.length} aktif`}
+        open={providerWarningCount > 0}
+        title="Servis tanımları"
+        warningCount={providerWarningCount}
+      >
+        <div className="ai-provider-management-grid">
           <div className="ai-provider-list">
             {providers.map((provider) => (
               <article className="ai-provider-card" key={provider.id}>
@@ -461,112 +461,111 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
               </article>
             ))}
           </div>
-        </CollapsiblePanel>
 
-        <CollapsiblePanel
-          detail="Yeni provider tanımı oluştur"
-          title="Özel servis ekle"
-        >
-          <form action={createAiProvider} className="admin-form">
-            <label>
-              <span>Servis adı</span>
-              <input name="name" placeholder="Örn. Local Lung CT AI" required />
-            </label>
-            <label>
-              <span>Tip</span>
-              <select name="providerType" defaultValue="custom">
-                <option value="custom">Custom medikal AI</option>
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Claude / Anthropic</option>
-                <option value="google">Gemini / Google</option>
-                <option value="mock">RAI Mock</option>
-              </select>
-            </label>
-            <label>
-              <span>Model</span>
-              <input name="defaultModel" placeholder="model veya endpoint sürümü" />
-            </label>
-            <label>
-              <span>Credential reference</span>
-              <input name="credentialReference" placeholder="RAI_CUSTOM_AI_API_KEY" />
-            </label>
-            <button className="button primary" type="submit">
-              Servis oluştur
-            </button>
-            <p className="form-help">
-              Yeni servis pasif açılır. Hesap/endpoint doğrulandıktan sonra aktif hale getiririz.
-            </p>
-          </form>
-        </CollapsiblePanel>
-      </section>
-
-      <section className="admin-user-grid">
-        <CollapsiblePanel
-          detail={
-            jobWarningCount
-              ? `${jobWarningCount} iş uyarı durumunda`
-              : `${jobs.length} son iş kaydı`
-          }
-          open={jobWarningCount > 0}
-          title="Son AI işleri"
-          warningCount={jobWarningCount}
-        >
-          {jobs.length ? (
-            <div className="responsive-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Tetkik</th>
-                    <th>Provider</th>
-                    <th>Durum</th>
-                    <th>Tarih</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {jobs.map((job) => (
-                    <AiJobTableRow job={job} key={job.id} />
-                  ))}
-                </tbody>
-              </table>
+          <aside className="ai-provider-create-panel">
+            <div>
+              <h3>Özel servis ekle</h3>
+              <p>Yeni provider tanımı oluştur.</p>
             </div>
-          ) : (
-            <p className="empty-state">Henüz AI işi yok.</p>
-          )}
-        </CollapsiblePanel>
+            <form action={createAiProvider} className="admin-form">
+              <label>
+                <span>Servis adı</span>
+                <input name="name" placeholder="Örn. Local Lung CT AI" required />
+              </label>
+              <label>
+                <span>Tip</span>
+                <select name="providerType" defaultValue="custom">
+                  <option value="custom">Custom medikal AI</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="anthropic">Claude / Anthropic</option>
+                  <option value="google">Gemini / Google</option>
+                  <option value="mock">RAI Mock</option>
+                </select>
+              </label>
+              <label>
+                <span>Model</span>
+                <input name="defaultModel" placeholder="model veya endpoint sürümü" />
+              </label>
+              <label>
+                <span>Credential reference</span>
+                <input name="credentialReference" placeholder="RAI_CUSTOM_AI_API_KEY" />
+              </label>
+              <button className="button primary" type="submit">
+                Servis oluştur
+              </button>
+              <p className="form-help">
+                Yeni servis pasif açılır. Hesap/endpoint doğrulandıktan sonra aktif hale getiririz.
+              </p>
+            </form>
+          </aside>
+        </div>
+      </CollapsiblePanel>
 
-        <CollapsiblePanel
-          detail={
-            draftWarningCount
-              ? `${draftWarningCount} kritik ön rapor`
-              : `${drafts.length} son ön rapor`
-          }
-          open={draftWarningCount > 0}
-          title="Son ön raporlar"
-          warningCount={draftWarningCount}
-        >
-          {drafts.length ? (
-            <div className="responsive-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Tetkik</th>
-                    <th>AI</th>
-                    <th>Skor</th>
-                    <th>Durum</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {drafts.map((draft) => (
-                    <AiDraftTableRow draft={draft} key={draft.id} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="empty-state">Henüz AI ön raporu yok.</p>
-          )}
-        </CollapsiblePanel>
-      </section>
+      <CollapsiblePanel
+        detail={
+          jobWarningCount
+            ? `${jobWarningCount} iş uyarı durumunda`
+            : `${jobs.length} son iş kaydı`
+        }
+        open={jobWarningCount > 0}
+        title="Son AI işleri"
+        warningCount={jobWarningCount}
+      >
+        {jobs.length ? (
+          <div className="responsive-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tetkik</th>
+                  <th>Provider</th>
+                  <th>Durum</th>
+                  <th>Tarih</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jobs.map((job) => (
+                  <AiJobTableRow job={job} key={job.id} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="empty-state">Henüz AI işi yok.</p>
+        )}
+      </CollapsiblePanel>
+
+      <CollapsiblePanel
+        detail={
+          draftWarningCount
+            ? `${draftWarningCount} kritik ön rapor`
+            : `${drafts.length} son ön rapor`
+        }
+        open={draftWarningCount > 0}
+        title="Son ön raporlar"
+        warningCount={draftWarningCount}
+      >
+        {drafts.length ? (
+          <div className="responsive-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tetkik</th>
+                  <th>AI</th>
+                  <th>Skor</th>
+                  <th>Durum</th>
+                </tr>
+              </thead>
+              <tbody>
+                {drafts.map((draft) => (
+                  <AiDraftTableRow draft={draft} key={draft.id} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="empty-state">Henüz AI ön raporu yok.</p>
+        )}
+      </CollapsiblePanel>
 
       <CollapsiblePanel
         detail={`${usageRows.length} token tüketim satırı`}
