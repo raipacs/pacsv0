@@ -1,4 +1,5 @@
 import Link from "next/link"
+import type { ReactNode } from "react"
 
 import { createAiProvider, testRaiLlmEndpoint, updateAiProvider } from "@/app/actions/admin"
 import { isMissingAiTableError } from "@/lib/ai-reporting"
@@ -158,6 +159,16 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
   const raiLlmStatus = buildRaiLlmStatus(raiLlmProvider)
   const raiLlmTestResult = parseRaiLlmTestResult(query)
   const readyDrafts = drafts.filter((draft) => draft.status === "ready")
+  const providerWarningCount = providers.filter(
+    (provider) =>
+      !provider.is_active || (provider.requires_credentials && !provider.credential_reference)
+  ).length
+  const jobWarningCount = jobs.filter(
+    (job) => job.status === "failed" || job.status === "waiting_credentials"
+  ).length
+  const draftWarningCount = drafts.filter((draft) => draft.criticality === "high").length
+  const raiLlmWarningCount = raiLlmStatus.ready ? 0 : 1
+  const usageWarningCount = usageUnavailable ? 1 : 0
   const usageSummary = summarizeUsage(usageRows)
   const totalUsage = usageSummary.reduce(
     (acc, item) => ({
@@ -209,10 +220,18 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
         </article>
       </section>
 
-      <section className="data-panel admin-section">
-        <div className="panel-heading">
+      <CollapsiblePanel
+        detail={
+          raiLlmWarningCount
+            ? "GPU endpoint ve Cloud Run kota adımı bekliyor"
+            : "RAI LLM endpoint kullanıma hazır"
+        }
+        open={raiLlmWarningCount > 0}
+        title="RAI LLM operasyon durumu"
+        warningCount={raiLlmWarningCount}
+      >
+        <div className="panel-heading compact">
           <div>
-            <h2>RAI LLM operasyon durumu</h2>
             <p>Self-hosted model hattı, endpoint ayarları ve canlı test adımları.</p>
           </div>
           <span className={`health-badge ${raiLlmStatus.ready ? "ok" : "warning"}`}>
@@ -279,12 +298,18 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
             <p className="form-help">Endpoint env tanımlandıktan sonra buradan canlı bağlantı testi yapılır.</p>
           )}
         </div>
-      </section>
+      </CollapsiblePanel>
 
-      <section className="data-panel admin-section">
-        <div className="panel-heading">
-          <h2>Token ve maliyet tüketimi</h2>
-        </div>
+      <CollapsiblePanel
+        detail={
+          usageUnavailable
+            ? "Token tüketim tablosu uyarı veriyor"
+            : `${formatNumber(totalUsage.totalTokens)} token / ${formatMoney(totalUsage.cost)}`
+        }
+        open={usageWarningCount > 0}
+        title="Token ve maliyet tüketimi"
+        warningCount={usageWarningCount}
+      >
         {usageUnavailable ? (
           <p className="table-note ai-usage-warning">
             Token tüketim tablosu henüz Supabase üzerinde uygulanmamış. Migration sonrası bu
@@ -366,13 +391,15 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
         ) : (
           <p className="empty-state">Bu tarih aralığında token tüketimi yok.</p>
         )}
-      </section>
+      </CollapsiblePanel>
 
       <section className="ai-admin-grid">
-        <section className="data-panel admin-section">
-          <div className="panel-heading">
-            <h2>Servis tanımları</h2>
-          </div>
+        <CollapsiblePanel
+          detail={`${providers.length} provider / ${activeProviders.length} aktif`}
+          open={providerWarningCount > 0}
+          title="Servis tanımları"
+          warningCount={providerWarningCount}
+        >
           <div className="ai-provider-list">
             {providers.map((provider) => (
               <article className="ai-provider-card" key={provider.id}>
@@ -434,12 +461,12 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
               </article>
             ))}
           </div>
-        </section>
+        </CollapsiblePanel>
 
-        <section className="data-panel admin-section">
-          <div className="panel-heading">
-            <h2>Özel servis ekle</h2>
-          </div>
+        <CollapsiblePanel
+          detail="Yeni provider tanımı oluştur"
+          title="Özel servis ekle"
+        >
           <form action={createAiProvider} className="admin-form">
             <label>
               <span>Servis adı</span>
@@ -470,14 +497,20 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
               Yeni servis pasif açılır. Hesap/endpoint doğrulandıktan sonra aktif hale getiririz.
             </p>
           </form>
-        </section>
+        </CollapsiblePanel>
       </section>
 
       <section className="admin-user-grid">
-        <section className="data-panel admin-section">
-          <div className="panel-heading">
-            <h2>Son AI işleri</h2>
-          </div>
+        <CollapsiblePanel
+          detail={
+            jobWarningCount
+              ? `${jobWarningCount} iş uyarı durumunda`
+              : `${jobs.length} son iş kaydı`
+          }
+          open={jobWarningCount > 0}
+          title="Son AI işleri"
+          warningCount={jobWarningCount}
+        >
           {jobs.length ? (
             <div className="responsive-table">
               <table>
@@ -499,12 +532,18 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
           ) : (
             <p className="empty-state">Henüz AI işi yok.</p>
           )}
-        </section>
+        </CollapsiblePanel>
 
-        <section className="data-panel admin-section">
-          <div className="panel-heading">
-            <h2>Son ön raporlar</h2>
-          </div>
+        <CollapsiblePanel
+          detail={
+            draftWarningCount
+              ? `${draftWarningCount} kritik ön rapor`
+              : `${drafts.length} son ön rapor`
+          }
+          open={draftWarningCount > 0}
+          title="Son ön raporlar"
+          warningCount={draftWarningCount}
+        >
           {drafts.length ? (
             <div className="responsive-table">
               <table>
@@ -526,13 +565,15 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
           ) : (
             <p className="empty-state">Henüz AI ön raporu yok.</p>
           )}
-        </section>
+        </CollapsiblePanel>
       </section>
 
-      <section className="data-panel admin-section">
-        <div className="panel-heading">
-          <h2>Token tüketim detayı</h2>
-        </div>
+      <CollapsiblePanel
+        detail={`${usageRows.length} token tüketim satırı`}
+        open={usageWarningCount > 0}
+        title="Token tüketim detayı"
+        warningCount={usageWarningCount}
+      >
         {usageRows.length ? (
           <div className="responsive-table">
             <table>
@@ -556,8 +597,37 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
         ) : (
           <p className="empty-state">Detay satırı yok.</p>
         )}
-      </section>
+      </CollapsiblePanel>
     </>
+  )
+}
+
+function CollapsiblePanel({
+  children,
+  detail,
+  open = false,
+  title,
+  warningCount = 0,
+}: {
+  children: ReactNode
+  detail: string
+  open?: boolean
+  title: string
+  warningCount?: number
+}) {
+  return (
+    <details className="data-panel admin-section collapsible-panel" open={open}>
+      <summary className="panel-heading">
+        <div>
+          <h2>{title}</h2>
+          <small>{detail}</small>
+        </div>
+        <span className={`panel-toggle ${warningCount ? "warning" : ""}`}>
+          {formatPanelToggle(warningCount)}
+        </span>
+      </summary>
+      {children}
+    </details>
   )
 }
 
@@ -591,6 +661,10 @@ function AiUsageTableRow({ usage }: { usage: AiUsageRow }) {
       <td>{formatMoney(Number(usage.total_cost))}</td>
     </tr>
   )
+}
+
+function formatPanelToggle(count: number) {
+  return count ? `${count} uyarı` : "Liste"
 }
 
 function AiJobTableRow({ job }: { job: AiJobRow }) {
