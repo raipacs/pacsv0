@@ -147,15 +147,10 @@ export function ReportEditorPanel({
             {selected.subtitle}
           </small>
         ) : null}
-        <span className="report-editor-summary-caret" aria-hidden="true">
-          ↓
-        </span>
-      </summary>
-      <div className="report-editor-toolbar">
-        <div className="report-editor-ai-slot" aria-label="AI rapor işlemleri">
-          {aiControl}
-        </div>
-        <div className="report-editor-toolbar-actions">
+        <div
+          className="report-editor-summary-actions"
+          onClick={(event) => event.stopPropagation()}
+        >
           {fullPageHref ? (
             <a
               aria-label="Raporu yeni sayfada aç"
@@ -176,6 +171,14 @@ export function ReportEditorPanel({
             PDF / Yazdır
           </button>
           {shareControl}
+        </div>
+        <span className="report-editor-summary-caret" aria-hidden="true">
+          ↓
+        </span>
+      </summary>
+      <div className="report-editor-toolbar">
+        <div className="report-editor-ai-slot" aria-label="AI rapor işlemleri">
+          {aiControl}
         </div>
       </div>
       <div className="report-editor-layout">

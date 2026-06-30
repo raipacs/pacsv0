@@ -819,6 +819,7 @@ body:has(.rai-viewer-page) .app-header {
   cursor: pointer;
   list-style: none;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 8px clamp(10px, 1.5vw, 18px);
   background: #071225;
@@ -850,6 +851,7 @@ body:has(.rai-viewer-page) .app-header {
 
 .report-editor-strip > summary small {
   display: inline-flex;
+  flex: 1 1 auto;
   min-width: 0;
   align-items: center;
   gap: 8px;
@@ -866,9 +868,32 @@ body:has(.rai-viewer-page) .app-header {
 }
 
 .report-editor-summary-caret {
-  margin-left: auto;
   color: #67e8f9;
   font-weight: 900;
+}
+
+.report-editor-summary-actions {
+  display: inline-flex;
+  margin-left: auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.report-editor-summary-actions .button.subtle,
+.report-editor-summary-actions .external-share-trigger {
+  min-height: 34px;
+  border-color: #24446f;
+  color: #e2e8f0;
+  background: #0b2148;
+}
+
+.report-editor-summary-actions .button.subtle:hover,
+.report-editor-summary-actions .button.subtle:focus-visible,
+.report-editor-summary-actions .external-share-trigger:hover,
+.report-editor-summary-actions .external-share-trigger:focus-visible {
+  border-color: #22d3ee;
+  color: #ecfeff;
+  background: #0f2f61;
 }
 
 .report-editor-toolbar {
@@ -898,17 +923,12 @@ body:has(.rai-viewer-page) .app-header {
   max-width: 260px;
 }
 
-.report-editor-toolbar-actions {
-  display: inline-flex;
-  min-width: 0;
-  align-items: flex-start;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
 .report-icon-button {
   min-width: 40px;
   padding-inline: 12px;
+  color: #67e8f9 !important;
+  font-size: 17px;
+  font-weight: 900;
 }
 
 .report-editor-layout {
@@ -1148,7 +1168,21 @@ body:has(.rai-viewer-page) .app-header {
   white-space: nowrap;
 }
 
-.report-editor-toolbar .external-share-panel {
+.report-editor-summary-actions .external-share-control {
+  justify-content: flex-end;
+}
+
+.report-editor-summary-actions .external-share-trigger {
+  width: 40px;
+  min-width: 40px;
+  padding-inline: 0;
+}
+
+.report-editor-summary-actions .external-share-trigger span {
+  color: #67e8f9;
+}
+
+.report-editor-summary-actions .external-share-panel {
   top: calc(100% + 10px);
 }
 
@@ -4053,20 +4087,19 @@ td span {
     flex: 1;
   }
 
-  .report-editor-toolbar,
-  .report-editor-toolbar-actions {
+  .report-editor-toolbar {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .report-editor-ai-slot {
-    min-width: 0;
-    width: 100%;
+  .report-editor-summary-actions {
+    flex: 1 1 100%;
+    margin-left: 0;
+    justify-content: flex-start;
   }
 
-  .report-editor-toolbar-actions > *,
-  .report-editor-toolbar-actions .external-share-control,
-  .report-editor-toolbar-actions .external-share-trigger {
+  .report-editor-ai-slot {
+    min-width: 0;
     width: 100%;
   }
 

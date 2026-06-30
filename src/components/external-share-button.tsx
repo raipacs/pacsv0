@@ -51,11 +51,12 @@ export function ExternalShareButton({ studyId }: { studyId: string }) {
       <button
         className="button subtle external-share-trigger"
         type="button"
+        aria-label="Güvenli paylaşım linki oluştur"
         aria-expanded={isOpen}
         onClick={() => setIsOpen((current) => !current)}
+        title="Güvenli paylaşım"
       >
         <span aria-hidden="true">↗</span>
-        Paylaş
       </button>
       {isOpen ? (
         <div className="external-share-panel">
