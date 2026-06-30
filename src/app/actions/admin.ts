@@ -438,6 +438,104 @@ export async function testQwenEndpoint() {
   redirect(`/admin/ai-services?${params.toString()}`)
 }
 
+export async function testDeepSeekEndpoint() {
+  const user = await requireAdmin()
+  const apiKey = process.env.DEEPSEEK_API_KEY?.trim()
+  const endpoint =
+    process.env.DEEPSEEK_BASE_URL?.trim() || "https://api.deepseek.com/chat/completions"
+  const model = process.env.DEEPSEEK_MODEL?.trim() || "deepseek-v4-flash"
+  const startedAt = Date.now()
+  let status = "failed"
+  let message = "DEEPSEEK_API_KEY tanımlı değil."
+  let elapsedMs = 0
+
+  if (apiKey) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 45_000)
+
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              content:
+                'Sen RAI PACS DeepSeek bağlantı testisin. Sadece JSON döndür: {"findings":"DeepSeek bağlantısı çalışıyor","impression":"Smoke test başarılı","recommendations":"Rapor kalite kontrol akışı test edilebilir","confidenceScore":0.1,"criticality":"none"}',
+              role: "system",
+            },
+            {
+              content: JSON.stringify({
+                provider: "deepseek",
+                study: {
+                  accessionNumber: "DEEPSEEK-ADMIN-SMOKE",
+                  description: "DeepSeek admin endpoint smoke test",
+                  modality: "SR",
+                },
+                task: "radiology_report_reasoning_smoke_test",
+              }),
+              role: "user",
+            },
+          ],
+          model,
+          response_format: { type: "json_object" },
+          temperature: 0,
+        }),
+        signal: controller.signal,
+      })
+
+      const rawText = await response.text()
+      elapsedMs = Date.now() - startedAt
+
+      if (response.ok) {
+        const payload = parseJsonObject(rawText)
+        const content = extractChatCompletionText(payload) || rawText.trim()
+        status = content ? "ok" : "failed"
+        message = content
+          ? `DeepSeek yanıt verdi. Model: ${String(payload?.model ?? model)}`
+          : "DeepSeek yanıt verdi ancak boş içerik döndürdü."
+      } else {
+        message = `DeepSeek ${response.status} döndü: ${clipForQuery(rawText)}`
+      }
+    } catch (error) {
+      elapsedMs = Date.now() - startedAt
+      message =
+        error instanceof Error && error.name === "AbortError"
+          ? "DeepSeek endpoint zaman aşımına uğradı."
+          : `DeepSeek testi başarısız: ${error instanceof Error ? error.message : String(error)}`
+    } finally {
+      clearTimeout(timeout)
+    }
+  }
+
+  if (isSupabaseConfigured) {
+    const supabase = await createClient()
+    await supabase.from("audit_logs").insert({
+      organization_id: user.organizationId,
+      actor_id: user.id,
+      action: "ai_provider.deepseek_tested",
+      resource_type: "ai_service_provider",
+      metadata: {
+        elapsedMs,
+        endpointConfigured: Boolean(endpoint),
+        keyConfigured: Boolean(apiKey),
+        model,
+        status,
+      },
+    })
+  }
+
+  const params = new URLSearchParams({
+    deepSeekMessage: clipForQuery(message),
+    deepSeekMs: String(elapsedMs),
+    deepSeekTest: status,
+  })
+  redirect(`/admin/ai-services?${params.toString()}`)
+}
+
 export async function updateMemberAccess(formData: FormData) {
   const user = await requireAdmin()
   if (!isSupabaseConfigured) redirect("/admin/users")

@@ -1,7 +1,13 @@
 import Link from "next/link"
 import type { ReactNode } from "react"
 
-import { createAiProvider, testQwenEndpoint, testRaiLlmEndpoint, updateAiProvider } from "@/app/actions/admin"
+import {
+  createAiProvider,
+  testDeepSeekEndpoint,
+  testQwenEndpoint,
+  testRaiLlmEndpoint,
+  updateAiProvider,
+} from "@/app/actions/admin"
 import { aiProviderMark, isMissingAiTableError } from "@/lib/ai-reporting"
 import { requireAdmin } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
@@ -89,6 +95,9 @@ type AiServicesPageProps = {
     qwenMessage?: string
     qwenMs?: string
     qwenTest?: string
+    deepSeekMessage?: string
+    deepSeekMs?: string
+    deepSeekTest?: string
     to?: string
   }>
 }
@@ -103,6 +112,7 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
     ensureRaiLlmProvider(supabase, user.organizationId, user.id),
     ensureRaiAiOrchestratorProvider(supabase, user.organizationId, user.id),
     ensureQwenProvider(supabase, user.organizationId, user.id),
+    ensureDeepSeekProvider(supabase, user.organizationId, user.id),
   ])
 
   const [providersResult, jobsResult, draftsResult, usageResult] = await Promise.all([
@@ -164,10 +174,13 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
   )
   const raiLlmProvider = providers.find((provider) => provider.slug === "rai-llm") ?? null
   const qwenProvider = providers.find((provider) => provider.slug === "qwen") ?? null
+  const deepSeekProvider = providers.find((provider) => provider.slug === "deepseek") ?? null
   const raiLlmStatus = buildRaiLlmStatus(raiLlmProvider)
   const raiLlmTestResult = parseRaiLlmTestResult(query)
   const qwenStatus = buildQwenStatus(qwenProvider)
   const qwenTestResult = parseQwenTestResult(query)
+  const deepSeekStatus = buildDeepSeekStatus(deepSeekProvider)
+  const deepSeekTestResult = parseDeepSeekTestResult(query)
   const readyDrafts = drafts.filter((draft) => draft.status === "ready")
   const providerWarningCount = providers.filter(
     (provider) =>
@@ -179,6 +192,7 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
   const draftWarningCount = drafts.filter((draft) => draft.criticality === "high").length
   const raiLlmWarningCount = raiLlmStatus.ready ? 0 : 1
   const qwenWarningCount = qwenStatus.ready ? 0 : 1
+  const deepSeekWarningCount = deepSeekStatus.ready ? 0 : 1
   const usageWarningCount = usageUnavailable ? 1 : 0
   const usageSummary = summarizeUsage(usageRows)
   const totalUsage = usageSummary.reduce(
@@ -307,6 +321,70 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
             </p>
           ) : (
             <p className="form-help">Endpoint env tanımlandıktan sonra buradan canlı bağlantı testi yapılır.</p>
+          )}
+        </div>
+      </CollapsiblePanel>
+
+      <CollapsiblePanel
+        detail={
+          deepSeekWarningCount
+            ? "DEEPSEEK_API_KEY ve provider aktivasyonu bekliyor"
+            : "DeepSeek API kullanıma hazır"
+        }
+        open={deepSeekWarningCount > 0}
+        title="DeepSeek bağlantı durumu"
+        warningCount={deepSeekWarningCount}
+      >
+        <div className="panel-heading compact">
+          <div>
+            <p>DeepSeek Chat/Reasoner API rapor metni, kalite kontrol ve reasoning akışları için kullanılır.</p>
+          </div>
+          <span className={`health-badge ${deepSeekStatus.ready ? "ok" : "warning"}`}>
+            {deepSeekStatus.ready ? "API hazır" : "Kurulum bekliyor"}
+          </span>
+        </div>
+        <div className="rai-llm-status-grid">
+          <article>
+            <span>Provider</span>
+            <strong>{deepSeekStatus.providerLabel}</strong>
+            <small>{deepSeekStatus.providerState}</small>
+          </article>
+          <article>
+            <span>Model</span>
+            <strong>{deepSeekStatus.model}</strong>
+            <small>Rapor metni ve reasoning modeli</small>
+          </article>
+          <article>
+            <span>Endpoint</span>
+            <strong>{deepSeekStatus.endpointState}</strong>
+            <small>{deepSeekStatus.endpointLabel}</small>
+          </article>
+          <article>
+            <span>API token</span>
+            <strong>{deepSeekStatus.apiKeyState}</strong>
+            <small>Secret değeri ekranda gösterilmez</small>
+          </article>
+        </div>
+        <div className="rai-llm-runbook">
+          <div>
+            <strong>Sıradaki operasyon</strong>
+            <p>{deepSeekStatus.nextStep}</p>
+          </div>
+          <pre>{deepSeekStatus.testCommand}</pre>
+        </div>
+        <div className="rai-llm-test-row">
+          <form action={testDeepSeekEndpoint}>
+            <button className="button subtle" type="submit">
+              DeepSeek canlı test et
+            </button>
+          </form>
+          {deepSeekTestResult ? (
+            <p className={`form-status ${deepSeekTestResult.ok ? "success" : "error"}`}>
+              {deepSeekTestResult.message}
+              {deepSeekTestResult.elapsedMs ? ` · ${deepSeekTestResult.elapsedMs} ms` : ""}
+            </p>
+          ) : (
+            <p className="form-help">DEEPSEEK_API_KEY tanımlandıktan sonra buradan API smoke test yapılır.</p>
           )}
         </div>
       </CollapsiblePanel>
@@ -895,6 +973,7 @@ function summarizeUsage(rows: AiUsageRow[]) {
 
 function providerLabel(value: string, slug?: string) {
   if (slug === "qwen") return "Qwen Vision"
+  if (slug === "deepseek") return "DeepSeek"
   if (slug === "medgemma") return "MedGemma"
   if (slug === "rai-llm") return "RAI LLM"
   if (slug === "rai-orchestrator") return "RAI AI Orchestrator"
@@ -920,6 +999,7 @@ function formatProviderSlug(slug: string) {
 
 function credentialPlaceholder(providerType: string, slug?: string) {
   if (slug === "qwen") return "QWEN_API_KEY"
+  if (slug === "deepseek") return "DEEPSEEK_API_KEY"
   if (slug === "medgemma") return "RAI_MEDGEMMA_API_KEY veya RAI_MEDGEMMA_ENDPOINT"
   if (slug === "rai-llm") return "RAI_LLM_API_KEY veya RAI_LLM_ENDPOINT"
   if (slug === "rai-orchestrator") return "Credential gerekmez; aktif providerları route eder"
@@ -1090,6 +1170,48 @@ function parseQwenTestResult(query: Awaited<AiServicesPageProps["searchParams"]>
   }
 }
 
+function buildDeepSeekStatus(provider: AiProviderRow | null) {
+  const endpoint =
+    process.env.DEEPSEEK_BASE_URL?.trim() || "https://api.deepseek.com/chat/completions"
+  const apiKeyReady = Boolean(process.env.DEEPSEEK_API_KEY?.trim())
+  const model = provider?.default_model || process.env.DEEPSEEK_MODEL || "deepseek-v4-flash"
+  const providerActive = provider?.is_active === true
+  const ready = Boolean(provider && providerActive && apiKeyReady)
+  const providerState = provider
+    ? providerActive
+      ? "Admin AI Servisleri içinde aktif"
+      : "Provider var, aktif değil"
+    : "Provider otomatik seed bekliyor"
+
+  return {
+    apiKeyState: apiKeyReady ? "Tanımlı" : "DEEPSEEK_API_KEY eksik",
+    endpointLabel: safeEndpointLabel(endpoint),
+    endpointState: "OpenAI-compatible",
+    model,
+    nextStep: ready
+      ? "RAI Viewer içinde DeepSeek provider seçilerek metadata/rapor metni odaklı ön rapor testi yapılabilir."
+      : "DeepSeek API key oluşturup Vercel production env içine DEEPSEEK_API_KEY olarak ekleyin; ardından provider aktif hale getirilir.",
+    providerLabel: provider?.name || "DeepSeek",
+    providerState,
+    ready,
+    testCommand: [
+      "DEEPSEEK_API_KEY=<secret>",
+      "DEEPSEEK_BASE_URL=https://api.deepseek.com/chat/completions",
+      `DEEPSEEK_MODEL=${model}`,
+      "Admin > AI Servisleri > DeepSeek canlı test et",
+    ].join(" \\\n"),
+  }
+}
+
+function parseDeepSeekTestResult(query: Awaited<AiServicesPageProps["searchParams"]>) {
+  if (!query.deepSeekTest) return null
+  return {
+    elapsedMs: Number(query.deepSeekMs || 0),
+    message: query.deepSeekMessage || "DeepSeek test sonucu alındı.",
+    ok: query.deepSeekTest === "ok",
+  }
+}
+
 function safeEndpointLabel(value: string) {
   try {
     const url = new URL(value)
@@ -1233,6 +1355,52 @@ async function ensureQwenProvider(
 
   if (error && error.code !== "23505") {
     throw new Error(`Qwen sağlayıcısı oluşturulamadı: ${error.message}`)
+  }
+}
+
+async function ensureDeepSeekProvider(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  userId: string
+) {
+  const { data: existing, error: existingError } = await supabase
+    .from("ai_service_providers")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("slug", "deepseek")
+    .maybeSingle()
+
+  if (existing) return
+  if (existingError) {
+    if (isMissingAiTableError(existingError)) return
+    throw new Error(`DeepSeek sağlayıcı kontrolü yapılamadı: ${existingError.message}`)
+  }
+
+  const { error } = await supabase.from("ai_service_providers").insert({
+    organization_id: organizationId,
+    created_by: userId,
+    credential_reference: "DEEPSEEK_API_KEY",
+    default_model: "deepseek-v4-flash",
+    is_active: false,
+    is_default: false,
+    name: "DeepSeek",
+    provider_type: "custom",
+    requires_credentials: true,
+    settings: {
+      availableModels: ["deepseek-v4-flash", "deepseek-v4-pro", "deepseek-chat", "deepseek-reasoner"],
+      baseUrlEnv: "DEEPSEEK_BASE_URL",
+      defaultBaseUrl: "https://api.deepseek.com/chat/completions",
+      deployment: "deepseek-openai-compatible",
+      family: "deepseek",
+      modelEnv: "DEEPSEEK_MODEL",
+      modalities: ["SR", "DX", "CT", "MR", "US"],
+      purpose: "radiology-report-reasoning-quality-control",
+    },
+    slug: "deepseek",
+  })
+
+  if (error && error.code !== "23505") {
+    throw new Error(`DeepSeek sağlayıcısı oluşturulamadı: ${error.message}`)
   }
 }
 

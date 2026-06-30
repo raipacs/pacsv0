@@ -594,6 +594,7 @@ export async function startAiPreReport(formData: FormData) {
         inputContext,
         model: provider.default_model || openAiCompatibleConfig.defaultModel,
         patientName: patient ? `${patient.first_name} ${patient.last_name}` : "",
+        supportsImages: openAiCompatibleConfig.supportsImages,
       })
 
       const { error: draftError } = await supabase.from("ai_report_drafts").insert({
@@ -1059,7 +1060,7 @@ const MEDGEMMA_MAX_ATTEMPTS = readPositiveIntegerEnv("RAI_MEDGEMMA_MAX_ATTEMPTS"
 const MEDGEMMA_RETRY_BASE_DELAY_MS = readPositiveIntegerEnv("RAI_MEDGEMMA_RETRY_DELAY_MS", 15_000)
 const MEDGEMMA_RETRY_MAX_DELAY_MS = readPositiveIntegerEnv("RAI_MEDGEMMA_RETRY_MAX_DELAY_MS", 30_000)
 const MEDGEMMA_RETRYABLE_STATUS_CODES = new Set([408, 409, 425, 429, 500, 502, 503, 504])
-const RAI_ORCHESTRATOR_PRIORITY = ["rai-llm", "qwen", "openai", "gemini-google", "claude", "medgemma", "rai-mock"]
+const RAI_ORCHESTRATOR_PRIORITY = ["rai-llm", "qwen", "deepseek", "openai", "gemini-google", "claude", "medgemma", "rai-mock"]
 
 async function resolveRaiOrchestratorProvider({
   excludedSlugs = [],
@@ -1349,11 +1350,13 @@ function resolveOpenAiCompatibleConfig(
     baseUrl: process.env[`${prefix}_BASE_URL`] || defaultOpenAiCompatibleBaseUrl(slug),
     defaultModel: process.env[`${prefix}_MODEL`] || defaultOpenAiCompatibleModel(slug),
     generator: `${slug}-openai-compatible`,
+    supportsImages: openAiCompatibleSupportsImages(slug),
   }
 }
 
 function openAiCompatibleEnvPrefix(slug: string, providerType: string) {
   if (slug === "qwen") return "QWEN"
+  if (slug === "deepseek") return "DEEPSEEK"
   if (providerType === "openai-compatible") {
     return slug
       .toUpperCase()
@@ -1365,12 +1368,18 @@ function openAiCompatibleEnvPrefix(slug: string, providerType: string) {
 
 function defaultOpenAiCompatibleBaseUrl(slug: string) {
   if (slug === "qwen") return "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions"
+  if (slug === "deepseek") return "https://api.deepseek.com/chat/completions"
   return ""
 }
 
 function defaultOpenAiCompatibleModel(slug: string) {
   if (slug === "qwen") return "qwen-vl-max-latest"
+  if (slug === "deepseek") return "deepseek-v4-flash"
   return "model"
+}
+
+function openAiCompatibleSupportsImages(slug: string) {
+  return slug === "qwen"
 }
 
 async function createOpenAiRadiologyDraft({
@@ -1597,6 +1606,7 @@ async function createOpenAiCompatibleRadiologyDraft({
   inputContext,
   model,
   patientName,
+  supportsImages,
 }: {
   apiKey: string
   baseUrl: string
@@ -1606,6 +1616,7 @@ async function createOpenAiCompatibleRadiologyDraft({
   inputContext: Record<string, unknown>
   model: string
   patientName: string
+  supportsImages: boolean
 }): Promise<OpenAiDraft> {
   if (!baseUrl) throw new Error("OpenAI-compatible provider endpoint tanımlı değil.")
 
@@ -1647,10 +1658,12 @@ async function createOpenAiCompatibleRadiologyDraft({
               }),
               type: "text",
             },
-            ...imagePreviews.map((preview) => ({
-              image_url: { url: preview.dataUrl },
-              type: "image_url",
-            })),
+            ...(supportsImages
+              ? imagePreviews.map((preview) => ({
+                  image_url: { url: preview.dataUrl },
+                  type: "image_url",
+                }))
+              : []),
           ],
           role: "user",
         },
