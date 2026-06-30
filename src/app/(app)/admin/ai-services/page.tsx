@@ -488,7 +488,6 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
                   <option value="openai">OpenAI</option>
                   <option value="anthropic">Claude / Anthropic</option>
                   <option value="google">Gemini / Google</option>
-                  <option value="openai-compatible">OpenAI-compatible</option>
                   <option value="mock">RAI Mock</option>
                 </select>
               </label>
@@ -837,8 +836,6 @@ function providerLabel(value: string, slug?: string) {
       return "Claude"
     case "google":
       return "Gemini"
-    case "openai-compatible":
-      return "OpenAI-compatible"
     case "mock":
       return "RAI Mock"
     default:
@@ -864,8 +861,6 @@ function credentialPlaceholder(providerType: string, slug?: string) {
       return "ANTHROPIC_API_KEY"
     case "google":
       return "GOOGLE_GENERATIVE_AI_API_KEY"
-    case "openai-compatible":
-      return "QWEN_API_KEY, TOGETHER_API_KEY..."
     case "mock":
       return "Credential gerekmez"
     default:
@@ -1107,7 +1102,7 @@ async function ensureQwenProvider(
     is_active: false,
     is_default: false,
     name: "Qwen Vision",
-    provider_type: "openai-compatible",
+    provider_type: "custom",
     requires_credentials: true,
     settings: {
       availableModels: ["qwen-vl-max-latest", "qwen-vl-plus-latest"],

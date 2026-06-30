@@ -14,7 +14,7 @@ select
   organizations.id,
   'Qwen Vision',
   'qwen',
-  'openai-compatible',
+  'custom',
   'qwen-vl-max-latest',
   false,
   false,
