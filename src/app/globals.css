@@ -775,6 +775,12 @@ body:has(.rai-viewer-page) .app-header {
   font-weight: 800;
 }
 
+.ai-job-alert.warning {
+  border-bottom-color: #92400e;
+  color: #fde68a;
+  background: #221505;
+}
+
 .ai-job-alert strong,
 .ai-job-alert span,
 .ai-job-alert small {

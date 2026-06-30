@@ -150,6 +150,8 @@ export function aiJobStatusLabel(status: string | null | undefined) {
       return "Çalışıyor"
     case "waiting_credentials":
       return "Hesap bilgisi bekliyor"
+    case "endpoint_waking":
+      return "Endpoint uyanıyor"
     case "failed":
       return "Başarısız"
     case "cancelled":

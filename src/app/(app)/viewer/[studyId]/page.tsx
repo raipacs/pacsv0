@@ -131,13 +131,16 @@ export default async function RaiViewerPage({
   const reportFullPageHref = createReportFullPageHref(studyId, query)
 
   const seriesById = new Map((series ?? []).map((item) => [item.id, item]))
-  const latestJobErrorText =
-    aiViewerState.latestJob?.status === "failed"
+  const latestAiJob = aiViewerState.latestJob
+  const latestJobWarningText =
+    latestAiJob && ["endpoint_waking", "failed"].includes(latestAiJob.status)
       ? [
-          aiViewerState.latestJob.providerName,
-          aiViewerState.latestJob.modelName,
-          "Ön rapor üretimi başarısız.",
-          aiViewerState.latestJob.errorMessage || "AI sağlayıcı hatası kaydedildi.",
+          latestAiJob.providerName,
+          latestAiJob.modelName,
+          latestAiJob.status === "endpoint_waking"
+            ? "Endpoint uyanıyor."
+            : "Ön rapor üretimi başarısız.",
+          latestAiJob.errorMessage || "AI sağlayıcı hatası kaydedildi.",
         ]
           .filter(Boolean)
           .join("\n")
@@ -184,14 +187,20 @@ export default async function RaiViewerPage({
           {isReportMode ? null : <ExternalShareButton studyId={studyId} />}
         </nav>
       </header>
-      {aiViewerState.latestJob?.status === "failed" ? (
-        <section className="ai-job-alert" aria-label="AI son çalışma durumu">
-          <strong>{aiViewerState.latestJob.providerName}</strong>
+      {latestAiJob && ["endpoint_waking", "failed"].includes(latestAiJob.status) ? (
+        <section
+          className={`ai-job-alert${latestAiJob.status === "endpoint_waking" ? " warning" : ""}`}
+          aria-label="AI son çalışma durumu"
+        >
+          <strong>{latestAiJob.providerName}</strong>
           <span>
-            {aiViewerState.latestJob.modelName || "model seçilmedi"} · Ön rapor üretimi başarısız.
+            {latestAiJob.modelName || "model seçilmedi"} ·{" "}
+            {latestAiJob.status === "endpoint_waking"
+              ? "Endpoint uyanıyor"
+              : "Ön rapor üretimi başarısız."}
           </span>
-          <small>{aiViewerState.latestJob.errorMessage || "AI sağlayıcı hatası kaydedildi."}</small>
-          <CopyErrorButton text={latestJobErrorText} />
+          <small>{latestAiJob.errorMessage || "AI sağlayıcı hatası kaydedildi."}</small>
+          <CopyErrorButton text={latestJobWarningText} />
         </section>
       ) : null}
       <ReportEditorPanel

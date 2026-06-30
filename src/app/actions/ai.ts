@@ -35,6 +35,7 @@ export async function startAiPreReport(formData: FormData) {
   const forceAiRunProviderId = parseOptionalUuid(formData.get("forceAiRunProviderId"))
   const orchestratorProviderId = parseOptionalUuid(formData.get("orchestratorProviderId"))
   const orchestratorProviderSlug = parseOptionalText(formData.get("orchestratorProviderSlug"))
+  const orchestratorSkipSlugs = parseOptionalCsv(formData.get("orchestratorSkipSlugs"))
   const supabase = await createClient()
 
   const [{ data: study, error: studyError }, { count: instanceCount, error: countError }] =
@@ -101,6 +102,7 @@ export async function startAiPreReport(formData: FormData) {
 
   if (provider.slug === "rai-orchestrator") {
     const routedProvider = await resolveRaiOrchestratorProvider({
+      excludedSlugs: orchestratorSkipSlugs,
       organizationId: user.organizationId,
       supabase,
     })
@@ -116,6 +118,9 @@ export async function startAiPreReport(formData: FormData) {
     routedFormData.set("providerId", routedProvider.id)
     routedFormData.set("orchestratorProviderId", provider.id)
     routedFormData.set("orchestratorProviderSlug", provider.slug)
+    if (orchestratorSkipSlugs.length) {
+      routedFormData.set("orchestratorSkipSlugs", orchestratorSkipSlugs.join(","))
+    }
     routedFormData.set(
       "returnTo",
       appendQuery(appendQueryIfMissing(returnTo, "aiProvider", provider.id), "orchestrator", routedProvider.slug)
@@ -644,15 +649,29 @@ export async function startAiPreReport(formData: FormData) {
         .eq("id", job.id)
         .eq("organization_id", user.organizationId)
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "MedGemma ön raporu üretilemedi."
+      const endpointWaking = isMedGemmaEndpointWakingError(error)
+      const nextStatus = endpointWaking ? "endpoint_waking" : "failed"
+
       await supabase
         .from("ai_jobs")
         .update({
-          status: "failed",
+          status: nextStatus,
           completed_at: new Date().toISOString(),
-          error_message: error instanceof Error ? error.message : "MedGemma ön raporu üretilemedi.",
+          error_message: errorMessage,
         })
         .eq("id", job.id)
         .eq("organization_id", user.organizationId)
+
+      if (endpointWaking && orchestratorProviderId && orchestratorProviderSlug) {
+        const fallbackFormData = new FormData()
+        fallbackFormData.set("studyId", studyId)
+        fallbackFormData.set("providerId", orchestratorProviderId)
+        fallbackFormData.set("forceAiRunProviderId", orchestratorProviderId)
+        fallbackFormData.set("orchestratorSkipSlugs", uniqueStrings([...orchestratorSkipSlugs, provider.slug]).join(","))
+        fallbackFormData.set("returnTo", appendQueryIfMissing(returnTo, "aiProvider", orchestratorProviderId))
+        return startAiPreReport(fallbackFormData)
+      }
     }
   }
 
@@ -793,6 +812,20 @@ function parseOptionalText(value: FormDataEntryValue | null) {
   return trimmed || null
 }
 
+function parseOptionalCsv(value: FormDataEntryValue | null) {
+  if (typeof value !== "string") return []
+  return uniqueStrings(
+    value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+  )
+}
+
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values))
+}
+
 function appendQueryIfMissing(path: string, key: string, value: string) {
   const [pathname, queryString] = path.split("?")
   if (!queryString) return appendQuery(path, key, value)
@@ -917,9 +950,11 @@ const MEDGEMMA_RETRYABLE_STATUS_CODES = new Set([408, 409, 425, 429, 500, 502, 5
 const RAI_ORCHESTRATOR_PRIORITY = ["rai-llm", "openai", "gemini-google", "claude", "medgemma", "rai-mock"]
 
 async function resolveRaiOrchestratorProvider({
+  excludedSlugs = [],
   organizationId,
   supabase,
 }: {
+  excludedSlugs?: string[]
   organizationId: string
   supabase: Awaited<ReturnType<typeof createClient>>
 }) {
@@ -933,6 +968,7 @@ async function resolveRaiOrchestratorProvider({
 
   const runnableProviders = ((providers ?? []) as OrchestratorProviderCandidate[])
     .filter((provider) => provider.slug !== "rai-orchestrator")
+    .filter((provider) => !excludedSlugs.includes(provider.slug))
     .filter(isRunnableOrchestratorProvider)
     .sort((left, right) => orchestratorProviderRank(left) - orchestratorProviderRank(right))
 
@@ -1766,6 +1802,17 @@ async function waitForMedGemmaRetryDelay(attemptIndex: number, retryAfterHeader?
 
 function isMedGemmaServiceUnavailable(error: Error) {
   return error.message.includes("503") || error.message.includes("SERVICE_UNAVAILABLE")
+}
+
+function isMedGemmaEndpointWakingError(error: unknown) {
+  if (!(error instanceof Error)) return false
+  return (
+    error.message.includes("hazır hale gelemedi") ||
+    error.message.includes("uykudan uyanıyor") ||
+    error.message.includes("geçici olarak servis veremiyor") ||
+    error.message.includes("SERVICE_UNAVAILABLE") ||
+    error.message.includes("503")
+  )
 }
 
 function parseRetryAfterMs(value?: string | null) {

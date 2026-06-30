@@ -167,7 +167,7 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
       !provider.is_active || (provider.requires_credentials && !provider.credential_reference)
   ).length
   const jobWarningCount = jobs.filter(
-    (job) => job.status === "failed" || job.status === "waiting_credentials"
+    (job) => job.status === "failed" || job.status === "waiting_credentials" || job.status === "endpoint_waking"
   ).length
   const draftWarningCount = drafts.filter((draft) => draft.criticality === "high").length
   const raiLlmWarningCount = raiLlmStatus.ready ? 0 : 1
@@ -1076,7 +1076,7 @@ async function ensureRaiAiOrchestratorProvider(
 function jobStatusClass(status: string) {
   if (status === "draft_ready") return "ok"
   if (status === "failed") return "error"
-  if (status === "waiting_credentials") return "warning"
+  if (status === "waiting_credentials" || status === "endpoint_waking") return "warning"
   return "unknown"
 }
 
@@ -1086,6 +1086,8 @@ function jobStatusLabel(status: string) {
       return "Ön rapor hazır"
     case "waiting_credentials":
       return "Hesap bekliyor"
+    case "endpoint_waking":
+      return "Endpoint uyanıyor"
     case "running":
       return "Çalışıyor"
     case "failed":

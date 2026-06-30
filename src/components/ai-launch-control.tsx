@@ -126,7 +126,7 @@ function AiLaunchFields({
       >
         {statusText}
       </span>
-      {!pending && latestJob?.status === "failed" && latestJob.errorMessage ? (
+      {!pending && ["endpoint_waking", "failed"].includes(latestJob?.status ?? "") && latestJob?.errorMessage ? (
         <CopyErrorButton text={statusText} />
       ) : null}
     </>
@@ -161,7 +161,7 @@ function formatLatestAiJob(
   const when = formatShortDateTime(job.completedAt ?? job.createdAt)
   const provider = `${job.providerName}${job.modelName ? ` · ${job.modelName}` : ""}`
   const status = aiJobStatusLabel(job.status)
-  const error = job.status === "failed" && job.errorMessage ? ` · ${job.errorMessage}` : ""
+  const error = ["endpoint_waking", "failed"].includes(job.status) && job.errorMessage ? ` · ${job.errorMessage}` : ""
 
   return `Son AI: ${status} · ${provider} · ${when}${error}`
 }
@@ -180,6 +180,8 @@ function aiJobStatusLabel(status: string) {
       return "Çalışıyor"
     case "waiting_credentials":
       return "Hesap bekliyor"
+    case "endpoint_waking":
+      return "Endpoint uyanıyor"
     default:
       return status
   }
