@@ -2,7 +2,7 @@ import Link from "next/link"
 import type { ReactNode } from "react"
 
 import { createAiProvider, testRaiLlmEndpoint, updateAiProvider } from "@/app/actions/admin"
-import { isMissingAiTableError } from "@/lib/ai-reporting"
+import { aiProviderMark, isMissingAiTableError } from "@/lib/ai-reporting"
 import { requireAdmin } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 
@@ -378,7 +378,7 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
                 {usageSummary.map((item) => (
                   <tr key={`${item.providerSlug}-${item.modelName}`}>
                     <td>
-                      <strong>{item.providerSlug}</strong>
+                      <strong>{formatProviderSlug(item.providerSlug)}</strong>
                     </td>
                     <td>{item.modelName || "-"}</td>
                     <td>{formatNumber(item.inputTokens)}</td>
@@ -408,7 +408,12 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
               <article className="ai-provider-card" key={provider.id}>
                 <div className="ai-provider-card-header">
                   <div>
-                    <strong>{provider.name}</strong>
+                    <strong>
+                      <span className="ai-provider-mark">
+                        {aiProviderMark({ providerType: provider.provider_type, slug: provider.slug })}
+                      </span>{" "}
+                      {provider.name}
+                    </strong>
                     <span>
                       {providerLabel(provider.provider_type, provider.slug)} · {provider.slug}
                     </span>
@@ -650,7 +655,7 @@ function AiUsageTableRow({ usage }: { usage: AiUsageRow }) {
         </span>
       </td>
       <td>
-        <strong>{usage.provider_slug}</strong>
+        <strong>{formatProviderSlug(usage.provider_slug)}</strong>
         <span>{usage.model_name ?? "-"}</span>
       </td>
       <td>{usageTypeLabel(usage.usage_type)}</td>
@@ -685,10 +690,12 @@ function AiJobTableRow({ job }: { job: AiJobRow }) {
         {orchestration ? (
           <span className="orchestrator-route-badge">↪ Orchestrator</span>
         ) : null}
-        <strong>{job.provider_slug}</strong>
+        <strong>{formatProviderSlug(job.provider_slug)}</strong>
         <span>
           {job.model_name ?? "-"}
-          {orchestration?.routedProviderSlug ? ` · route: ${orchestration.routedProviderSlug}` : ""}
+          {orchestration?.routedProviderSlug
+            ? ` · route: ${formatProviderSlug(orchestration.routedProviderSlug)}`
+            : ""}
         </span>
       </td>
       <td>
@@ -732,7 +739,7 @@ function AiDraftTableRow({ draft }: { draft: AiDraftRow }) {
         </span>
       </td>
       <td>
-        <strong>{job?.provider_slug ?? "-"}</strong>
+        <strong>{job?.provider_slug ? formatProviderSlug(job.provider_slug) : "-"}</strong>
         <span>{job?.model_name ?? "-"}</span>
       </td>
       <td>{formatConfidence(draft.confidence_score)}</td>
@@ -832,6 +839,10 @@ function providerLabel(value: string, slug?: string) {
     default:
       return "Custom medikal AI"
   }
+}
+
+function formatProviderSlug(slug: string) {
+  return `${aiProviderMark({ slug })} ${slug}`
 }
 
 function credentialPlaceholder(providerType: string, slug?: string) {

@@ -5,7 +5,7 @@ import { useFormStatus } from "react-dom"
 
 import { startAiPreReport } from "@/app/actions/ai"
 import { CopyErrorButton } from "@/components/copy-error-button"
-import type { AiProviderOption } from "@/lib/ai-reporting"
+import { aiProviderMark, type AiProviderOption } from "@/lib/ai-reporting"
 
 type AiLaunchJobStatus = {
   completedAt: string | null
@@ -105,7 +105,7 @@ function AiLaunchFields({
         {selectedProvider ? null : <option value="">AI servisi yok</option>}
         {providers.map((provider) => (
           <option disabled={!provider.isActive} key={provider.id} value={provider.id}>
-            {provider.name}
+            {formatProviderName(provider)}
             {provider.defaultModel ? ` · ${provider.defaultModel}` : ""}
             {provider.isActive ? "" : " · hesap bekliyor"}
           </option>
@@ -136,7 +136,7 @@ function AiLaunchFields({
 function formatPendingAiJob(provider: AiProviderOption | null) {
   if (!provider) return "AI çalışıyor..."
 
-  const label = `${provider.name}${provider.defaultModel ? ` · ${provider.defaultModel}` : ""}`
+  const label = `${formatProviderName(provider)}${provider.defaultModel ? ` · ${provider.defaultModel}` : ""}`
   if (provider.slug === "medgemma") {
     return `${label} çalışıyor... Endpoint uyanıyorsa 1-2 dk sürebilir.`
   }
@@ -153,7 +153,7 @@ function formatLatestAiJob(
   shouldForceRerun: boolean
 ) {
   if (shouldForceRerun && selectedProvider) {
-    return `${selectedProvider.name} ile önceki rapor açıldı. Yeniden çalıştırmak için AI'ya tekrar basın.`
+    return `${formatProviderName(selectedProvider)} ile önceki rapor açıldı. Yeniden çalıştırmak için AI'ya tekrar basın.`
   }
 
   if (!job) return "AI otomatik çalışmaz; butona basınca seçili servis başlar."
@@ -164,6 +164,10 @@ function formatLatestAiJob(
   const error = job.status === "failed" && job.errorMessage ? ` · ${job.errorMessage}` : ""
 
   return `Son AI: ${status} · ${provider} · ${when}${error}`
+}
+
+function formatProviderName(provider: AiProviderOption) {
+  return `${aiProviderMark({ providerType: provider.providerType, slug: provider.slug })} ${provider.name}`
 }
 
 function aiJobStatusLabel(status: string) {

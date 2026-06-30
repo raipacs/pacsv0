@@ -2441,6 +2441,35 @@ td span {
   margin-top: 14px;
 }
 
+.ai-provider-mark {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(15, 118, 110, 0.24);
+  border-radius: 5px;
+  color: var(--primary-dark);
+  background: #ecfdf5;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.orchestrator-route-badge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  margin-bottom: 4px;
+  border: 1px solid rgba(59, 130, 246, 0.28);
+  border-radius: 999px;
+  padding: 2px 8px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
 .form-help {
   margin: 0;
   color: var(--muted);

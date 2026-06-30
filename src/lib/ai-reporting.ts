@@ -9,6 +9,26 @@ export type AiProviderOption = {
   requiresCredentials: boolean
 }
 
+export function aiProviderMark({
+  providerType,
+  slug,
+}: {
+  providerType?: string | null
+  slug?: string | null
+}) {
+  if (slug === "rai-orchestrator") return "↪"
+  if (slug === "rai-llm") return "▣"
+  if (slug === "rai-mock") return "●"
+  if (slug === "medgemma") return "✚"
+  if (slug === "radialog") return "◌"
+  if (slug === "gemini-google" || providerType === "google") return "◇"
+  if (slug === "claude" || providerType === "anthropic") return "✦"
+  if (slug === "openai" || providerType === "openai") return "◆"
+  if (providerType === "mock") return "●"
+
+  return "■"
+}
+
 export type MockAiDraftInput = {
   accessionNumber: string
   description: string | null
