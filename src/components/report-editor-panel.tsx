@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { useMemo, useState } from "react"
 
 import { finalizeReport, saveReportDraft } from "@/app/actions/reports"
@@ -29,18 +30,26 @@ export type ReportEditorAiDraft = {
 
 export function ReportEditorPanel({
   aiDrafts,
+  aiControl,
+  fullPageHref,
   initialSourceId,
+  isFullPage,
   isNewAiDraft,
   reports,
   returnTo,
+  shareControl,
   studyId,
   template,
 }: {
   aiDrafts: ReportEditorAiDraft[]
+  aiControl?: ReactNode
+  fullPageHref?: string
   initialSourceId: string
+  isFullPage?: boolean
   isNewAiDraft: boolean
   reports: ReportEditorReport[]
   returnTo: string
+  shareControl?: ReactNode
   studyId: string
   template: { findings: string; impression: string }
 }) {
@@ -121,10 +130,15 @@ export function ReportEditorPanel({
   }
 
   return (
-    <details className="report-editor-strip" open={sources.length > 1 || Boolean(findings || impression)}>
+    <details
+      className={`report-editor-strip${isFullPage ? " is-full-page" : ""}`}
+      open={isFullPage || sources.length > 1 || Boolean(findings || impression)}
+    >
       <summary>
-        <span>Rapor</span>
-        <strong>{selected?.title ?? "Manuel rapor"}</strong>
+        <div className="report-editor-summary-text">
+          <span>Rapor</span>
+          <strong>{selected?.title ?? "Manuel rapor"}</strong>
+        </div>
         {selected ? (
           <small>
             <span className={`health-badge ${selectedBadgeClass(selected.status)}`}>
@@ -133,7 +147,37 @@ export function ReportEditorPanel({
             {selected.subtitle}
           </small>
         ) : null}
+        <span className="report-editor-summary-caret" aria-hidden="true">
+          ↓
+        </span>
       </summary>
+      <div className="report-editor-toolbar">
+        <div className="report-editor-ai-slot" aria-label="AI rapor işlemleri">
+          {aiControl}
+        </div>
+        <div className="report-editor-toolbar-actions">
+          {fullPageHref ? (
+            <a
+              aria-label="Raporu yeni sayfada aç"
+              className="button subtle report-icon-button"
+              href={fullPageHref}
+              rel="noreferrer"
+              target="_blank"
+              title="Raporu yeni sayfada aç"
+            >
+              ↗
+            </a>
+          ) : null}
+          <button
+            className="button subtle"
+            onClick={() => window.print()}
+            type="button"
+          >
+            PDF / Yazdır
+          </button>
+          {shareControl}
+        </div>
+      </div>
       <div className="report-editor-layout">
         <aside className="report-source-list" aria-label="Rapor taslakları">
           {sources.map((source) => (
@@ -154,7 +198,10 @@ export function ReportEditorPanel({
           <input name="sourceAiDraftId" type="hidden" value={selected?.sourceAiDraftId ?? ""} />
           <input name="returnTo" type="hidden" value={returnTo} />
           <label>
-            Bulgular
+            <span>
+              Bulgular
+              <small>Klinik bulgular, ölçümler ve karşılaştırma notları</small>
+            </span>
             <textarea
               name="findings"
               onChange={(event) => setFindings(event.target.value)}
@@ -165,7 +212,10 @@ export function ReportEditorPanel({
             />
           </label>
           <label>
-            İzlenim
+            <span>
+              İzlenim
+              <small>Kısa sonuç, tanısal değerlendirme ve öneri</small>
+            </span>
             <textarea
               name="impression"
               onChange={(event) => setImpression(event.target.value)}

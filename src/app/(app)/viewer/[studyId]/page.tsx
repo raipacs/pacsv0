@@ -37,6 +37,7 @@ export default async function RaiViewerPage({
     aiProvider?: string
     aiReuse?: string
     patientId?: string
+    reportMode?: string
     reportId?: string
   }>
 }) {
@@ -126,6 +127,8 @@ export default async function RaiViewerPage({
   const returnTo = query.patientId
     ? `/viewer/${studyId}?patientId=${encodeURIComponent(query.patientId)}`
     : `/viewer/${studyId}`
+  const isReportMode = query.reportMode === "full"
+  const reportFullPageHref = createReportFullPageHref(studyId, query)
 
   const seriesById = new Map((series ?? []).map((item) => [item.id, item]))
   const latestJobErrorText =
@@ -141,7 +144,7 @@ export default async function RaiViewerPage({
       : ""
 
   return (
-    <section className="rai-viewer-page">
+    <section className={`rai-viewer-page${isReportMode ? " report-only-page" : ""}`}>
       <header className="rai-viewer-bar">
         <div>
           <p className="eyebrow">RAI Viewer</p>
@@ -162,15 +165,6 @@ export default async function RaiViewerPage({
         </div>
         <nav aria-label="Viewer navigasyonu">
           <PrivacyToggle />
-          <AiLaunchControl
-            initialProviderId={query.aiProvider ?? aiViewerState.latestJob?.selectedProviderId ?? undefined}
-            latestJob={aiViewerState.latestJob}
-            providers={aiViewerState.providers}
-            reuseProviderId={query.aiReuse}
-            returnTo={returnTo}
-            studyId={studyId}
-            unavailableReason={aiViewerState.unavailableReason}
-          />
           <Link className="button subtle" href="/worklist">
             Worklist
           </Link>
@@ -202,15 +196,29 @@ export default async function RaiViewerPage({
       ) : null}
       <ReportEditorPanel
         aiDrafts={aiViewerState.drafts}
+        aiControl={
+          <AiLaunchControl
+            initialProviderId={query.aiProvider ?? aiViewerState.latestJob?.selectedProviderId ?? undefined}
+            latestJob={aiViewerState.latestJob}
+            providers={aiViewerState.providers}
+            reuseProviderId={query.aiReuse}
+            returnTo={returnTo}
+            studyId={studyId}
+            unavailableReason={aiViewerState.unavailableReason}
+          />
+        }
+        fullPageHref={isReportMode ? undefined : reportFullPageHref}
         initialSourceId={resolveInitialReportSourceId(
           query.aiDraft,
           query.reportId,
           reports ?? [],
           aiViewerState.drafts
         )}
+        isFullPage={isReportMode}
         isNewAiDraft={Boolean(query.aiJob && query.aiJob === aiViewerState.latestDraft?.jobId)}
         reports={mapReportsForEditor(reports ?? [])}
         returnTo={returnTo}
+        shareControl={<ExternalShareButton studyId={studyId} />}
         studyId={studyId}
         template={createRadiologyReportTemplate({
           accessionNumber: study.accession_number,
@@ -218,26 +226,28 @@ export default async function RaiViewerPage({
           modality: study.modality,
         })}
       />
-      <RaiDicomViewer
-        studyId={studyId}
-        study={{
-          accessionNumber: study.accession_number,
-          description: study.description ?? "DICOM görüntüleme",
-          modality: study.modality,
-          patientName: patient ? `${patient.first_name} ${patient.last_name}` : "",
-          patientNumber: patient?.patient_number ?? "",
-          studyAt: study.study_at,
-        }}
-        instances={(instances ?? []).map((instance) => ({
-          id: instance.id,
-          seriesId: instance.series_id,
-          seriesNumber: seriesById.get(instance.series_id)?.series_number ?? null,
-          seriesDescription: seriesById.get(instance.series_id)?.description ?? null,
-          seriesModality: seriesById.get(instance.series_id)?.modality ?? study.modality,
-          instanceNumber: instance.instance_number,
-          sopInstanceUid: instance.sop_instance_uid,
-        }))}
-      />
+      {isReportMode ? null : (
+        <RaiDicomViewer
+          studyId={studyId}
+          study={{
+            accessionNumber: study.accession_number,
+            description: study.description ?? "DICOM görüntüleme",
+            modality: study.modality,
+            patientName: patient ? `${patient.first_name} ${patient.last_name}` : "",
+            patientNumber: patient?.patient_number ?? "",
+            studyAt: study.study_at,
+          }}
+          instances={(instances ?? []).map((instance) => ({
+            id: instance.id,
+            seriesId: instance.series_id,
+            seriesNumber: seriesById.get(instance.series_id)?.series_number ?? null,
+            seriesDescription: seriesById.get(instance.series_id)?.description ?? null,
+            seriesModality: seriesById.get(instance.series_id)?.modality ?? study.modality,
+            instanceNumber: instance.instance_number,
+            sopInstanceUid: instance.sop_instance_uid,
+          }))}
+        />
+      )}
     </section>
   )
 }
@@ -464,6 +474,28 @@ function resolveInitialReportSourceId(
   if (latestReport) return `report:${latestReport.id}`
 
   return "template:new"
+}
+
+function createReportFullPageHref(
+  studyId: string,
+  query: {
+    aiDraft?: string
+    aiJob?: string
+    aiProvider?: string
+    aiReuse?: string
+    patientId?: string
+    reportId?: string
+  }
+) {
+  const params = new URLSearchParams()
+  params.set("reportMode", "full")
+
+  for (const key of ["patientId", "aiProvider", "aiDraft", "aiReuse", "aiJob", "reportId"] as const) {
+    const value = query[key]
+    if (value) params.set(key, value)
+  }
+
+  return `/viewer/${studyId}?${params.toString()}`
 }
 
 function createRadiologyReportTemplate({

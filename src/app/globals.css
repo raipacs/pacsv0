@@ -622,6 +622,10 @@ p {
   background: #030712;
 }
 
+.rai-viewer-page.report-only-page {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
 html:has(.rai-viewer-page),
 html:has(.external-share-page),
 body:has(.rai-viewer-page),
@@ -799,6 +803,11 @@ body:has(.rai-viewer-page) .app-header {
   background: #071225;
 }
 
+.report-editor-strip.is-full-page {
+  max-height: none;
+  min-height: 0;
+}
+
 .report-editor-strip > summary {
   position: sticky;
   top: 0;
@@ -817,14 +826,23 @@ body:has(.rai-viewer-page) .app-header {
   display: none;
 }
 
-.report-editor-strip > summary span {
+.report-editor-summary-text {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.report-editor-strip > summary span,
+.report-editor-summary-text span {
   color: #67e8f9;
   font-size: 12px;
   font-weight: 900;
   text-transform: uppercase;
 }
 
-.report-editor-strip > summary strong {
+.report-editor-strip > summary strong,
+.report-editor-summary-text strong {
   font-size: 13px;
 }
 
@@ -845,11 +863,62 @@ body:has(.rai-viewer-page) .app-header {
   flex: 0 0 auto;
 }
 
+.report-editor-summary-caret {
+  margin-left: auto;
+  color: #67e8f9;
+  font-weight: 900;
+}
+
+.report-editor-toolbar {
+  position: sticky;
+  top: 38px;
+  z-index: 2;
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid rgba(18, 51, 102, 0.75);
+  border-bottom: 1px solid rgba(18, 51, 102, 0.75);
+  padding: 10px clamp(10px, 1.5vw, 18px);
+  background: #071225;
+}
+
+.report-editor-ai-slot {
+  min-width: min(100%, 420px);
+}
+
+.report-editor-ai-slot .ai-launch-control {
+  max-width: none;
+}
+
+.report-editor-ai-slot .ai-launch-control select {
+  max-width: 260px;
+}
+
+.report-editor-toolbar-actions {
+  display: inline-flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.report-icon-button {
+  min-width: 40px;
+  padding-inline: 12px;
+}
+
 .report-editor-layout {
   display: grid;
   grid-template-columns: minmax(180px, 0.28fr) minmax(0, 1fr);
   gap: 12px;
   padding: 0 clamp(10px, 1.5vw, 18px) 12px;
+}
+
+.report-editor-strip.is-full-page .report-editor-layout {
+  grid-template-columns: minmax(240px, 0.24fr) minmax(0, 1fr);
+  padding-top: 12px;
 }
 
 .report-source-list {
@@ -911,6 +980,17 @@ body:has(.rai-viewer-page) .app-header {
   font-weight: 900;
 }
 
+.report-editor-form label > span {
+  display: grid;
+  gap: 2px;
+}
+
+.report-editor-form label > span small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .report-editor-form textarea {
   width: 100%;
   min-height: 92px;
@@ -925,6 +1005,16 @@ body:has(.rai-viewer-page) .app-header {
   line-height: 1.45;
   outline: none;
   resize: none;
+}
+
+.report-editor-strip.is-full-page .report-editor-form textarea {
+  min-height: 240px;
+  max-height: none;
+  resize: vertical;
+}
+
+.report-editor-strip.is-full-page .report-editor-form label:nth-of-type(2) textarea {
+  min-height: 180px;
 }
 
 .report-editor-form textarea:focus {
@@ -1034,6 +1124,10 @@ body:has(.rai-viewer-page) .app-header {
   font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.report-editor-toolbar .external-share-panel {
+  top: calc(100% + 10px);
 }
 
 .external-share-error-page {
@@ -3932,13 +4026,26 @@ td span {
     flex-basis: 100%;
   }
 
-  .rai-viewer-bar nav > .ai-launch-control {
-    flex-basis: 100%;
-  }
-
   .ai-launch-control select {
     max-width: none;
     flex: 1;
+  }
+
+  .report-editor-toolbar,
+  .report-editor-toolbar-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .report-editor-ai-slot {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .report-editor-toolbar-actions > *,
+  .report-editor-toolbar-actions .external-share-control,
+  .report-editor-toolbar-actions .external-share-trigger {
+    width: 100%;
   }
 
   .report-editor-form {
@@ -4045,6 +4152,79 @@ td span {
   .admin-filter-form label:first-child,
   .admin-filter-actions {
     grid-column: 1 / -1;
+  }
+}
+
+@media print {
+  html:has(.rai-viewer-page),
+  body:has(.rai-viewer-page) {
+    height: auto;
+    overflow: visible;
+  }
+
+  body:has(.rai-viewer-page) {
+    background: white;
+  }
+
+  .rai-viewer-bar,
+  .ai-job-alert,
+  .rai-dicom-viewer,
+  .report-editor-strip > summary,
+  .report-editor-toolbar,
+  .report-source-list,
+  .report-editor-actions {
+    display: none !important;
+  }
+
+  .rai-viewer-page,
+  .rai-viewer-page.report-only-page {
+    display: block;
+    height: auto;
+    overflow: visible;
+    background: white;
+  }
+
+  .report-editor-strip,
+  .report-editor-strip.is-full-page {
+    display: block;
+    max-height: none;
+    overflow: visible;
+    border: 0;
+    color: #111827;
+    background: white;
+  }
+
+  .report-editor-layout {
+    display: block;
+    padding: 0;
+  }
+
+  .report-editor-form {
+    display: block;
+  }
+
+  .report-editor-form input {
+    display: none;
+  }
+
+  .report-editor-form label {
+    margin-bottom: 18px;
+    color: #111827;
+    page-break-inside: avoid;
+  }
+
+  .report-editor-form label > span small {
+    color: #4b5563;
+  }
+
+  .report-editor-form textarea {
+    min-height: 0;
+    max-height: none;
+    border: 0;
+    padding: 0;
+    color: #111827;
+    background: white;
+    resize: none;
   }
 }
 
