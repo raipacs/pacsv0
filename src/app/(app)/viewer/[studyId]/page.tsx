@@ -181,7 +181,7 @@ export default async function RaiViewerPage({
           >
             OHIF yeni sekme
           </a>
-          <ExternalShareButton studyId={studyId} />
+          {isReportMode ? null : <ExternalShareButton studyId={studyId} />}
         </nav>
       </header>
       {aiViewerState.latestJob?.status === "failed" ? (

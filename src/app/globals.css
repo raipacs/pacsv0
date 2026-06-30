@@ -804,8 +804,10 @@ body:has(.rai-viewer-page) .app-header {
 }
 
 .report-editor-strip.is-full-page {
+  height: 100%;
   max-height: none;
   min-height: 0;
+  overflow: hidden;
 }
 
 .report-editor-strip > summary {
@@ -918,7 +920,21 @@ body:has(.rai-viewer-page) .app-header {
 
 .report-editor-strip.is-full-page .report-editor-layout {
   grid-template-columns: minmax(240px, 0.24fr) minmax(0, 1fr);
+  height: calc(100dvh - 184px);
   padding-top: 12px;
+  overflow: hidden;
+}
+
+.report-editor-strip.is-full-page .report-source-list {
+  max-height: none;
+  min-height: 0;
+}
+
+.report-editor-strip.is-full-page .report-editor-form {
+  grid-template-columns: 1fr;
+  align-content: start;
+  min-height: 0;
+  overflow: auto;
 }
 
 .report-source-list {
@@ -1008,13 +1024,19 @@ body:has(.rai-viewer-page) .app-header {
 }
 
 .report-editor-strip.is-full-page .report-editor-form textarea {
-  min-height: 240px;
+  min-height: clamp(220px, 30dvh, 360px);
   max-height: none;
   resize: vertical;
 }
 
 .report-editor-strip.is-full-page .report-editor-form label:nth-of-type(2) textarea {
-  min-height: 180px;
+  min-height: clamp(160px, 22dvh, 260px);
+}
+
+.report-editor-strip.is-full-page .report-editor-actions {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  align-content: center;
 }
 
 .report-editor-form textarea:focus {
