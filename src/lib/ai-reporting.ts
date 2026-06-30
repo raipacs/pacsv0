@@ -21,6 +21,7 @@ export function aiProviderMark({
   if (slug === "rai-mock") return "●"
   if (slug === "medgemma") return "✚"
   if (slug === "radialog") return "◌"
+  if (slug === "qwen" || providerType === "openai-compatible") return "⬢"
   if (slug === "gemini-google" || providerType === "google") return "◇"
   if (slug === "claude" || providerType === "anthropic") return "✦"
   if (slug === "openai" || providerType === "openai") return "◆"
@@ -49,6 +50,7 @@ const pricingUsdPerMillionTokens: Record<
   claude: { input: 3, output: 15, note: "Temsili varsayılan fiyat" },
   gemini: { input: 1.25, output: 10, note: "Temsili varsayılan fiyat" },
   medgemma: { input: 0, output: 0, note: "Custom endpoint fiyatı tanımlanacak" },
+  qwen: { input: 0.3, output: 1.2, note: "Temsili Qwen Vision fiyatı; Alibaba Model Studio planına göre güncellenecek" },
   "rai-llm": { input: 0, output: 0, note: "Self-hosted RAI LLM; GPU/endpoint maliyeti ayrı izlenir" },
   radialog: { input: 0, output: 0, note: "Custom endpoint fiyatı tanımlanacak" },
 }

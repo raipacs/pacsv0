@@ -33,7 +33,7 @@ const permissionTableSchema = z
   .min(2)
   .max(80)
   .regex(/^[a-z0-9_]+$/)
-const aiProviderTypeSchema = z.enum(["mock", "openai", "anthropic", "google", "custom"])
+const aiProviderTypeSchema = z.enum(["mock", "openai", "anthropic", "google", "openai-compatible", "custom"])
 const dicomModalitySchema = z.object({
   modalityId: optionalUuidSchema,
   branchId: optionalUuidSchema,

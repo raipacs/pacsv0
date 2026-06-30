@@ -155,10 +155,21 @@ export async function startAiPreReport(formData: FormData) {
   const canRunGemini = provider.provider_type === "google" && Boolean(googleApiKey)
   const medGemmaConfig = resolveMedGemmaConfig(provider.slug, provider.credential_reference)
   const raiLlmConfig = resolveRaiLlmConfig(provider.slug, provider.credential_reference)
+  const openAiCompatibleConfig = resolveOpenAiCompatibleConfig(
+    provider.slug,
+    provider.provider_type,
+    provider.credential_reference
+  )
   const canRunMedGemma = Boolean(medGemmaConfig)
   const canRunRaiLlm = Boolean(raiLlmConfig)
+  const canRunOpenAiCompatible = Boolean(openAiCompatibleConfig)
   const canRunLiveProvider =
-    canRunOpenAi || canRunAnthropic || canRunGemini || canRunMedGemma || canRunRaiLlm
+    canRunOpenAi ||
+    canRunAnthropic ||
+    canRunGemini ||
+    canRunOpenAiCompatible ||
+    canRunMedGemma ||
+    canRunRaiLlm
   const now = new Date().toISOString()
   const jobStatus = isMock ? "draft_ready" : canRunLiveProvider ? "running" : "waiting_credentials"
   const waitingMessage =
@@ -166,7 +177,9 @@ export async function startAiPreReport(formData: FormData) {
       ? "MedGemma endpoint tanımı bekleniyor. RAI_MEDGEMMA_ENDPOINT ve gerekirse RAI_MEDGEMMA_API_KEY Vercel/Supabase secret olarak tanımlanmalı."
       : provider.slug === "rai-llm"
         ? "RAI LLM endpoint tanımı bekleniyor. RAI_LLM_ENDPOINT ve gerekirse RAI_LLM_API_KEY Vercel/Supabase secret olarak tanımlanmalı."
-        : "AI sağlayıcı hesabı/anahtarı tanımlanınca çalıştırılacak."
+        : provider.slug === "qwen"
+          ? "Qwen API anahtarı bekleniyor. QWEN_API_KEY Vercel/Supabase secret olarak tanımlanmalı."
+          : "AI sağlayıcı hesabı/anahtarı tanımlanınca çalıştırılacak."
   const inputContext = {
     accessionNumber: study.accession_number,
     description: study.description,
@@ -561,6 +574,105 @@ export async function startAiPreReport(formData: FormData) {
     }
   }
 
+  if (canRunOpenAiCompatible && openAiCompatibleConfig) {
+    try {
+      const visualContext = await loadAiVisualContext({
+        organizationId: user.organizationId,
+        studyId,
+        supabase,
+      })
+      assertImagePreviewsReady({
+        errors: visualContext.imagePreviewErrors,
+        imagePreviews: visualContext.imagePreviews,
+      })
+      const draft = await createOpenAiCompatibleRadiologyDraft({
+        apiKey: openAiCompatibleConfig.apiKey,
+        baseUrl: openAiCompatibleConfig.baseUrl,
+        generator: openAiCompatibleConfig.generator,
+        imagePreviewErrors: visualContext.imagePreviewErrors,
+        imagePreviews: visualContext.imagePreviews,
+        inputContext,
+        model: provider.default_model || openAiCompatibleConfig.defaultModel,
+        patientName: patient ? `${patient.first_name} ${patient.last_name}` : "",
+      })
+
+      const { error: draftError } = await supabase.from("ai_report_drafts").insert({
+        organization_id: user.organizationId,
+        study_id: studyId,
+        job_id: job.id,
+        findings: draft.findings,
+        impression: draft.impression,
+        recommendations: draft.recommendations,
+        confidence_score: draft.confidenceScore,
+        criticality: draft.criticality,
+        source_summary: draft.sourceSummary,
+      })
+
+      if (draftError) throw new Error(`${provider.name} ön raporu kaydedilemedi: ${draftError.message}`)
+
+      const tokenUsage =
+        draft.usage ??
+        estimateTokenUsage({
+          findings: draft.findings,
+          impression: draft.impression,
+          inputContext,
+        })
+      const cost = calculateAiUsageCost({
+        inputTokens: tokenUsage.inputTokens,
+        outputTokens: tokenUsage.outputTokens,
+        providerSlug: provider.slug,
+      })
+
+      const { error: usageError } = await supabase.from("ai_usage_events").insert({
+        organization_id: user.organizationId,
+        job_id: job.id,
+        study_id: studyId,
+        provider_slug: provider.slug,
+        model_name: provider.default_model,
+        usage_type: "pre_report",
+        input_tokens: tokenUsage.inputTokens,
+        output_tokens: tokenUsage.outputTokens,
+        currency: cost.currency,
+        input_cost: cost.inputCost,
+        output_cost: cost.outputCost,
+        pricing_snapshot: cost.pricingSnapshot,
+        metadata: {
+          accessionNumber: study.accession_number,
+          dicomReferenceCount: visualContext.dicomReferences.length,
+          imagePreviewCount: visualContext.imagePreviews.length,
+          modality: study.modality,
+          estimated: !draft.usage,
+          responseId: draft.responseId,
+        },
+        created_by: user.id,
+      })
+
+      if (usageError && !isMissingAiTableError(usageError)) {
+        throw new Error(`${provider.name} tüketim kaydı oluşturulamadı: ${usageError.message}`)
+      }
+
+      await supabase
+        .from("ai_jobs")
+        .update({
+          status: "draft_ready",
+          completed_at: new Date().toISOString(),
+          error_message: null,
+        })
+        .eq("id", job.id)
+        .eq("organization_id", user.organizationId)
+    } catch (error) {
+      await supabase
+        .from("ai_jobs")
+        .update({
+          status: "failed",
+          completed_at: new Date().toISOString(),
+          error_message: error instanceof Error ? error.message : `${provider.name} ön raporu üretilemedi.`,
+        })
+        .eq("id", job.id)
+        .eq("organization_id", user.organizationId)
+    }
+  }
+
   if (canRunMedGemma && medGemmaConfig) {
     try {
       const visualContext = await loadAiVisualContext({
@@ -947,7 +1059,7 @@ const MEDGEMMA_MAX_ATTEMPTS = readPositiveIntegerEnv("RAI_MEDGEMMA_MAX_ATTEMPTS"
 const MEDGEMMA_RETRY_BASE_DELAY_MS = readPositiveIntegerEnv("RAI_MEDGEMMA_RETRY_DELAY_MS", 15_000)
 const MEDGEMMA_RETRY_MAX_DELAY_MS = readPositiveIntegerEnv("RAI_MEDGEMMA_RETRY_MAX_DELAY_MS", 30_000)
 const MEDGEMMA_RETRYABLE_STATUS_CODES = new Set([408, 409, 425, 429, 500, 502, 503, 504])
-const RAI_ORCHESTRATOR_PRIORITY = ["rai-llm", "openai", "gemini-google", "claude", "medgemma", "rai-mock"]
+const RAI_ORCHESTRATOR_PRIORITY = ["rai-llm", "qwen", "openai", "gemini-google", "claude", "medgemma", "rai-mock"]
 
 async function resolveRaiOrchestratorProvider({
   excludedSlugs = [],
@@ -1039,6 +1151,9 @@ function isRunnableOrchestratorProvider(provider: OrchestratorProviderCandidate)
   if (provider.provider_type === "openai") return hasProviderEnvValue(provider)
   if (provider.provider_type === "anthropic") return hasProviderEnvValue(provider)
   if (provider.provider_type === "google") return hasProviderEnvValue(provider)
+  if (provider.provider_type === "openai-compatible" || provider.slug === "qwen") {
+    return Boolean(resolveOpenAiCompatibleConfig(provider.slug, provider.provider_type, provider.credential_reference))
+  }
   if (provider.slug === "medgemma") return Boolean(resolveMedGemmaConfig(provider.slug, provider.credential_reference))
   if (provider.slug === "rai-llm") return Boolean(resolveRaiLlmConfig(provider.slug, provider.credential_reference))
   return false
@@ -1059,6 +1174,8 @@ function orchestratorProviderRank(provider: OrchestratorProviderCandidate) {
       return 30
     case "anthropic":
       return 40
+    case "openai-compatible":
+      return 45
     case "mock":
       return 90
     default:
@@ -1213,6 +1330,47 @@ function resolveRaiLlmConfig(slug: string, credentialReference: string | null) {
       : "openai-compatible"
 
   return { apiKey, endpoint, endpointMode }
+}
+
+function resolveOpenAiCompatibleConfig(
+  slug: string,
+  providerType: string,
+  credentialReference: string | null
+) {
+  const prefix = openAiCompatibleEnvPrefix(slug, providerType)
+  if (!prefix) return null
+
+  const referencedValue = credentialReference ? process.env[credentialReference] : undefined
+  const apiKey = referencedValue || process.env[`${prefix}_API_KEY`]
+  if (!apiKey) return null
+
+  return {
+    apiKey,
+    baseUrl: process.env[`${prefix}_BASE_URL`] || defaultOpenAiCompatibleBaseUrl(slug),
+    defaultModel: process.env[`${prefix}_MODEL`] || defaultOpenAiCompatibleModel(slug),
+    generator: `${slug}-openai-compatible`,
+  }
+}
+
+function openAiCompatibleEnvPrefix(slug: string, providerType: string) {
+  if (slug === "qwen") return "QWEN"
+  if (providerType === "openai-compatible") {
+    return slug
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+  }
+  return null
+}
+
+function defaultOpenAiCompatibleBaseUrl(slug: string) {
+  if (slug === "qwen") return "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions"
+  return ""
+}
+
+function defaultOpenAiCompatibleModel(slug: string) {
+  if (slug === "qwen") return "qwen-vl-max-latest"
+  return "model"
 }
 
 async function createOpenAiRadiologyDraft({
@@ -1428,6 +1586,105 @@ function extractAnthropicOutputText(payload: AnthropicResponse) {
   const text = chunks.join("\n").trim()
   if (!text) throw new Error("Claude boş ön rapor döndürdü.")
   return text
+}
+
+async function createOpenAiCompatibleRadiologyDraft({
+  apiKey,
+  baseUrl,
+  generator,
+  imagePreviewErrors,
+  imagePreviews,
+  inputContext,
+  model,
+  patientName,
+}: {
+  apiKey: string
+  baseUrl: string
+  generator: string
+  imagePreviewErrors: string[]
+  imagePreviews: AiImagePreview[]
+  inputContext: Record<string, unknown>
+  model: string
+  patientName: string
+}): Promise<OpenAiDraft> {
+  if (!baseUrl) throw new Error("OpenAI-compatible provider endpoint tanımlı değil.")
+
+  const response = await fetch(baseUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        {
+          content: [
+            "Sen radyoloji ön rapor asistanısın.",
+            "Tanı koymazsın; yalnızca hekimin düzenleyip onaylayacağı Türkçe bir ön rapor taslağı hazırlarsın.",
+            "DICOM görüntülerinden üretilmiş PNG önizlemelerini ve tetkik metadata bilgisini birlikte değerlendir.",
+            "Yalnızca görüntüde ve metadata bağlamında desteklenen bulguları yaz; belirsizlikleri açıkça belirt.",
+            "Bulgular ve izlenim alanlarını kısa tut; her biri en fazla 3 cümle olsun.",
+            "Sadece JSON döndür. Markdown, açıklama veya kod bloğu kullanma.",
+          ].join(" "),
+          role: "system",
+        },
+        {
+          content: [
+            {
+              text: JSON.stringify({
+                expectedJson: {
+                  confidenceScore: "number 0..1",
+                  criticality: "none | low | medium | high",
+                  findings: "string",
+                  impression: "string",
+                  recommendations: "string",
+                },
+                patientName,
+                study: inputContext,
+                task: "radiology_pre_report",
+                visualContext: imagePreviewSummary(imagePreviews, imagePreviewErrors),
+              }),
+              type: "text",
+            },
+            ...imagePreviews.map((preview) => ({
+              image_url: { url: preview.dataUrl },
+              type: "image_url",
+            })),
+          ],
+          role: "user",
+        },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+    }),
+  })
+
+  const payload = (await response.json().catch(() => null)) as MedGemmaResponse | null
+  if (!response.ok) {
+    const message =
+      payload?.error?.message || `OpenAI-compatible provider isteği başarısız oldu (${response.status}).`
+    throw new Error(message)
+  }
+
+  const text = extractMedGemmaOutputText(payload, JSON.stringify(payload ?? {}))
+  const parsed = parseOpenAiDraftJson(text)
+
+  return {
+    confidenceScore: parsed.confidenceScore,
+    criticality: parsed.criticality,
+    findings: parsed.findings,
+    impression: parsed.impression,
+    recommendations: parsed.recommendations,
+    responseId: payload?.id ?? payload?.responseId,
+    sourceSummary: {
+      generator,
+      imagePreviewCount: imagePreviews.length,
+      inputContext,
+      model,
+    },
+    usage: extractMedGemmaUsage(payload),
+  }
 }
 
 async function createGeminiRadiologyDraft({

@@ -99,6 +99,7 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
   await Promise.all([
     ensureRaiLlmProvider(supabase, user.organizationId, user.id),
     ensureRaiAiOrchestratorProvider(supabase, user.organizationId, user.id),
+    ensureQwenProvider(supabase, user.organizationId, user.id),
   ])
 
   const [providersResult, jobsResult, draftsResult, usageResult] = await Promise.all([
@@ -487,6 +488,7 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
                   <option value="openai">OpenAI</option>
                   <option value="anthropic">Claude / Anthropic</option>
                   <option value="google">Gemini / Google</option>
+                  <option value="openai-compatible">OpenAI-compatible</option>
                   <option value="mock">RAI Mock</option>
                 </select>
               </label>
@@ -822,6 +824,7 @@ function summarizeUsage(rows: AiUsageRow[]) {
 }
 
 function providerLabel(value: string, slug?: string) {
+  if (slug === "qwen") return "Qwen Vision"
   if (slug === "medgemma") return "MedGemma"
   if (slug === "rai-llm") return "RAI LLM"
   if (slug === "rai-orchestrator") return "RAI AI Orchestrator"
@@ -834,6 +837,8 @@ function providerLabel(value: string, slug?: string) {
       return "Claude"
     case "google":
       return "Gemini"
+    case "openai-compatible":
+      return "OpenAI-compatible"
     case "mock":
       return "RAI Mock"
     default:
@@ -846,6 +851,7 @@ function formatProviderSlug(slug: string) {
 }
 
 function credentialPlaceholder(providerType: string, slug?: string) {
+  if (slug === "qwen") return "QWEN_API_KEY"
   if (slug === "medgemma") return "RAI_MEDGEMMA_API_KEY veya RAI_MEDGEMMA_ENDPOINT"
   if (slug === "rai-llm") return "RAI_LLM_API_KEY veya RAI_LLM_ENDPOINT"
   if (slug === "rai-orchestrator") return "Credential gerekmez; aktif providerları route eder"
@@ -858,6 +864,8 @@ function credentialPlaceholder(providerType: string, slug?: string) {
       return "ANTHROPIC_API_KEY"
     case "google":
       return "GOOGLE_GENERATIVE_AI_API_KEY"
+    case "openai-compatible":
+      return "QWEN_API_KEY, TOGETHER_API_KEY..."
     case "mock":
       return "Credential gerekmez"
     default:
@@ -1061,7 +1069,7 @@ async function ensureRaiAiOrchestratorProvider(
     settings: {
       fallbackPolicy: "first-active-runnable-provider",
       family: "rai-ai-orchestrator",
-      priority: ["rai-llm", "openai", "gemini-google", "claude", "medgemma", "rai-mock"],
+      priority: ["rai-llm", "qwen", "openai", "gemini-google", "claude", "medgemma", "rai-mock"],
       purpose: "route-ai-pre-report-to-best-available-provider",
       routerVersion: "v0",
     },
@@ -1070,6 +1078,52 @@ async function ensureRaiAiOrchestratorProvider(
 
   if (error && error.code !== "23505") {
     throw new Error(`RAI AI Orchestrator sağlayıcısı oluşturulamadı: ${error.message}`)
+  }
+}
+
+async function ensureQwenProvider(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  userId: string
+) {
+  const { data: existing, error: existingError } = await supabase
+    .from("ai_service_providers")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("slug", "qwen")
+    .maybeSingle()
+
+  if (existing) return
+  if (existingError) {
+    if (isMissingAiTableError(existingError)) return
+    throw new Error(`Qwen sağlayıcı kontrolü yapılamadı: ${existingError.message}`)
+  }
+
+  const { error } = await supabase.from("ai_service_providers").insert({
+    organization_id: organizationId,
+    created_by: userId,
+    credential_reference: "QWEN_API_KEY",
+    default_model: "qwen-vl-max-latest",
+    is_active: false,
+    is_default: false,
+    name: "Qwen Vision",
+    provider_type: "openai-compatible",
+    requires_credentials: true,
+    settings: {
+      availableModels: ["qwen-vl-max-latest", "qwen-vl-plus-latest"],
+      baseUrlEnv: "QWEN_BASE_URL",
+      defaultBaseUrl: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
+      deployment: "alibaba-model-studio-openai-compatible",
+      family: "qwen-vl",
+      modalities: ["DX", "CT", "MR", "US", "SR"],
+      modelEnv: "QWEN_MODEL",
+      purpose: "vision-language-radiology-pre-report-draft",
+    },
+    slug: "qwen",
+  })
+
+  if (error && error.code !== "23505") {
+    throw new Error(`Qwen sağlayıcısı oluşturulamadı: ${error.message}`)
   }
 }
 
