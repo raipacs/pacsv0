@@ -20,6 +20,7 @@ export function AiLaunchControl({
   initialProviderId,
   latestJob,
   providers,
+  reuseProviderId,
   returnTo,
   studyId,
   unavailableReason,
@@ -27,6 +28,7 @@ export function AiLaunchControl({
   initialProviderId?: string
   latestJob: AiLaunchJobStatus | null
   providers: AiProviderOption[]
+  reuseProviderId?: string
   returnTo: string
   studyId: string
   unavailableReason?: string
@@ -52,6 +54,7 @@ export function AiLaunchControl({
         latestJob={latestJob}
         onProviderChange={setSelectedProviderId}
         providers={providers}
+        reuseProviderId={reuseProviderId}
         selectedProvider={selectedProvider}
         selectedProviderId={selectedProviderId}
         unavailableReason={unavailableReason}
@@ -65,6 +68,7 @@ function AiLaunchFields({
   latestJob,
   onProviderChange,
   providers,
+  reuseProviderId,
   selectedProvider,
   selectedProviderId,
   unavailableReason,
@@ -73,18 +77,23 @@ function AiLaunchFields({
   latestJob: AiLaunchJobStatus | null
   onProviderChange: (providerId: string) => void
   providers: AiProviderOption[]
+  reuseProviderId?: string
   selectedProvider: AiProviderOption | null
   selectedProviderId: string
   unavailableReason?: string
 }) {
   const { pending } = useFormStatus()
   const isDisabled = disabled || pending
+  const shouldForceRerun = Boolean(reuseProviderId && reuseProviderId === selectedProviderId)
   const statusText = pending
     ? formatPendingAiJob(selectedProvider)
-    : unavailableReason || formatLatestAiJob(latestJob)
+    : unavailableReason || formatLatestAiJob(latestJob, selectedProvider, shouldForceRerun)
 
   return (
     <>
+      {shouldForceRerun ? (
+        <input name="forceAiRunProviderId" type="hidden" value={selectedProviderId} />
+      ) : null}
       <select
         aria-label="AI servisi"
         disabled={isDisabled}
@@ -138,7 +147,15 @@ function formatPendingAiJob(provider: AiProviderOption | null) {
   return `${label} çalışıyor...`
 }
 
-function formatLatestAiJob(job: AiLaunchJobStatus | null) {
+function formatLatestAiJob(
+  job: AiLaunchJobStatus | null,
+  selectedProvider: AiProviderOption | null,
+  shouldForceRerun: boolean
+) {
+  if (shouldForceRerun && selectedProvider) {
+    return `${selectedProvider.name} ile önceki rapor açıldı. Yeniden çalıştırmak için AI'ya tekrar basın.`
+  }
+
   if (!job) return "AI otomatik çalışmaz; butona basınca seçili servis başlar."
 
   const when = formatShortDateTime(job.completedAt ?? job.createdAt)

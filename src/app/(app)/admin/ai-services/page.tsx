@@ -25,6 +25,7 @@ type AiProviderRow = {
 
 type AiJobRow = {
   id: string
+  input_context: Record<string, unknown> | null
   provider_slug: string
   model_name: string | null
   status: string
@@ -111,7 +112,9 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
       .order("name", { ascending: true }),
     supabase
       .from("ai_jobs")
-      .select("id, provider_slug, model_name, status, created_at, completed_at, studies(accession_number, modality, description)")
+      .select(
+        "id, provider_slug, model_name, status, input_context, created_at, completed_at, studies(accession_number, modality, description)"
+      )
       .eq("organization_id", user.organizationId)
       .order("created_at", { ascending: false })
       .limit(12),
@@ -668,6 +671,7 @@ function formatPanelToggle(count: number) {
 
 function AiJobTableRow({ job }: { job: AiJobRow }) {
   const study = firstRelation(job.studies)
+  const orchestration = getJobOrchestration(job)
 
   return (
     <tr>
@@ -678,8 +682,14 @@ function AiJobTableRow({ job }: { job: AiJobRow }) {
         </span>
       </td>
       <td>
+        {orchestration ? (
+          <span className="orchestrator-route-badge">↪ Orchestrator</span>
+        ) : null}
         <strong>{job.provider_slug}</strong>
-        <span>{job.model_name ?? "-"}</span>
+        <span>
+          {job.model_name ?? "-"}
+          {orchestration?.routedProviderSlug ? ` · route: ${orchestration.routedProviderSlug}` : ""}
+        </span>
       </td>
       <td>
         <span className={`health-badge ${jobStatusClass(job.status)}`}>
@@ -689,6 +699,24 @@ function AiJobTableRow({ job }: { job: AiJobRow }) {
       <td>{formatDateTime(job.created_at)}</td>
     </tr>
   )
+}
+
+function getJobOrchestration(job: AiJobRow) {
+  const context = job.input_context
+  if (!context || typeof context !== "object") return null
+  const orchestration = context.orchestrator
+  if (!orchestration || typeof orchestration !== "object") return null
+
+  const routedProviderSlug =
+    "routedProviderSlug" in orchestration && typeof orchestration.routedProviderSlug === "string"
+      ? orchestration.routedProviderSlug
+      : null
+  const providerSlug =
+    "providerSlug" in orchestration && typeof orchestration.providerSlug === "string"
+      ? orchestration.providerSlug
+      : null
+
+  return { providerSlug, routedProviderSlug }
 }
 
 function AiDraftTableRow({ draft }: { draft: AiDraftRow }) {

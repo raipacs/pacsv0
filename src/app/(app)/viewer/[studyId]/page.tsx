@@ -31,7 +31,14 @@ export default async function RaiViewerPage({
   searchParams,
 }: {
   params: Promise<{ studyId: string }>
-  searchParams: Promise<{ aiJob?: string; aiProvider?: string; patientId?: string; reportId?: string }>
+  searchParams: Promise<{
+    aiDraft?: string
+    aiJob?: string
+    aiProvider?: string
+    aiReuse?: string
+    patientId?: string
+    reportId?: string
+  }>
 }) {
   const [{ studyId }, query, user] = await Promise.all([
     params,
@@ -159,6 +166,7 @@ export default async function RaiViewerPage({
             initialProviderId={query.aiProvider}
             latestJob={aiViewerState.latestJob}
             providers={aiViewerState.providers}
+            reuseProviderId={query.aiReuse}
             returnTo={returnTo}
             studyId={studyId}
             unavailableReason={aiViewerState.unavailableReason}
@@ -195,6 +203,7 @@ export default async function RaiViewerPage({
       <ReportEditorPanel
         aiDrafts={aiViewerState.drafts}
         initialSourceId={resolveInitialReportSourceId(
+          query.aiDraft,
           query.reportId,
           reports ?? [],
           aiViewerState.drafts
@@ -424,10 +433,13 @@ function firstRelation<T>(value: T | T[] | null | undefined) {
 }
 
 function resolveInitialReportSourceId(
+  aiDraftId: string | undefined,
   reportId: string | undefined,
   reports: ReportRow[],
   aiDrafts: ReportEditorAiDraft[]
 ) {
+  if (aiDraftId && aiDrafts.some((draft) => draft.id === aiDraftId)) return `ai:${aiDraftId}`
+
   if (reportId && reports.some((report) => report.id === reportId)) return `report:${reportId}`
 
   const latestDraft = reports.find((report) => report.status === "draft")

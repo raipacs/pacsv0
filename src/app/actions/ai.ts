@@ -32,6 +32,9 @@ export async function startAiPreReport(formData: FormData) {
   const studyId = idSchema.parse(formData.get("studyId"))
   const providerId = idSchema.parse(formData.get("providerId"))
   const returnTo = returnToSchema.parse(String(formData.get("returnTo") ?? `/viewer/${studyId}`))
+  const forceAiRunProviderId = parseOptionalUuid(formData.get("forceAiRunProviderId"))
+  const orchestratorProviderId = parseOptionalUuid(formData.get("orchestratorProviderId"))
+  const orchestratorProviderSlug = parseOptionalText(formData.get("orchestratorProviderSlug"))
   const supabase = await createClient()
 
   const [{ data: study, error: studyError }, { count: instanceCount, error: countError }] =
@@ -72,6 +75,30 @@ export async function startAiPreReport(formData: FormData) {
   }
   if (!provider || !provider.is_active) throw new Error("Seçilen AI servisi aktif değil.")
 
+  if (forceAiRunProviderId !== provider.id) {
+    const reusableDraft = await findReusableAiDraftForProvider({
+      organizationId: user.organizationId,
+      providerId: provider.id,
+      studyId,
+      supabase,
+    })
+
+    if (reusableDraft) {
+      revalidatePath(`/viewer/${studyId}`)
+      redirect(
+        appendQuery(
+          appendQuery(
+            appendQueryIfMissing(returnTo, "aiProvider", provider.id),
+            "aiDraft",
+            reusableDraft.id
+          ),
+          "aiReuse",
+          provider.id
+        )
+      )
+    }
+  }
+
   if (provider.slug === "rai-orchestrator") {
     const routedProvider = await resolveRaiOrchestratorProvider({
       organizationId: user.organizationId,
@@ -87,6 +114,8 @@ export async function startAiPreReport(formData: FormData) {
     const routedFormData = new FormData()
     routedFormData.set("studyId", studyId)
     routedFormData.set("providerId", routedProvider.id)
+    routedFormData.set("orchestratorProviderId", provider.id)
+    routedFormData.set("orchestratorProviderSlug", provider.slug)
     routedFormData.set(
       "returnTo",
       appendQuery(appendQueryIfMissing(returnTo, "aiProvider", provider.id), "orchestrator", routedProvider.slug)
@@ -141,6 +170,16 @@ export async function startAiPreReport(formData: FormData) {
     patientNumber: patient?.patient_number ?? "",
     seriesCount: seriesCount ?? 0,
     studyAt: study.study_at,
+    ...(orchestratorProviderId && orchestratorProviderSlug
+      ? {
+          orchestrator: {
+            providerId: orchestratorProviderId,
+            providerSlug: orchestratorProviderSlug,
+            routedProviderId: provider.id,
+            routedProviderSlug: provider.slug,
+          },
+        }
+      : {}),
   }
 
   const { data: job, error: jobError } = await supabase
@@ -742,6 +781,18 @@ function appendQuery(path: string, key: string, value: string) {
   return `${path}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`
 }
 
+function parseOptionalUuid(value: FormDataEntryValue | null) {
+  if (typeof value !== "string") return null
+  const parsed = idSchema.safeParse(value)
+  return parsed.success ? parsed.data : null
+}
+
+function parseOptionalText(value: FormDataEntryValue | null) {
+  if (typeof value !== "string") return null
+  const trimmed = value.trim()
+  return trimmed || null
+}
+
 function appendQueryIfMissing(path: string, key: string, value: string) {
   const [pathname, queryString] = path.split("?")
   if (!queryString) return appendQuery(path, key, value)
@@ -886,6 +937,64 @@ async function resolveRaiOrchestratorProvider({
     .sort((left, right) => orchestratorProviderRank(left) - orchestratorProviderRank(right))
 
   return runnableProviders[0] ?? null
+}
+
+async function findReusableAiDraftForProvider({
+  organizationId,
+  providerId,
+  studyId,
+  supabase,
+}: {
+  organizationId: string
+  providerId: string
+  studyId: string
+  supabase: Awaited<ReturnType<typeof createClient>>
+}) {
+  const { data: drafts, error } = await supabase
+    .from("ai_report_drafts")
+    .select("id, ai_jobs(provider_id, input_context, status)")
+    .eq("organization_id", organizationId)
+    .eq("study_id", studyId)
+    .eq("status", "ready")
+    .order("created_at", { ascending: false })
+    .limit(20)
+
+  if (error) {
+    if (isMissingAiTableError(error)) return null
+    throw new Error(`Mevcut AI raporu kontrol edilemedi: ${error.message}`)
+  }
+
+  for (const draft of drafts ?? []) {
+    const job = firstRelation(
+      draft.ai_jobs as
+        | { input_context?: unknown; provider_id?: string | null; status?: string | null }
+        | { input_context?: unknown; provider_id?: string | null; status?: string | null }[]
+        | null
+    )
+
+    if (!job || job.status !== "draft_ready") continue
+    if (job.provider_id === providerId) return { id: String(draft.id) }
+    if (getOrchestratorProviderId(job.input_context) === providerId) {
+      return { id: String(draft.id) }
+    }
+  }
+
+  return null
+}
+
+function getOrchestratorProviderId(inputContext: unknown) {
+  if (!inputContext || typeof inputContext !== "object") return null
+  if (!("orchestrator" in inputContext)) return null
+
+  const orchestrator = inputContext.orchestrator
+  if (!orchestrator || typeof orchestrator !== "object") return null
+  if (!("providerId" in orchestrator)) return null
+
+  return typeof orchestrator.providerId === "string" ? orchestrator.providerId : null
+}
+
+function firstRelation<T>(value: T | T[] | null | undefined) {
+  return Array.isArray(value) ? value[0] : value
 }
 
 function isRunnableOrchestratorProvider(provider: OrchestratorProviderCandidate) {
