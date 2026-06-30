@@ -163,7 +163,7 @@ export default async function RaiViewerPage({
         <nav aria-label="Viewer navigasyonu">
           <PrivacyToggle />
           <AiLaunchControl
-            initialProviderId={query.aiProvider}
+            initialProviderId={query.aiProvider ?? aiViewerState.latestJob?.selectedProviderId ?? undefined}
             latestJob={aiViewerState.latestJob}
             providers={aiViewerState.providers}
             reuseProviderId={query.aiReuse}
@@ -270,6 +270,7 @@ type AiJobView = {
   errorMessage: string | null
   modelName: string | null
   providerName: string
+  selectedProviderId: string | null
   status: string
 }
 
@@ -348,7 +349,7 @@ async function loadLatestAiJob(
   const { data: job, error } = await supabase
     .from("ai_jobs")
     .select(
-      "status, provider_slug, model_name, error_message, created_at, completed_at, ai_service_providers(name)"
+      "status, provider_id, provider_slug, model_name, input_context, error_message, created_at, completed_at, ai_service_providers(name)"
     )
     .eq("organization_id", organizationId)
     .eq("study_id", studyId)
@@ -373,8 +374,20 @@ async function loadLatestAiJob(
     errorMessage: job.error_message,
     modelName: job.model_name ?? null,
     providerName: provider?.name ?? job.provider_slug ?? "AI",
+    selectedProviderId: getOrchestratorProviderId(job.input_context) ?? job.provider_id ?? null,
     status: job.status,
   }
+}
+
+function getOrchestratorProviderId(inputContext: unknown) {
+  if (!inputContext || typeof inputContext !== "object") return null
+  if (!("orchestrator" in inputContext)) return null
+
+  const orchestrator = inputContext.orchestrator
+  if (!orchestrator || typeof orchestrator !== "object") return null
+  if (!("providerId" in orchestrator)) return null
+
+  return typeof orchestrator.providerId === "string" ? orchestrator.providerId : null
 }
 
 function mapAiProviders(rows: Array<Record<string, unknown>>): AiProviderOption[] {
