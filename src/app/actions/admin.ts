@@ -334,6 +334,110 @@ export async function testRaiLlmEndpoint() {
   redirect(`/admin/ai-services?${params.toString()}`)
 }
 
+export async function testQwenEndpoint() {
+  const user = await requireAdmin()
+  const apiKey = process.env.QWEN_API_KEY?.trim()
+  const endpoint =
+    process.env.QWEN_BASE_URL?.trim() ||
+    "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions"
+  const model = process.env.QWEN_MODEL?.trim() || "qwen-vl-max-latest"
+  const startedAt = Date.now()
+  let status = "failed"
+  let message = "QWEN_API_KEY tanımlı değil."
+  let elapsedMs = 0
+
+  if (apiKey) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 45_000)
+
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              content:
+                'Sen RAI PACS Qwen bağlantı testisin. Sadece JSON döndür: {"findings":"Qwen bağlantısı çalışıyor","impression":"Smoke test başarılı","recommendations":"Viewer üzerinde görüntülü test yapılabilir","confidenceScore":0.1,"criticality":"none"}',
+              role: "system",
+            },
+            {
+              content: [
+                {
+                  text: JSON.stringify({
+                    provider: "qwen",
+                    study: {
+                      accessionNumber: "QWEN-ADMIN-SMOKE",
+                      description: "Qwen admin endpoint smoke test",
+                      modality: "SR",
+                    },
+                    task: "radiology_pre_report_smoke_test",
+                  }),
+                  type: "text",
+                },
+              ],
+              role: "user",
+            },
+          ],
+          model,
+          response_format: { type: "json_object" },
+          temperature: 0,
+        }),
+        signal: controller.signal,
+      })
+
+      const rawText = await response.text()
+      elapsedMs = Date.now() - startedAt
+
+      if (response.ok) {
+        const payload = parseJsonObject(rawText)
+        const content = extractChatCompletionText(payload) || rawText.trim()
+        status = content ? "ok" : "failed"
+        message = content
+          ? `Qwen yanıt verdi. Model: ${String(payload?.model ?? model)}`
+          : "Qwen yanıt verdi ancak boş içerik döndürdü."
+      } else {
+        message = `Qwen ${response.status} döndü: ${clipForQuery(rawText)}`
+      }
+    } catch (error) {
+      elapsedMs = Date.now() - startedAt
+      message =
+        error instanceof Error && error.name === "AbortError"
+          ? "Qwen endpoint zaman aşımına uğradı."
+          : `Qwen testi başarısız: ${error instanceof Error ? error.message : String(error)}`
+    } finally {
+      clearTimeout(timeout)
+    }
+  }
+
+  if (isSupabaseConfigured) {
+    const supabase = await createClient()
+    await supabase.from("audit_logs").insert({
+      organization_id: user.organizationId,
+      actor_id: user.id,
+      action: "ai_provider.qwen_tested",
+      resource_type: "ai_service_provider",
+      metadata: {
+        elapsedMs,
+        endpointConfigured: Boolean(endpoint),
+        keyConfigured: Boolean(apiKey),
+        model,
+        status,
+      },
+    })
+  }
+
+  const params = new URLSearchParams({
+    qwenMessage: clipForQuery(message),
+    qwenMs: String(elapsedMs),
+    qwenTest: status,
+  })
+  redirect(`/admin/ai-services?${params.toString()}`)
+}
+
 export async function updateMemberAccess(formData: FormData) {
   const user = await requireAdmin()
   if (!isSupabaseConfigured) redirect("/admin/users")

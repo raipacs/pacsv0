@@ -1,7 +1,7 @@
 import Link from "next/link"
 import type { ReactNode } from "react"
 
-import { createAiProvider, testRaiLlmEndpoint, updateAiProvider } from "@/app/actions/admin"
+import { createAiProvider, testQwenEndpoint, testRaiLlmEndpoint, updateAiProvider } from "@/app/actions/admin"
 import { aiProviderMark, isMissingAiTableError } from "@/lib/ai-reporting"
 import { requireAdmin } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
@@ -86,6 +86,9 @@ type AiServicesPageProps = {
     raiLlmMessage?: string
     raiLlmMs?: string
     raiLlmTest?: string
+    qwenMessage?: string
+    qwenMs?: string
+    qwenTest?: string
     to?: string
   }>
 }
@@ -160,8 +163,11 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
     (provider) => !provider.requires_credentials || provider.credential_reference
   )
   const raiLlmProvider = providers.find((provider) => provider.slug === "rai-llm") ?? null
+  const qwenProvider = providers.find((provider) => provider.slug === "qwen") ?? null
   const raiLlmStatus = buildRaiLlmStatus(raiLlmProvider)
   const raiLlmTestResult = parseRaiLlmTestResult(query)
+  const qwenStatus = buildQwenStatus(qwenProvider)
+  const qwenTestResult = parseQwenTestResult(query)
   const readyDrafts = drafts.filter((draft) => draft.status === "ready")
   const providerWarningCount = providers.filter(
     (provider) =>
@@ -172,6 +178,7 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
   ).length
   const draftWarningCount = drafts.filter((draft) => draft.criticality === "high").length
   const raiLlmWarningCount = raiLlmStatus.ready ? 0 : 1
+  const qwenWarningCount = qwenStatus.ready ? 0 : 1
   const usageWarningCount = usageUnavailable ? 1 : 0
   const usageSummary = summarizeUsage(usageRows)
   const totalUsage = usageSummary.reduce(
@@ -300,6 +307,70 @@ export default async function AiServicesPage({ searchParams }: AiServicesPagePro
             </p>
           ) : (
             <p className="form-help">Endpoint env tanımlandıktan sonra buradan canlı bağlantı testi yapılır.</p>
+          )}
+        </div>
+      </CollapsiblePanel>
+
+      <CollapsiblePanel
+        detail={
+          qwenWarningCount
+            ? "QWEN_API_KEY ve provider aktivasyonu bekliyor"
+            : "Qwen Vision API kullanıma hazır"
+        }
+        open={qwenWarningCount > 0}
+        title="Qwen Vision bağlantı durumu"
+        warningCount={qwenWarningCount}
+      >
+        <div className="panel-heading compact">
+          <div>
+            <p>Alibaba Model Studio / Qwen VL OpenAI-compatible API bağlantısı.</p>
+          </div>
+          <span className={`health-badge ${qwenStatus.ready ? "ok" : "warning"}`}>
+            {qwenStatus.ready ? "API hazır" : "Kurulum bekliyor"}
+          </span>
+        </div>
+        <div className="rai-llm-status-grid">
+          <article>
+            <span>Provider</span>
+            <strong>{qwenStatus.providerLabel}</strong>
+            <small>{qwenStatus.providerState}</small>
+          </article>
+          <article>
+            <span>Model</span>
+            <strong>{qwenStatus.model}</strong>
+            <small>Qwen VL görüntü-dil modeli</small>
+          </article>
+          <article>
+            <span>Endpoint</span>
+            <strong>{qwenStatus.endpointState}</strong>
+            <small>{qwenStatus.endpointLabel}</small>
+          </article>
+          <article>
+            <span>API token</span>
+            <strong>{qwenStatus.apiKeyState}</strong>
+            <small>Secret değeri ekranda gösterilmez</small>
+          </article>
+        </div>
+        <div className="rai-llm-runbook">
+          <div>
+            <strong>Sıradaki operasyon</strong>
+            <p>{qwenStatus.nextStep}</p>
+          </div>
+          <pre>{qwenStatus.testCommand}</pre>
+        </div>
+        <div className="rai-llm-test-row">
+          <form action={testQwenEndpoint}>
+            <button className="button subtle" type="submit">
+              Qwen canlı test et
+            </button>
+          </form>
+          {qwenTestResult ? (
+            <p className={`form-status ${qwenTestResult.ok ? "success" : "error"}`}>
+              {qwenTestResult.message}
+              {qwenTestResult.elapsedMs ? ` · ${qwenTestResult.elapsedMs} ms` : ""}
+            </p>
+          ) : (
+            <p className="form-help">QWEN_API_KEY tanımlandıktan sonra buradan API smoke test yapılır.</p>
           )}
         </div>
       </CollapsiblePanel>
@@ -973,6 +1044,49 @@ function parseRaiLlmTestResult(query: Awaited<AiServicesPageProps["searchParams"
     elapsedMs: Number(query.raiLlmMs || 0),
     message: query.raiLlmMessage || "RAI LLM test sonucu alındı.",
     ok: query.raiLlmTest === "ok",
+  }
+}
+
+function buildQwenStatus(provider: AiProviderRow | null) {
+  const endpoint =
+    process.env.QWEN_BASE_URL?.trim() ||
+    "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions"
+  const apiKeyReady = Boolean(process.env.QWEN_API_KEY?.trim())
+  const model = provider?.default_model || process.env.QWEN_MODEL || "qwen-vl-max-latest"
+  const providerActive = provider?.is_active === true
+  const ready = Boolean(provider && providerActive && apiKeyReady)
+  const providerState = provider
+    ? providerActive
+      ? "Admin AI Servisleri içinde aktif"
+      : "Provider var, aktif değil"
+    : "Provider otomatik seed bekliyor"
+
+  return {
+    apiKeyState: apiKeyReady ? "Tanımlı" : "QWEN_API_KEY eksik",
+    endpointLabel: safeEndpointLabel(endpoint),
+    endpointState: "OpenAI-compatible",
+    model,
+    nextStep: ready
+      ? "RAI Viewer içinde Qwen Vision provider seçilerek görüntülü ön rapor testi yapılabilir."
+      : "Alibaba Model Studio üzerinden Qwen API key oluşturup Vercel production env içine QWEN_API_KEY olarak ekleyin; ardından provider aktif hale getirilir.",
+    providerLabel: provider?.name || "Qwen Vision",
+    providerState,
+    ready,
+    testCommand: [
+      "QWEN_API_KEY=<secret>",
+      "QWEN_BASE_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
+      `QWEN_MODEL=${model}`,
+      "Admin > AI Servisleri > Qwen canlı test et",
+    ].join(" \\\n"),
+  }
+}
+
+function parseQwenTestResult(query: Awaited<AiServicesPageProps["searchParams"]>) {
+  if (!query.qwenTest) return null
+  return {
+    elapsedMs: Number(query.qwenMs || 0),
+    message: query.qwenMessage || "Qwen test sonucu alındı.",
+    ok: query.qwenTest === "ok",
   }
 }
 
