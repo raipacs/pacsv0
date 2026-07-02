@@ -44,7 +44,73 @@ function patchIndexHtml(filePath) {
     ""
   )
   html = html.replace("<title>OHIF Viewer</title>", "<title>RAI OHIF Viewer</title>")
+  html = injectRaiReturnButton(html)
   writeFileSync(filePath, html)
+}
+
+function injectRaiReturnButton(html) {
+  const marker = "rai-ohif-return-button"
+  if (html.includes(marker)) return html
+
+  const style = `
+<style>
+  .${marker} {
+    align-items: center;
+    background: #0f766e;
+    border: 1px solid rgba(103, 232, 249, 0.35);
+    border-radius: 8px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+    color: #fff;
+    display: none;
+    font: 700 13px/1.1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    gap: 7px;
+    padding: 9px 12px;
+    position: fixed;
+    right: 14px;
+    text-decoration: none;
+    top: 10px;
+    z-index: 2147483647;
+  }
+
+  .${marker}:hover {
+    background: #0d9488;
+  }
+</style>`
+
+  const script = `
+<script>
+  (function () {
+    var params = new URLSearchParams(window.location.search);
+    var rawReturnUrl = params.get("returnUrl");
+    if (!rawReturnUrl) return;
+
+    var target;
+    try {
+      target = new URL(rawReturnUrl, window.location.origin);
+    } catch (_) {
+      return;
+    }
+
+    if (target.origin !== window.location.origin || !target.pathname.startsWith("/viewer/")) return;
+
+    var link = document.createElement("a");
+    link.className = "${marker}";
+    link.href = target.pathname + target.search + target.hash;
+    link.textContent = "RAI Viewer";
+    link.setAttribute("aria-label", "RAI Viewer'a don");
+    link.style.display = "inline-flex";
+    document.addEventListener("DOMContentLoaded", function () {
+      document.body.appendChild(link);
+    });
+  })();
+</script>`
+
+  if (html.includes("</head>")) {
+    html = html.replace("</head>", `${style}\n</head>`)
+  }
+  return html.includes("</body>")
+    ? html.replace("</body>", `${script}\n</body>`)
+    : `${html}\n${style}\n${script}`
 }
 
 function patchAppBundle(dirPath) {

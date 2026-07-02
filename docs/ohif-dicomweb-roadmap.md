@@ -41,6 +41,8 @@ The RAI OHIF gateway is also available:
 - `GET /ohif/config?token=...`: signed DICOMweb datasource config for a future self-host OHIF build.
 - `GET /ohif-viewer/viewer/dicomjson?url=...`: self-host OHIF static viewer, generated at build time from `@ohif/app`.
 - `ohif.raipacs.com`: host rewrite serves gateway, static viewer, config, DICOMweb and viewer-data paths.
+- Self-host OHIF accepts a `returnUrl=/viewer/:studyId` launch parameter and shows a fixed
+  RAI Viewer return button when the target is same-origin and under `/viewer/`.
 
 ## Phase 2 target
 
@@ -60,8 +62,9 @@ Move to a RAI-controlled OHIF + DICOMweb deployment:
 2. Validate frame-level WADO-RS against MR, CT, DX and US modality datasets.
 3. Add signed launch handoff from RAI Viewer to the RAI OHIF gateway. Done.
 4. Deploy OHIF static shell under `ohif.raipacs.com/ohif-viewer`. Done.
-5. Configure OHIF datasource from `/ohif/config` and route QIDO/WADO to `/dicomweb`.
-6. Keep current `viewer.ohif.org` links as emergency fallback until self-host OHIF is clinically validated.
+5. Add RAI Viewer return handoff inside self-host OHIF. Done.
+6. Configure OHIF datasource from `/ohif/config` and route QIDO/WADO to `/dicomweb`.
+7. Keep current `viewer.ohif.org` links as emergency fallback until self-host OHIF is clinically validated.
 
 ## Security baseline
 

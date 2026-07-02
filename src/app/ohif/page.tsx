@@ -72,7 +72,13 @@ export default async function OhifGatewayPage({ searchParams }: OhifGatewayPageP
   const dicomwebRoot = new URL("/dicomweb", origin).toString()
   const configUrl = new URL("/ohif/config", origin)
   configUrl.searchParams.set("token", token)
-  const hostedOhifUrl = createOhifDicomJsonFallbackUrl({ origin, studyIds, token })
+  const raiViewerReturnUrl = `/viewer/${studyIds[0]}`
+  const hostedOhifUrl = createOhifDicomJsonFallbackUrl({
+    origin,
+    returnUrl: raiViewerReturnUrl,
+    studyIds,
+    token,
+  })
 
   return (
     <main className="rai-ohif-page">
@@ -85,7 +91,7 @@ export default async function OhifGatewayPage({ searchParams }: OhifGatewayPageP
           </p>
         </div>
         <nav aria-label="OHIF navigasyonu">
-          <Link className="button subtle" href={`/viewer/${studyIds[0]}`}>
+          <Link className="button subtle" href={raiViewerReturnUrl}>
             RAI Viewer
           </Link>
           <a className="button primary" href={hostedOhifUrl}>

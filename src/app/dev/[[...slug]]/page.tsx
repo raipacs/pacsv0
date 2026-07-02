@@ -185,6 +185,16 @@ const searchItems = [
 const changelog = [
   {
     date: "2026-07-02",
+    version: "0.2.0-dev.22",
+    title: "Self-host OHIF RAI Viewer geri donusu eklendi",
+    items: [
+      "RAI OHIF launch linkleri artik self-host OHIF URL'ine guvenli returnUrl parametresi ekler.",
+      "OHIF static build patch'i returnUrl varsa sag ustte RAI Viewer'a donus butonu gosterir.",
+      "Return hedefi ayni origin ve /viewer/ path'i ile sinirlandirilir.",
+    ],
+  },
+  {
+    date: "2026-07-02",
     version: "0.2.0-dev.21",
     title: "Self-host RAI OHIF static viewer eklendi",
     items: [

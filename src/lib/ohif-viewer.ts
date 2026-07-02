@@ -6,11 +6,13 @@ const RAI_OHIF_VIEWER_PATH = "/ohif-viewer/viewer/dicomjson"
 export function createOhifDicomJsonViewerUrl({
   origin,
   organizationId,
+  returnUrl,
   studyId,
   userId,
 }: {
   origin: string
   organizationId: string
+  returnUrl?: string
   studyId: string
   userId: string
 }) {
@@ -24,17 +26,19 @@ export function createOhifDicomJsonViewerUrl({
     token
   )}`
 
-  return createRaiHostedOhifDicomJsonUrl({ manifestUrl: dicomJsonUrl, origin })
+  return createRaiHostedOhifDicomJsonUrl({ manifestUrl: dicomJsonUrl, origin, returnUrl })
 }
 
 export function createOhifDicomJsonSessionViewerUrl({
   origin,
   organizationId,
+  returnUrl,
   studyIds,
   userId,
 }: {
   origin: string
   organizationId: string
+  returnUrl?: string
   studyIds: string[]
   userId: string
 }) {
@@ -50,7 +54,7 @@ export function createOhifDicomJsonSessionViewerUrl({
     token
   )}`
 
-  return createRaiHostedOhifDicomJsonUrl({ manifestUrl: dicomJsonUrl, origin })
+  return createRaiHostedOhifDicomJsonUrl({ manifestUrl: dicomJsonUrl, origin, returnUrl })
 }
 
 export function createRaiOhifViewerUrl({
@@ -95,10 +99,12 @@ export function createRaiOhifSessionViewerUrl({
 
 export function createOhifDicomJsonFallbackUrl({
   origin,
+  returnUrl,
   studyIds,
   token,
 }: {
   origin: string
+  returnUrl?: string
   studyIds: string[]
   token: string
 }) {
@@ -110,7 +116,11 @@ export function createOhifDicomJsonFallbackUrl({
   const manifestUrl = new URL(manifestPath, origin)
   manifestUrl.searchParams.set("token", token)
 
-  return createRaiHostedOhifDicomJsonUrl({ manifestUrl: manifestUrl.toString(), origin })
+  return createRaiHostedOhifDicomJsonUrl({
+    manifestUrl: manifestUrl.toString(),
+    origin,
+    returnUrl,
+  })
 }
 
 export function createPublicOhifDicomJsonFallbackUrl({
@@ -145,12 +155,15 @@ function createRaiOhifLaunchUrl({ origin, token }: { origin: string; token: stri
 function createRaiHostedOhifDicomJsonUrl({
   manifestUrl,
   origin,
+  returnUrl,
 }: {
   manifestUrl: string
   origin: string
+  returnUrl?: string
 }) {
   const url = new URL(RAI_OHIF_VIEWER_PATH, getRaiOhifOrigin(origin))
   url.searchParams.set("url", manifestUrl)
+  if (returnUrl) url.searchParams.set("returnUrl", returnUrl)
   return url.toString()
 }
 
