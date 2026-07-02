@@ -1409,6 +1409,7 @@ function formatViewerDateTime(value: string | null) {
 
   return new Intl.DateTimeFormat("tr-TR", {
     dateStyle: "short",
+    timeZone: "Europe/Istanbul",
     timeStyle: "short",
   }).format(date)
 }
