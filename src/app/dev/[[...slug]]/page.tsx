@@ -190,7 +190,7 @@ const changelog = [
     items: [
       "RAI OHIF launch linkleri artik self-host OHIF URL'ine guvenli returnUrl parametresi ekler.",
       "OHIF static build patch'i returnUrl varsa sag ustte RAI Viewer'a donus butonu gosterir.",
-      "Return hedefi ayni origin ve /viewer/ path'i ile sinirlandirilir.",
+      "Return hedefi RAI app origin ve /viewer/ path'i ile sinirlandirilir.",
     ],
   },
   {

@@ -91,11 +91,18 @@ function injectRaiReturnButton(html) {
       return;
     }
 
-    if (target.origin !== window.location.origin || !target.pathname.startsWith("/viewer/")) return;
+    var allowedOrigins = [
+      window.location.origin,
+      "https://app.raipacs.com",
+      "http://localhost:4174",
+      "http://127.0.0.1:4174",
+    ];
+
+    if (allowedOrigins.indexOf(target.origin) === -1 || !target.pathname.startsWith("/viewer/")) return;
 
     var link = document.createElement("a");
     link.className = "${marker}";
-    link.href = target.pathname + target.search + target.hash;
+    link.href = target.href;
     link.textContent = "RAI Viewer";
     link.setAttribute("aria-label", "RAI Viewer'a don");
     link.style.display = "inline-flex";

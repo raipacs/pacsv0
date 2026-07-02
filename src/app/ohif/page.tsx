@@ -72,7 +72,7 @@ export default async function OhifGatewayPage({ searchParams }: OhifGatewayPageP
   const dicomwebRoot = new URL("/dicomweb", origin).toString()
   const configUrl = new URL("/ohif/config", origin)
   configUrl.searchParams.set("token", token)
-  const raiViewerReturnUrl = `/viewer/${studyIds[0]}`
+  const raiViewerReturnUrl = new URL(`/viewer/${studyIds[0]}`, getRaiAppOrigin(origin)).toString()
   const hostedOhifUrl = createOhifDicomJsonFallbackUrl({
     origin,
     returnUrl: raiViewerReturnUrl,
@@ -222,6 +222,20 @@ function getRequestOrigin(requestHeaders: Headers) {
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host")
   const protocol = requestHeaders.get("x-forwarded-proto") ?? "https"
   return host ? `${protocol}://${host}` : "https://app.raipacs.com"
+}
+
+function getRaiAppOrigin(origin: string) {
+  const configuredOrigin = process.env.NEXT_PUBLIC_RAI_APP_ORIGIN?.trim()
+  if (configuredOrigin) return configuredOrigin
+
+  try {
+    const url = new URL(origin)
+    if (url.hostname === "ohif.raipacs.com") return "https://app.raipacs.com"
+  } catch {
+    return "https://app.raipacs.com"
+  }
+
+  return origin
 }
 
 function firstRelation<T>(value: T | T[] | null | undefined) {

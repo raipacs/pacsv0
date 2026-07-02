@@ -41,8 +41,9 @@ The RAI OHIF gateway is also available:
 - `GET /ohif/config?token=...`: signed DICOMweb datasource config for a future self-host OHIF build.
 - `GET /ohif-viewer/viewer/dicomjson?url=...`: self-host OHIF static viewer, generated at build time from `@ohif/app`.
 - `ohif.raipacs.com`: host rewrite serves gateway, static viewer, config, DICOMweb and viewer-data paths.
-- Self-host OHIF accepts a `returnUrl=/viewer/:studyId` launch parameter and shows a fixed
-  RAI Viewer return button when the target is same-origin and under `/viewer/`.
+- Self-host OHIF accepts a `returnUrl=https://app.raipacs.com/viewer/:studyId` launch
+  parameter and shows a fixed RAI Viewer return button when the target is an approved RAI
+  app origin under `/viewer/`.
 
 ## Phase 2 target
 
