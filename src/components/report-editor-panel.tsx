@@ -281,6 +281,7 @@ function formatDateTime(value: string | null) {
     hour: "2-digit",
     minute: "2-digit",
     month: "2-digit",
+    timeZone: "Europe/Istanbul",
     year: "numeric",
   }).format(new Date(value))
 }

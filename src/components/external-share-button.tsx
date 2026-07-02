@@ -115,6 +115,7 @@ function formatExpiry(value: string) {
   if (!value) return "süreli"
   return new Intl.DateTimeFormat("tr-TR", {
     dateStyle: "short",
+    timeZone: "Europe/Istanbul",
     timeStyle: "short",
   }).format(new Date(value))
 }

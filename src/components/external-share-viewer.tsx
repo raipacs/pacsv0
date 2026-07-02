@@ -138,6 +138,7 @@ export function ExternalShareViewer({ token: initialToken = "" }: { token?: stri
 function formatExpiry(value: string) {
   return new Intl.DateTimeFormat("tr-TR", {
     dateStyle: "short",
+    timeZone: "Europe/Istanbul",
     timeStyle: "short",
   }).format(new Date(value))
 }

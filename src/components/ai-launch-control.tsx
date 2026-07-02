@@ -194,5 +194,6 @@ function formatShortDateTime(value: string | null) {
     hour: "2-digit",
     minute: "2-digit",
     month: "2-digit",
+    timeZone: "Europe/Istanbul",
   }).format(new Date(value))
 }
