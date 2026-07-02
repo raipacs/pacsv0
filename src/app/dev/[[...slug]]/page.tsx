@@ -185,6 +185,16 @@ const searchItems = [
 const changelog = [
   {
     date: "2026-07-02",
+    version: "0.2.0-dev.20",
+    title: "OHIF Gateway iframe fallback'i kaldirildi",
+    items: [
+      "Public viewer.ohif.org iframe icinde calismadigi icin gateway artik top-level launch akisi kullanir.",
+      "OHIF ayni sekmede ac ve yeni sekmede ac aksiyonlari signed DICOMweb token ile calisir.",
+      "Gomulu OHIF deneyimi self-host OHIF build fazina ayrildi; DICOMweb/config katmani korunur.",
+    ],
+  },
+  {
+    date: "2026-07-02",
     version: "0.2.0-dev.19",
     title: "RAI OHIF Gateway launch katmani eklendi",
     items: [
@@ -515,7 +525,8 @@ export default function DevDocsPage() {
               <li>Frame cache ve preview katmani viewer performansini hizlandirir.</li>
               <li>Renkli US gibi farkli fotometrik yorumlar desteklenir.</li>
               <li>OHIF hasta oturumu ayni hastanin son tetkiklerini tek dicomjson manifestinde acar.</li>
-              <li>RAI OHIF Gateway signed token, DICOMweb root ve fallback OHIF linkini tek ekranda tasir.</li>
+              <li>RAI OHIF Gateway signed token, DICOMweb root ve OHIF launch aksiyonlarini tek ekranda tasir.</li>
+              <li>Public OHIF iframe icinde calismadigi icin fallback viewer top-level sayfada acilir.</li>
               <li>Harici paylasim linkleri privacy mode on varsayimi ile calisir.</li>
             </ul>
             <p>

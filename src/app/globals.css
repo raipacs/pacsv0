@@ -776,19 +776,6 @@ body:has(.rai-ohif-page) .app-header {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-.rai-ohif-frame-shell {
-  min-width: 0;
-  min-height: 0;
-  background: #020617;
-}
-
-.rai-ohif-frame {
-  width: 100%;
-  height: 100%;
-  border: 0;
-  background: #000;
-}
-
 .rai-ohif-empty {
   align-self: center;
   justify-self: center;
@@ -806,6 +793,83 @@ body:has(.rai-ohif-page) .app-header {
 
 .rai-ohif-empty p {
   color: #bfdbfe;
+}
+
+.rai-ohif-launch-panel {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  place-items: center;
+  overflow: auto;
+  padding: clamp(16px, 3vw, 40px);
+  background: #020617;
+}
+
+.rai-ohif-launch-card {
+  display: grid;
+  width: min(720px, 100%);
+  gap: 18px;
+  border: 1px solid #1d3f6f;
+  border-radius: 10px;
+  padding: clamp(18px, 2vw, 28px);
+  background: #081528;
+  box-shadow: 0 24px 70px rgb(0 0 0 / 36%);
+}
+
+.rai-ohif-launch-card h2 {
+  margin: 4px 0 8px;
+  color: white;
+  font-size: clamp(24px, 3vw, 40px);
+  line-height: 1.05;
+}
+
+.rai-ohif-launch-card p {
+  max-width: 62ch;
+  margin: 0;
+  color: #bfdbfe;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.rai-ohif-launch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.rai-ohif-launch-actions .button {
+  min-height: 44px;
+}
+
+.rai-ohif-launch-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 2px 0 0;
+}
+
+.rai-ohif-launch-card dl > div {
+  min-width: 0;
+  border: 1px solid #123366;
+  border-radius: 8px;
+  padding: 10px;
+  background: #0b2148;
+}
+
+.rai-ohif-launch-card dt {
+  color: #67e8f9;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.rai-ohif-launch-card dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  color: #dbeafe;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .rai-viewer-bar {
@@ -4287,6 +4351,16 @@ td span {
     max-height: 240px;
     border-right: 0;
     border-bottom: 1px solid #123366;
+  }
+
+  .rai-ohif-launch-panel {
+    align-items: start;
+    place-items: stretch;
+    padding: 14px;
+  }
+
+  .rai-ohif-launch-card dl {
+    grid-template-columns: 1fr;
   }
 
   .ai-launch-control select {

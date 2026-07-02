@@ -88,8 +88,11 @@ export default async function OhifGatewayPage({ searchParams }: OhifGatewayPageP
           <Link className="button subtle" href={`/viewer/${studyIds[0]}`}>
             RAI Viewer
           </Link>
-          <a className="button primary" href={fallbackUrl} rel="noreferrer" target="_blank">
-            OHIF fallback ac
+          <a className="button primary" href={fallbackUrl}>
+            OHIF ayni sekmede ac
+          </a>
+          <a className="button subtle" href={fallbackUrl} rel="noreferrer" target="_blank">
+            Yeni sekmede ac
           </a>
         </nav>
       </header>
@@ -137,13 +140,45 @@ export default async function OhifGatewayPage({ searchParams }: OhifGatewayPageP
           </div>
         </aside>
 
-        <section className="rai-ohif-frame-shell">
-          <iframe
-            className="rai-ohif-frame"
-            referrerPolicy="no-referrer"
-            src={fallbackUrl}
-            title="OHIF Viewer"
-          />
+        <section className="rai-ohif-launch-panel" aria-label="OHIF launch">
+          <div className="rai-ohif-launch-card">
+            <div>
+              <p className="eyebrow">OHIF Launch</p>
+              <h2>Public OHIF iframe icinde acilmaz</h2>
+              <p>
+                viewer.ohif.org iframe baglantisini reddettigi icin RAI Gateway
+                OHIF&apos;i ayni signed token ve DICOMweb manifestiyle ust sayfada
+                baslatir. Gomulu OHIF deneyimi icin sonraki adim self-host OHIF
+                build&apos;idir.
+              </p>
+            </div>
+            <div className="rai-ohif-launch-actions">
+              <a className="button primary" href={fallbackUrl}>
+                OHIF ayni sekmede ac
+              </a>
+              <a className="button subtle" href={fallbackUrl} rel="noreferrer" target="_blank">
+                Yeni sekmede ac
+              </a>
+            </div>
+            <dl>
+              <div>
+                <dt>Tetkik</dt>
+                <dd>{studies.length || studyIds.length}</dd>
+              </div>
+              <div>
+                <dt>Gateway</dt>
+                <dd>{origin}</dd>
+              </div>
+              <div>
+                <dt>DICOMweb</dt>
+                <dd>{dicomwebRoot}</dd>
+              </div>
+              <div>
+                <dt>Fallback</dt>
+                <dd>viewer.ohif.org/dicomjson</dd>
+              </div>
+            </dl>
+          </div>
         </section>
       </section>
     </main>
