@@ -180,6 +180,7 @@ export function RaiDicomViewer({
   const activeInstance = orderedInstances[activeIndex]
   const loadableInstanceId = activeInstance?.id ?? ""
   const hasMultipleInstances = orderedInstances.length > 1
+  const effectiveTool: ViewerTool = tool === "scroll" && !hasMultipleInstances ? "window" : tool
   const canGoPrevious = hasMultipleInstances && activeIndex > 0
   const canGoNext = hasMultipleInstances && activeIndex < orderedInstances.length - 1
   const studyDateTime = formatViewerDateTime(study.studyAt)
@@ -571,7 +572,7 @@ export function RaiDicomViewer({
 
       if (key === "0") resetViewer()
       if (key === "i") setInvert((value) => !value)
-      if (key === "s") setTool("scroll")
+      if (key === "s" && hasMultipleInstances) setTool("scroll")
       if (key === "p") setTool("pan")
       if (key === "w") setTool("window")
       if (key === "z") setTool("zoom")
@@ -638,10 +639,12 @@ export function RaiDicomViewer({
   function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
     event.preventDefault()
 
-    if (tool === "zoom" || event.ctrlKey || event.metaKey || !hasMultipleInstances) {
+    if (effectiveTool === "zoom" || event.ctrlKey || event.metaKey) {
       adjustZoom(event.deltaY > 0 ? -0.12 : 0.12)
       return
     }
+
+    if (!hasMultipleInstances) return
 
     const now = Date.now()
     if (now - wheelRef.current < 42) return
@@ -785,28 +788,37 @@ export function RaiDicomViewer({
           <div className="segmented viewer-mode">
             <button
               type="button"
-              className={tool === "scroll" ? "active" : ""}
-              onClick={() => setTool("scroll")}
+              className={effectiveTool === "scroll" ? "active" : ""}
+              disabled={!hasMultipleInstances}
+              aria-disabled={!hasMultipleInstances}
+              title={
+                hasMultipleInstances
+                  ? "Stack scroll"
+                  : "Tek görüntülü seride scroll aracı kapalı"
+              }
+              onClick={() => {
+                if (hasMultipleInstances) setTool("scroll")
+              }}
             >
               Scroll
             </button>
             <button
               type="button"
-              className={tool === "pan" ? "active" : ""}
+              className={effectiveTool === "pan" ? "active" : ""}
               onClick={() => setTool("pan")}
             >
               Pan
             </button>
             <button
               type="button"
-              className={tool === "window" ? "active" : ""}
+              className={effectiveTool === "window" ? "active" : ""}
               onClick={() => setTool("window")}
             >
               W/L
             </button>
             <button
               type="button"
-              className={tool === "zoom" ? "active" : ""}
+              className={effectiveTool === "zoom" ? "active" : ""}
               onClick={() => setTool("zoom")}
             >
               Zoom
@@ -841,7 +853,7 @@ export function RaiDicomViewer({
         <div className="rai-dicom-quick-rail" aria-label="Hızlı viewer araçları">
           <button
             type="button"
-            className={tool === "window" ? "active" : ""}
+            className={effectiveTool === "window" ? "active" : ""}
             aria-label="Window level aracı"
             title="Window/Level"
             onClick={() => setTool("window")}
@@ -850,7 +862,7 @@ export function RaiDicomViewer({
           </button>
           <button
             type="button"
-            className={tool === "zoom" ? "active" : ""}
+            className={effectiveTool === "zoom" ? "active" : ""}
             aria-label="Zoom aracı"
             title="Zoom"
             onClick={() => setTool("zoom")}
@@ -859,7 +871,7 @@ export function RaiDicomViewer({
           </button>
           <button
             type="button"
-            className={tool === "pan" ? "active" : ""}
+            className={effectiveTool === "pan" ? "active" : ""}
             aria-label="Pan aracı"
             title="Pan"
             onClick={() => setTool("pan")}
@@ -932,7 +944,7 @@ export function RaiDicomViewer({
           <dl className="dicom-corner corner-bottom-left">
             <div>
               <dt>Araç</dt>
-              <dd>{tool.toUpperCase()}</dd>
+              <dd>{effectiveTool.toUpperCase()}</dd>
             </div>
             <div>
               <dt>W/L</dt>
@@ -972,8 +984,9 @@ export function RaiDicomViewer({
         {viewerStatus ? <p className="viewer-status">{viewerStatus}</p> : null}
         <canvas
           ref={canvasRef}
-          className={`rai-dicom-canvas is-${tool}`}
+          className={`rai-dicom-canvas is-${effectiveTool}`}
           onPointerDown={(event) => {
+            event.preventDefault()
             dragRef.current = {
               x: event.clientX,
               y: event.clientY,
@@ -984,12 +997,13 @@ export function RaiDicomViewer({
               zoom,
               index: activeIndex,
               scrollStep: 0,
-              tool,
+              tool: effectiveTool,
             }
             event.currentTarget.setPointerCapture(event.pointerId)
           }}
           onPointerMove={(event) => {
             if (!dragRef.current) return
+            event.preventDefault()
 
             const deltaX = event.clientX - dragRef.current.x
             const deltaY = event.clientY - dragRef.current.y
@@ -1240,7 +1254,7 @@ export function RaiDicomViewer({
           </div>
           <div>
             <dt>Araç</dt>
-            <dd>{tool.toUpperCase()}</dd>
+            <dd>{effectiveTool.toUpperCase()}</dd>
           </div>
           <div>
             <dt>Cache</dt>
