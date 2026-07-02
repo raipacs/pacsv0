@@ -8,3 +8,5 @@ dist/
 !.env.example
 rai-llm-vercel.env
 .vercel
+.tmp-ohif/
+public/ohif-viewer/

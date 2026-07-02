@@ -185,6 +185,16 @@ const searchItems = [
 const changelog = [
   {
     date: "2026-07-02",
+    version: "0.2.0-dev.21",
+    title: "Self-host RAI OHIF static viewer eklendi",
+    items: [
+      "Build sirasinda @ohif/app 3.12.5 static dist indirilip /ohif-viewer altinda RAI domaininden servis edilir.",
+      "RAI Viewer ve OHIF Gateway linkleri public viewer.ohif.org yerine ohif.raipacs.com/ohif-viewer akisini kullanir.",
+      "OHIF asset path, webpack public path ve SPA rewrite kurallari /ohif-viewer prefix'i icin patchlenir.",
+    ],
+  },
+  {
+    date: "2026-07-02",
     version: "0.2.0-dev.20",
     title: "OHIF Gateway iframe fallback'i kaldirildi",
     items: [
@@ -525,14 +535,15 @@ export default function DevDocsPage() {
               <li>Frame cache ve preview katmani viewer performansini hizlandirir.</li>
               <li>Renkli US gibi farkli fotometrik yorumlar desteklenir.</li>
               <li>OHIF hasta oturumu ayni hastanin son tetkiklerini tek dicomjson manifestinde acar.</li>
-              <li>RAI OHIF Gateway signed token, DICOMweb root ve OHIF launch aksiyonlarini tek ekranda tasir.</li>
-              <li>Public OHIF iframe icinde calismadigi icin fallback viewer top-level sayfada acilir.</li>
+              <li>RAI OHIF Gateway signed token, DICOMweb root ve RAI-hosted OHIF launch aksiyonlarini tek ekranda tasir.</li>
+              <li>Self-host OHIF static viewer /ohif-viewer altinda RAI domaininden servis edilir.</li>
+              <li>Public OHIF sadece teknik fallback olarak kodda korunur; ana akis RAI domainindedir.</li>
               <li>Harici paylasim linkleri privacy mode on varsayimi ile calisir.</li>
             </ul>
             <p>
-              Faz 2 hedefi self-host OHIF ve DICOMweb endpoint olarak planlanir. Gateway
-              katmani hazirdir; sonraki adim OHIF static build&apos;in RAI domaini altinda
-              servis edilmesidir.
+              Faz 2 hedefi self-host OHIF ve DICOMweb endpoint olarak ilerler. Gateway
+              katmani ve static OHIF shell hazirdir; sonraki adim OHIF datasource&apos;u
+              dogrudan /ohif/config ve /dicomweb uzerinden sertlestirmektir.
             </p>
             <pre>{`GET /dicomweb/studies
 GET /dicomweb/studies/{StudyInstanceUID}/series

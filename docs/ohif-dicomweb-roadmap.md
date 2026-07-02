@@ -11,10 +11,9 @@ RAI PACS currently opens OHIF through signed `dicomjson` manifests:
 - Instance proxy: `/viewer-data/instances/:instanceId`
 
 This keeps OHIF usable without exposing Supabase Storage directly. RAI Viewer now launches
-OHIF through the RAI-controlled `/ohif` gateway first. `viewer.ohif.org` remains the fallback UI
-until a self-hosted OHIF static build is deployed under `ohif.raipacs.com`. The public OHIF
-viewer cannot be embedded in an iframe, so the gateway opens that fallback as a top-level
-navigation/new-tab launch.
+OHIF through the RAI-controlled `/ohif` gateway first. The primary launch path is the
+self-hosted OHIF static viewer under `/ohif-viewer` on `ohif.raipacs.com`. Public
+`viewer.ohif.org` remains only as a technical fallback.
 
 ## Phase 2 read-only foundation
 
@@ -38,15 +37,16 @@ The next hardening step is broader transfer-syntax validation against real modal
 
 The RAI OHIF gateway is also available:
 
-- `GET /ohif?token=...`: launch page with study list, DICOMweb root and top-level OHIF fallback actions.
+- `GET /ohif?token=...`: launch page with study list, DICOMweb root and RAI-hosted OHIF actions.
 - `GET /ohif/config?token=...`: signed DICOMweb datasource config for a future self-host OHIF build.
-- `ohif.raipacs.com`: host rewrite is prepared so the same app can serve gateway, config, DICOMweb and viewer-data paths.
+- `GET /ohif-viewer/viewer/dicomjson?url=...`: self-host OHIF static viewer, generated at build time from `@ohif/app`.
+- `ohif.raipacs.com`: host rewrite serves gateway, static viewer, config, DICOMweb and viewer-data paths.
 
 ## Phase 2 target
 
 Move to a RAI-controlled OHIF + DICOMweb deployment:
 
-- `ohif.raipacs.com`: self-hosted OHIF build with RAI branding and no public OHIF banner.
+- `ohif.raipacs.com`: self-hosted OHIF build with RAI launch control and no public OHIF iframe dependency.
 - `dicomweb.raipacs.com`: RAI DICOMweb gateway.
 - `GET /dicomweb/studies`: QIDO-RS study search.
 - `GET /dicomweb/studies/:studyInstanceUid/series`: QIDO-RS series search.
@@ -59,9 +59,9 @@ Move to a RAI-controlled OHIF + DICOMweb deployment:
 1. Complete DICOMweb read APIs backed by current PostgreSQL metadata and Supabase Storage.
 2. Validate frame-level WADO-RS against MR, CT, DX and US modality datasets.
 3. Add signed launch handoff from RAI Viewer to the RAI OHIF gateway. Done.
-4. Deploy OHIF as a separate Vercel or Cloud Run app under `ohif.raipacs.com`.
+4. Deploy OHIF static shell under `ohif.raipacs.com/ohif-viewer`. Done.
 5. Configure OHIF datasource from `/ohif/config` and route QIDO/WADO to `/dicomweb`.
-6. Keep current `viewer.ohif.org` links as fallback until self-host OHIF is stable.
+6. Keep current `viewer.ohif.org` links as emergency fallback until self-host OHIF is clinically validated.
 
 ## Security baseline
 
@@ -75,6 +75,5 @@ Move to a RAI-controlled OHIF + DICOMweb deployment:
 
 The current multi-study dicomjson route is the bridge. It is enough for testing OHIF study
 navigation today, but it should not be treated as the final enterprise PACS viewer layer.
-The `/ohif/config` contract is the bridge from the current fallback viewer to the future
-RAI-hosted OHIF application. Public `viewer.ohif.org` rejects iframe embedding, so same-page
-embedded OHIF requires a self-hosted OHIF build served from the RAI domain.
+The `/ohif/config` contract is the bridge from the current dicomjson launch path to the
+future direct DICOMweb datasource configuration.

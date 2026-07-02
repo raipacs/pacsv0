@@ -46,6 +46,7 @@ function shouldRewriteOhifHostPath(pathname: string) {
     "/dicomweb",
     "/favicon.ico",
     "/ohif",
+    "/ohif-viewer",
     "/viewer-data",
   ].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
 }

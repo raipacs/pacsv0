@@ -1,0 +1,100 @@
+import { execFileSync } from "node:child_process"
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
+
+const OHIF_APP_VERSION = "3.12.5"
+const PUBLIC_PATH = "/ohif-viewer/"
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..")
+const tmpDir = join(root, ".tmp-ohif")
+const outputDir = join(root, "public", "ohif-viewer")
+
+rmSync(tmpDir, { force: true, recursive: true })
+mkdirSync(tmpDir, { recursive: true })
+mkdirSync(dirname(outputDir), { recursive: true })
+
+const packOutput = execFileSync(
+  "npm",
+  ["pack", `@ohif/app@${OHIF_APP_VERSION}`, "--pack-destination", tmpDir, "--json"],
+  { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] }
+)
+
+const [{ filename }] = JSON.parse(packOutput)
+const tarball = join(tmpDir, filename)
+execFileSync("tar", ["-xzf", tarball, "-C", tmpDir], { stdio: "inherit" })
+
+rmSync(outputDir, { force: true, recursive: true })
+cpSync(join(tmpDir, "package", "dist"), outputDir, { recursive: true })
+
+patchIndexHtml(join(outputDir, "index.html"))
+patchAppBundle(outputDir)
+patchAppConfig(join(outputDir, "app-config.js"))
+removeSourceMaps(outputDir)
+
+rmSync(tmpDir, { force: true, recursive: true })
+console.log(`OHIF ${OHIF_APP_VERSION} static build prepared at ${outputDir}`)
+
+function patchIndexHtml(filePath) {
+  let html = readFileSync(filePath, "utf8")
+  html = html.replaceAll("window.PUBLIC_URL = '/';", `window.PUBLIC_URL = '${PUBLIC_PATH}';`)
+  html = html.replace(/(href|src)="\/(?!\/)/g, `$1="${PUBLIC_PATH}`)
+  html = html.replace(
+    /<script rel="preload" as="script" type="module" src="\/ohif-viewer\/init-service-worker\.js"><\/script>/,
+    ""
+  )
+  html = html.replace("<title>OHIF Viewer</title>", "<title>RAI OHIF Viewer</title>")
+  writeFileSync(filePath, html)
+}
+
+function patchAppBundle(dirPath) {
+  const bundleName = findFile(dirPath, /^app\.bundle\..+\.js$/)
+  const bundlePath = join(dirPath, bundleName)
+  let bundle = readFileSync(bundlePath, "utf8")
+  bundle = bundle.replace('__webpack_require__.p = "/";', `__webpack_require__.p = "${PUBLIC_PATH}";`)
+  writeFileSync(bundlePath, bundle)
+}
+
+function patchAppConfig(filePath) {
+  let config = readFileSync(filePath, "utf8")
+  config = config.replace("routerBasename: null,", "routerBasename: '/ohif-viewer',")
+  config = config.replace("showWarningMessageForCrossOrigin: true,", "showWarningMessageForCrossOrigin: false,")
+
+  // The upstream config keeps dynamic config commented out. RAI enables it so
+  // /ohif/config can later become the primary datasource contract for self-host OHIF.
+  if (!/^\s{2}dangerouslyUseDynamicConfig:\s*\{/m.test(config)) {
+    config = config.replace(
+      "  dataSources: [",
+      "  dangerouslyUseDynamicConfig: {\n    enabled: true,\n    regex: /^(https:\\/\\/(app|ohif)\\.raipacs\\.com|http:\\/\\/localhost:4174|http:\\/\\/127\\.0\\.0\\.1:4174)\\/ohif\\/config\\?token=.+/,\n  },\n  dataSources: ["
+    )
+  }
+  writeFileSync(filePath, config)
+}
+
+function findFile(dirPath, pattern) {
+  const files = execFileSync("find", [dirPath, "-maxdepth", "1", "-type", "f"], {
+    encoding: "utf8",
+  })
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+
+  const match = files.map((file) => file.split("/").pop()).find((file) => pattern.test(file))
+  if (!match || !existsSync(join(dirPath, match))) {
+    throw new Error(`OHIF bundle file not found for pattern ${pattern}`)
+  }
+  return match
+}
+
+function removeSourceMaps(dirPath) {
+  const sourceMaps = execFileSync("find", [dirPath, "-type", "f", "-name", "*.map"], {
+    encoding: "utf8",
+  })
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+
+  for (const sourceMap of sourceMaps) {
+    rmSync(sourceMap, { force: true })
+  }
+}

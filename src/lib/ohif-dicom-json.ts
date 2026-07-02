@@ -61,7 +61,7 @@ export const OHIF_CORS_HEADERS = {
   "Access-Control-Allow-Headers":
     "accept, authorization, content-type, origin, range, x-requested-with",
   "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-  "Access-Control-Allow-Origin": "https://viewer.ohif.org",
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Expose-Headers":
     "accept-ranges, content-length, content-range, content-type",
   "Cache-Control": "private, no-store",

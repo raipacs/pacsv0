@@ -72,7 +72,7 @@ export default async function OhifGatewayPage({ searchParams }: OhifGatewayPageP
   const dicomwebRoot = new URL("/dicomweb", origin).toString()
   const configUrl = new URL("/ohif/config", origin)
   configUrl.searchParams.set("token", token)
-  const fallbackUrl = createOhifDicomJsonFallbackUrl({ origin, studyIds, token })
+  const hostedOhifUrl = createOhifDicomJsonFallbackUrl({ origin, studyIds, token })
 
   return (
     <main className="rai-ohif-page">
@@ -88,10 +88,10 @@ export default async function OhifGatewayPage({ searchParams }: OhifGatewayPageP
           <Link className="button subtle" href={`/viewer/${studyIds[0]}`}>
             RAI Viewer
           </Link>
-          <a className="button primary" href={fallbackUrl}>
-            OHIF ayni sekmede ac
+          <a className="button primary" href={hostedOhifUrl}>
+            RAI OHIF ac
           </a>
-          <a className="button subtle" href={fallbackUrl} rel="noreferrer" target="_blank">
+          <a className="button subtle" href={hostedOhifUrl} rel="noreferrer" target="_blank">
             Yeni sekmede ac
           </a>
         </nav>
@@ -144,19 +144,18 @@ export default async function OhifGatewayPage({ searchParams }: OhifGatewayPageP
           <div className="rai-ohif-launch-card">
             <div>
               <p className="eyebrow">OHIF Launch</p>
-              <h2>Public OHIF iframe icinde acilmaz</h2>
+              <h2>RAI self-host OHIF hazir</h2>
               <p>
-                viewer.ohif.org iframe baglantisini reddettigi icin RAI Gateway
-                OHIF&apos;i ayni signed token ve DICOMweb manifestiyle ust sayfada
-                baslatir. Gomulu OHIF deneyimi icin sonraki adim self-host OHIF
-                build&apos;idir.
+                Bu gateway signed token ile yetkili tetkikleri RAI domaini altinda
+                calisan OHIF Viewer&apos;a aktarir. DICOM nesneleri private storage&apos;da
+                kalir; OHIF yalnizca RAI DICOMweb ve viewer-data endpointlerini kullanir.
               </p>
             </div>
             <div className="rai-ohif-launch-actions">
-              <a className="button primary" href={fallbackUrl}>
-                OHIF ayni sekmede ac
+              <a className="button primary" href={hostedOhifUrl}>
+                RAI OHIF ac
               </a>
-              <a className="button subtle" href={fallbackUrl} rel="noreferrer" target="_blank">
+              <a className="button subtle" href={hostedOhifUrl} rel="noreferrer" target="_blank">
                 Yeni sekmede ac
               </a>
             </div>
@@ -174,8 +173,8 @@ export default async function OhifGatewayPage({ searchParams }: OhifGatewayPageP
                 <dd>{dicomwebRoot}</dd>
               </div>
               <div>
-                <dt>Fallback</dt>
-                <dd>viewer.ohif.org/dicomjson</dd>
+                <dt>Viewer</dt>
+                <dd>{new URL("/ohif-viewer", origin).toString()}</dd>
               </div>
             </dl>
           </div>
