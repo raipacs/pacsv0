@@ -45,6 +45,12 @@ const apiRows = [
     auth: "Signed launch token",
   },
   {
+    method: "GET",
+    path: "/viewer-data/ohif-session",
+    scope: "OHIF icin hasta bazli coklu tetkik dicomjson manifesti",
+    auth: "Signed multi-study launch token",
+  },
+  {
     method: "POST",
     path: "/api/share",
     scope: "Sureli harici paylasim linki",
@@ -135,6 +141,16 @@ const searchItems = [
 ]
 
 const changelog = [
+  {
+    date: "2026-07-02",
+    version: "0.2.0-dev.16",
+    title: "OHIF hasta oturumu ve DICOMweb yol haritasi",
+    items: [
+      "RAI Viewer icine tek tetkik OHIF linkine ek olarak hasta bazli coklu tetkik OHIF oturumu eklendi.",
+      "Signed launch token artik tek study veya study-session kapsaminda birden fazla study tasiyabilir.",
+      "Uzun vadeli self-host OHIF + DICOMweb gecisi icin operasyon yol haritasi dokumante edildi.",
+    ],
+  },
   {
     date: "2026-07-02",
     version: "0.2.0-dev.15",
@@ -426,8 +442,14 @@ export default function DevDocsPage() {
             <ul>
               <li>Frame cache ve preview katmani viewer performansini hizlandirir.</li>
               <li>Renkli US gibi farkli fotometrik yorumlar desteklenir.</li>
+              <li>OHIF hasta oturumu ayni hastanin son tetkiklerini tek dicomjson manifestinde acar.</li>
               <li>Harici paylasim linkleri privacy mode on varsayimi ile calisir.</li>
             </ul>
+            <p>
+              Faz 2 hedefi self-host OHIF ve DICOMweb endpoint olarak planlanir. Bu fazda
+              public viewer.ohif.org bagimliligi kalkar; QIDO-RS, WADO-RS ve
+              STOW-RS servisleri RAI domainleri altinda sunulur.
+            </p>
           </DocBlock>
 
           <DocBlock eyebrow="API" id="api-reference" title="Public ve signed teknik yuzeyler">

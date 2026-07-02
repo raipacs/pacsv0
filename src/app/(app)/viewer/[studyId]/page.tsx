@@ -20,7 +20,10 @@ import { isMissingAiTableError, type AiProviderOption } from "@/lib/ai-reporting
 import { requireUser } from "@/lib/auth"
 import { isSupabaseConfigured } from "@/lib/config"
 import { hasOhifLaunchSecret } from "@/lib/ohif-launch"
-import { createOhifDicomJsonViewerUrl } from "@/lib/ohif-viewer"
+import {
+  createOhifDicomJsonSessionViewerUrl,
+  createOhifDicomJsonViewerUrl,
+} from "@/lib/ohif-viewer"
 import { createClient } from "@/lib/supabase/server"
 
 export const metadata = { title: "RAI Viewer" }
@@ -68,11 +71,13 @@ export default async function RaiViewerPage({
   if (error) throw new Error(`Viewer tetkiki alınamadı: ${error.message}`)
   if (!study) notFound()
 
+  const patient = Array.isArray(study.patients) ? study.patients[0] : study.patients
   const [
     { data: series, error: seriesError },
     { data: instances, error: instancesError },
     aiViewerState,
     { data: reports, error: reportsError },
+    patientOhifStudyIds,
   ] = await Promise.all([
       supabase
         .from("series")
@@ -94,6 +99,9 @@ export default async function RaiViewerPage({
         .eq("study_id", study.id)
         .order("version", { ascending: false })
         .limit(12),
+      patient?.id
+        ? loadPatientOhifStudyIds(supabase, user.organizationId, patient.id)
+        : Promise.resolve([studyId]),
     ])
 
   if (seriesError) {
@@ -108,7 +116,6 @@ export default async function RaiViewerPage({
     throw new Error(`Rapor bilgisi alınamadı: ${reportsError.message}`)
   }
 
-  const patient = Array.isArray(study.patients) ? study.patients[0] : study.patients
   const requestHeaders = await headers()
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host")
   const protocol = requestHeaders.get("x-forwarded-proto") ?? "https"
@@ -119,6 +126,16 @@ export default async function RaiViewerPage({
     studyId,
     userId: user.id,
   })
+  const ohifSessionStudyIds = Array.from(new Set([studyId, ...patientOhifStudyIds])).slice(0, 25)
+  const patientOhifViewerUrl =
+    ohifSessionStudyIds.length > 1
+      ? createOhifDicomJsonSessionViewerUrl({
+          origin,
+          organizationId: user.organizationId,
+          studyIds: ohifSessionStudyIds,
+          userId: user.id,
+        })
+      : null
   const patientHref = query.patientId
     ? `/patients/${query.patientId}`
     : patient?.id
@@ -184,6 +201,17 @@ export default async function RaiViewerPage({
           >
             OHIF yeni sekme
           </a>
+          {patientOhifViewerUrl ? (
+            <a
+              className="button subtle"
+              href={patientOhifViewerUrl}
+              rel="noreferrer"
+              target="_blank"
+              title="Bu hastanın tetkiklerini aynı OHIF oturumunda aç"
+            >
+              OHIF hasta
+            </a>
+          ) : null}
           {isReportMode ? null : <ExternalShareButton studyId={studyId} />}
         </nav>
       </header>
@@ -291,6 +319,26 @@ type AiJobView = {
   providerName: string
   selectedProviderId: string | null
   status: string
+}
+
+async function loadPatientOhifStudyIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  patientId: string
+) {
+  const { data, error } = await supabase
+    .from("studies")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("patient_id", patientId)
+    .order("study_at", { ascending: false })
+    .limit(25)
+
+  if (error) {
+    throw new Error(`OHIF hasta oturumu tetkikleri alınamadı: ${error.message}`)
+  }
+
+  return (data ?? []).map((row) => row.id)
 }
 
 async function loadAiViewerState(

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 
+import { OHIF_CORS_HEADERS } from "@/lib/ohif-dicom-json"
 import { verifyOhifLaunchToken } from "@/lib/ohif-launch"
 import { createServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service"
 
@@ -8,13 +9,7 @@ type RouteContext = {
 }
 
 const CORS_HEADERS = {
-  "Access-Control-Allow-Headers":
-    "accept, authorization, content-type, origin, range, x-requested-with",
-  "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-  "Access-Control-Allow-Origin": "https://viewer.ohif.org",
-  "Access-Control-Expose-Headers":
-    "accept-ranges, content-length, content-range, content-type",
-  "Cache-Control": "private, no-store",
+  ...OHIF_CORS_HEADERS,
   "Cross-Origin-Resource-Policy": "cross-origin",
 }
 
