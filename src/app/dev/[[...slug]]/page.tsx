@@ -56,6 +56,12 @@ const apiRows = [
     scope: "Paylasim onizleme ve OHIF acilis",
     auth: "Sureli share token",
   },
+  {
+    method: "GET/POST",
+    path: "/api/jobs/ai-provider-health",
+    scope: "Gunluk AI provider saglik testi ve e-posta raporu",
+    auth: "Vercel Cron Bearer token",
+  },
 ]
 
 const dataTables = [
@@ -129,6 +135,16 @@ const searchItems = [
 ]
 
 const changelog = [
+  {
+    date: "2026-07-02",
+    version: "0.2.0-dev.15",
+    title: "AI provider saglik cron job'u eklendi",
+    items: [
+      "Vercel Cron her gun Turkiye saatiyle 09:00'da aktif AI provider'lari test eder.",
+      "OpenAI, Claude, Gemini, Qwen, DeepSeek, MedGemma, RAI LLM ve RAI AI Orchestrator saglik sonucu support@raipacs.com adresine gonderilecek sekilde hazirlandi.",
+      "Qwen varsayilan modeli qwen-vl-max olarak guncellendi; eski latest model adlari runtime'da normalize edilir.",
+    ],
+  },
   {
     date: "2026-06-29",
     version: "0.2.0-dev.14",
@@ -302,7 +318,7 @@ export default function DevDocsPage() {
         <aside className="dev-docs-status" aria-label="Platform durumu">
           <strong>Current snapshot</strong>
           <span>0.2.0 MVP</span>
-          <small>Son guncelleme: 28 Haziran 2026</small>
+          <small>Son guncelleme: 2 Temmuz 2026</small>
           <dl>
             <div>
               <dt>App</dt>
@@ -476,6 +492,8 @@ export default function DevDocsPage() {
               <article>OpenAI / GPT-5.5</article>
               <article>Claude</article>
               <article>Gemini</article>
+              <article>Qwen Vision</article>
+              <article>DeepSeek</article>
               <article>MedGemma endpoint</article>
               <article>RAI LLM self-hosted</article>
               <article>RAI AI Orchestrator</article>
@@ -506,6 +524,7 @@ export default function DevDocsPage() {
               <article>DICOM import: browser upload veya guvenli importer script</article>
               <article>Importer hesabi: import penceresi disinda pasif tutulur</article>
               <article>Gateway loglari: Admin DICOM Server panelinde izlenir</article>
+              <article>AI provider health: Vercel Cron 09:00 TR, Resend e-posta raporu</article>
               <article>Harici paylasim: sureli token ve privacy mode on</article>
             </div>
             <pre>{`npm run import:dicom-folder
