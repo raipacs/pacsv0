@@ -742,11 +742,19 @@ body:has(.rai-viewer-page) .app-header {
   min-width: 116px;
 }
 
-.ai-launch-status {
-  display: block;
+.ai-launch-status-row {
+  display: flex;
   flex: 1 1 100%;
   min-width: 0;
   max-width: 100%;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-launch-status {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   color: #93c5fd;
   font-size: 11px;

@@ -88,6 +88,10 @@ function AiLaunchFields({
   const statusText = pending
     ? formatPendingAiJob(selectedProvider)
     : unavailableReason || formatLatestAiJob(latestJob, selectedProvider, shouldForceRerun)
+  const canCopyLatestError =
+    !pending &&
+    ["endpoint_waking", "failed"].includes(latestJob?.status ?? "") &&
+    Boolean(latestJob?.errorMessage)
 
   return (
     <>
@@ -119,16 +123,16 @@ function AiLaunchFields({
       >
         {pending ? "AI çalışıyor..." : "AI"}
       </button>
-      <span
-        className={`ai-launch-status${pending ? " is-running" : ""}`}
-        aria-live="polite"
-        title={statusText}
-      >
-        {statusText}
+      <span className="ai-launch-status-row">
+        <span
+          className={`ai-launch-status${pending ? " is-running" : ""}`}
+          aria-live="polite"
+          title={statusText}
+        >
+          {statusText}
+        </span>
+        {canCopyLatestError ? <CopyErrorButton text={statusText} /> : null}
       </span>
-      {!pending && ["endpoint_waking", "failed"].includes(latestJob?.status ?? "") && latestJob?.errorMessage ? (
-        <CopyErrorButton text={statusText} />
-      ) : null}
     </>
   )
 }
