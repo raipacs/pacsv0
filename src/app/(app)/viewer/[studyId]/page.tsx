@@ -21,8 +21,8 @@ import { requireUser } from "@/lib/auth"
 import { isSupabaseConfigured } from "@/lib/config"
 import { hasOhifLaunchSecret } from "@/lib/ohif-launch"
 import {
-  createOhifDicomJsonSessionViewerUrl,
-  createOhifDicomJsonViewerUrl,
+  createRaiOhifSessionViewerUrl,
+  createRaiOhifViewerUrl,
 } from "@/lib/ohif-viewer"
 import { createClient } from "@/lib/supabase/server"
 
@@ -120,7 +120,7 @@ export default async function RaiViewerPage({
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host")
   const protocol = requestHeaders.get("x-forwarded-proto") ?? "https"
   const origin = host ? `${protocol}://${host}` : "https://app.raipacs.com"
-  const viewerUrl = createOhifDicomJsonViewerUrl({
+  const viewerUrl = createRaiOhifViewerUrl({
     origin,
     organizationId: user.organizationId,
     studyId,
@@ -129,7 +129,7 @@ export default async function RaiViewerPage({
   const ohifSessionStudyIds = Array.from(new Set([studyId, ...patientOhifStudyIds])).slice(0, 25)
   const patientOhifViewerUrl =
     ohifSessionStudyIds.length > 1
-      ? createOhifDicomJsonSessionViewerUrl({
+      ? createRaiOhifSessionViewerUrl({
           origin,
           organizationId: user.organizationId,
           studyIds: ohifSessionStudyIds,

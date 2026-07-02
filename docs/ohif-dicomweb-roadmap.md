@@ -4,12 +4,15 @@
 
 RAI PACS currently opens OHIF through signed `dicomjson` manifests:
 
+- RAI OHIF gateway: `/ohif`
+- Self-host OHIF config contract: `/ohif/config`
 - Single study: `/viewer-data/studies/:studyId`
 - Patient session: `/viewer-data/ohif-session`
 - Instance proxy: `/viewer-data/instances/:instanceId`
 
-This keeps OHIF usable without exposing Supabase Storage directly. The limitation is that
-`viewer.ohif.org` remains an external UI and its study list is session-manifest based.
+This keeps OHIF usable without exposing Supabase Storage directly. RAI Viewer now launches
+OHIF through the RAI-controlled `/ohif` gateway first. `viewer.ohif.org` remains the fallback UI
+until a self-hosted OHIF static build is deployed under `ohif.raipacs.com`.
 
 ## Phase 2 read-only foundation
 
@@ -31,6 +34,12 @@ Frame-level WADO-RS has an MVP implementation. Native uncompressed pixel data an
 encapsulated compressed frame fragments are returned as `multipart/related` responses.
 The next hardening step is broader transfer-syntax validation against real modality datasets.
 
+The RAI OHIF gateway is also available:
+
+- `GET /ohif?token=...`: launch page with study list, DICOMweb root and fallback OHIF viewer.
+- `GET /ohif/config?token=...`: signed DICOMweb datasource config for a future self-host OHIF build.
+- `ohif.raipacs.com`: host rewrite is prepared so the same app can serve gateway, config, DICOMweb and viewer-data paths.
+
 ## Phase 2 target
 
 Move to a RAI-controlled OHIF + DICOMweb deployment:
@@ -47,9 +56,9 @@ Move to a RAI-controlled OHIF + DICOMweb deployment:
 
 1. Complete DICOMweb read APIs backed by current PostgreSQL metadata and Supabase Storage.
 2. Validate frame-level WADO-RS against MR, CT, DX and US modality datasets.
-3. Add OAuth/session handoff from RAI Viewer to self-host OHIF.
+3. Add signed launch handoff from RAI Viewer to the RAI OHIF gateway. Done.
 4. Deploy OHIF as a separate Vercel or Cloud Run app under `ohif.raipacs.com`.
-5. Configure OHIF datasource to `dicomweb.raipacs.com`.
+5. Configure OHIF datasource from `/ohif/config` and route QIDO/WADO to `/dicomweb`.
 6. Keep current `viewer.ohif.org` links as fallback until self-host OHIF is stable.
 
 ## Security baseline
@@ -64,3 +73,5 @@ Move to a RAI-controlled OHIF + DICOMweb deployment:
 
 The current multi-study dicomjson route is the bridge. It is enough for testing OHIF study
 navigation today, but it should not be treated as the final enterprise PACS viewer layer.
+The `/ohif/config` contract is the bridge from the current fallback viewer to the future
+RAI-hosted OHIF application.

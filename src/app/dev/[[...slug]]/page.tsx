@@ -34,6 +34,18 @@ const guideCards = [
 const apiRows = [
   {
     method: "GET",
+    path: "/ohif",
+    scope: "RAI kontrollu OHIF launch sayfasi",
+    auth: "Signed launch token",
+  },
+  {
+    method: "GET",
+    path: "/ohif/config",
+    scope: "Self-host OHIF DICOMweb datasource config",
+    auth: "Signed launch token",
+  },
+  {
+    method: "GET",
     path: "/viewer-data/studies/:studyId",
     scope: "OHIF dicomjson metadata",
     auth: "Signed launch token",
@@ -171,6 +183,16 @@ const searchItems = [
 ]
 
 const changelog = [
+  {
+    date: "2026-07-02",
+    version: "0.2.0-dev.19",
+    title: "RAI OHIF Gateway launch katmani eklendi",
+    items: [
+      "RAI Viewer OHIF butonlari artik dogrudan public OHIF yerine RAI /ohif launch sayfasina gider.",
+      "/ohif/config endpoint'i signed token ile DICOMweb datasource bilgisini uretir.",
+      "ohif.raipacs.com host rewrite hazirlandi; public viewer.ohif.org simdilik fallback olarak korunur.",
+    ],
+  },
   {
     date: "2026-07-02",
     version: "0.2.0-dev.18",
@@ -486,19 +508,20 @@ export default function DevDocsPage() {
               RAI Viewer radyolog icin ana is istasyonudur. Scroll, pan,
               window/level, zoom, fit, frame ok tuslari, seri paneli,
               preview/liste modu, privacy mode ve AI on rapor paneli birlikte
-              calisir. OHIF yeni sekme, harici OHIF viewer ile dicomjson
-              entegrasyonu icin korunur.
+              calisir. OHIF yeni sekme artik RAI kontrollu launch katmanindan
+              acilir; harici OHIF viewer fallback olarak korunur.
             </p>
             <ul>
               <li>Frame cache ve preview katmani viewer performansini hizlandirir.</li>
               <li>Renkli US gibi farkli fotometrik yorumlar desteklenir.</li>
               <li>OHIF hasta oturumu ayni hastanin son tetkiklerini tek dicomjson manifestinde acar.</li>
+              <li>RAI OHIF Gateway signed token, DICOMweb root ve fallback OHIF linkini tek ekranda tasir.</li>
               <li>Harici paylasim linkleri privacy mode on varsayimi ile calisir.</li>
             </ul>
             <p>
-              Faz 2 hedefi self-host OHIF ve DICOMweb endpoint olarak planlanir. Bu fazda
-              public viewer.ohif.org bagimliligi kalkar; QIDO-RS, WADO-RS ve
-              STOW-RS servisleri RAI domainleri altinda sunulur.
+              Faz 2 hedefi self-host OHIF ve DICOMweb endpoint olarak planlanir. Gateway
+              katmani hazirdir; sonraki adim OHIF static build&apos;in RAI domaini altinda
+              servis edilmesidir.
             </p>
             <pre>{`GET /dicomweb/studies
 GET /dicomweb/studies/{StudyInstanceUID}/series
@@ -536,8 +559,9 @@ GET /dicomweb/studies/{StudyInstanceUID}/series/{SeriesInstanceUID}/instances/{S
             </div>
             <p>
               DICOM instance proxy <code>Range</code> headerlarini upstream
-              Storage signed URL tarafina tasir. OHIF CORS yalnizca viewer.ohif.org
-              icin aciktir; RAI Viewer dahili signed URL akisini kullanir.
+              Storage signed URL tarafina tasir. DICOMweb CORS RAI app, OHIF domaini
+              ve public fallback viewer icin kisitli tutulur; RAI Viewer dahili signed
+              URL akisini kullanir.
             </p>
           </DocBlock>
 

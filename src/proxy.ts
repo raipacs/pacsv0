@@ -13,6 +13,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.rewrite(rewriteUrl)
   }
 
+  if (isOhifHost(request) && shouldRewriteOhifHostPath(request.nextUrl.pathname)) {
+    const rewriteUrl = request.nextUrl.clone()
+    rewriteUrl.pathname = `/ohif${rewriteUrl.pathname === "/" ? "" : rewriteUrl.pathname}`
+    return NextResponse.rewrite(rewriteUrl)
+  }
+
   if (!isSupabaseConfigured) return NextResponse.next()
   return updateSession(request)
 }
@@ -26,4 +32,20 @@ export const config = {
 function isDeveloperDocsHost(request: NextRequest) {
   const host = request.headers.get("host")?.split(":")[0].toLowerCase()
   return host === "dev.raipacs.com"
+}
+
+function isOhifHost(request: NextRequest) {
+  const host = request.headers.get("host")?.split(":")[0].toLowerCase()
+  return host === "ohif.raipacs.com"
+}
+
+function shouldRewriteOhifHostPath(pathname: string) {
+  return ![
+    "/_next",
+    "/api",
+    "/dicomweb",
+    "/favicon.ico",
+    "/ohif",
+    "/viewer-data",
+  ].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
 }

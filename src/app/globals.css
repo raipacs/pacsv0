@@ -639,6 +639,175 @@ body:has(.rai-viewer-page) .app-header {
   display: none;
 }
 
+.rai-ohif-page {
+  display: grid;
+  height: 100dvh;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  color: #dbeafe;
+  background: #030712;
+}
+
+html:has(.rai-ohif-page),
+body:has(.rai-ohif-page) {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body:has(.rai-ohif-page) .app-header {
+  display: none;
+}
+
+.rai-ohif-toolbar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #123366;
+  padding: 10px clamp(12px, 1.6vw, 20px);
+  background: #061a3f;
+}
+
+.rai-ohif-toolbar h1 {
+  margin: 0 0 2px;
+  color: white;
+  font-size: 18px;
+}
+
+.rai-ohif-toolbar p:last-child {
+  margin: 0;
+  color: #93c5fd;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rai-ohif-toolbar nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.rai-ohif-toolbar .button.subtle {
+  border-color: #24446f;
+  color: #e2e8f0;
+  background: #0b2148;
+}
+
+.rai-ohif-layout {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+}
+
+.rai-ohif-panel {
+  min-height: 0;
+  overflow: auto;
+  border-right: 1px solid #123366;
+  padding: 14px;
+  background: #081528;
+}
+
+.rai-ohif-panel h2 {
+  margin: 0 0 10px;
+  color: #f8fafc;
+  font-size: 15px;
+}
+
+.rai-ohif-panel dl {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 22px;
+}
+
+.rai-ohif-panel dt {
+  color: #67e8f9;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.rai-ohif-panel dd {
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+  color: #bfdbfe;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.rai-ohif-panel ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rai-ohif-panel li {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #1d3f6f;
+  border-radius: 8px;
+  padding: 10px;
+  background: #0b2148;
+}
+
+.rai-ohif-panel li strong {
+  overflow: hidden;
+  color: white;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rai-ohif-panel li span,
+.rai-ohif-panel li small {
+  color: #93c5fd;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.rai-ohif-panel li small {
+  overflow-wrap: anywhere;
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.rai-ohif-frame-shell {
+  min-width: 0;
+  min-height: 0;
+  background: #020617;
+}
+
+.rai-ohif-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+}
+
+.rai-ohif-empty {
+  align-self: center;
+  justify-self: center;
+  width: min(520px, calc(100vw - 32px));
+  border: 1px solid #1d3f6f;
+  border-radius: 10px;
+  padding: 28px;
+  background: #0b2148;
+}
+
+.rai-ohif-empty h1 {
+  margin-bottom: 8px;
+  color: white;
+}
+
+.rai-ohif-empty p {
+  color: #bfdbfe;
+}
+
 .rai-viewer-bar {
   grid-row: 1;
   display: flex;
@@ -4094,6 +4263,30 @@ td span {
 
   .rai-viewer-bar nav > .external-share-control {
     flex-basis: 100%;
+  }
+
+  .rai-ohif-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .rai-ohif-toolbar nav {
+    justify-content: stretch;
+  }
+
+  .rai-ohif-toolbar nav > * {
+    flex: 1 1 160px;
+  }
+
+  .rai-ohif-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .rai-ohif-panel {
+    max-height: 240px;
+    border-right: 0;
+    border-bottom: 1px solid #123366;
   }
 
   .ai-launch-control select {
