@@ -11,6 +11,24 @@ RAI PACS currently opens OHIF through signed `dicomjson` manifests:
 This keeps OHIF usable without exposing Supabase Storage directly. The limitation is that
 `viewer.ohif.org` remains an external UI and its study list is session-manifest based.
 
+## Phase 2 read-only foundation
+
+The first DICOMweb read-only layer is now available under `/dicomweb`:
+
+- `GET /dicomweb/studies`
+- `GET /dicomweb/studies/{StudyInstanceUID}/series`
+- `GET /dicomweb/studies/{StudyInstanceUID}/series/{SeriesInstanceUID}/instances`
+- `GET /dicomweb/studies/{StudyInstanceUID}/metadata`
+- `GET /dicomweb/studies/{StudyInstanceUID}/series/{SeriesInstanceUID}/metadata`
+- `GET /dicomweb/studies/{StudyInstanceUID}/series/{SeriesInstanceUID}/instances/{SOPInstanceUID}/metadata`
+- `GET /dicomweb/studies/{StudyInstanceUID}/series/{SeriesInstanceUID}/instances/{SOPInstanceUID}`
+
+Authorization supports the current RAI app session or a Bearer/query launch token. When a
+launch token is used, access is restricted to the studies included in that token.
+
+Frame-level WADO-RS is intentionally not marked complete yet. It needs explicit frame
+extraction and multipart response handling, especially for compressed DICOM transfer syntaxes.
+
 ## Phase 2 target
 
 Move to a RAI-controlled OHIF + DICOMweb deployment:
@@ -25,11 +43,12 @@ Move to a RAI-controlled OHIF + DICOMweb deployment:
 
 ## Implementation order
 
-1. Add DICOMweb read APIs backed by current PostgreSQL metadata and Supabase Storage.
-2. Add OAuth/session handoff from RAI Viewer to self-host OHIF.
-3. Deploy OHIF as a separate Vercel or Cloud Run app under `ohif.raipacs.com`.
-4. Configure OHIF datasource to `dicomweb.raipacs.com`.
-5. Keep current `viewer.ohif.org` links as fallback until self-host OHIF is stable.
+1. Complete DICOMweb read APIs backed by current PostgreSQL metadata and Supabase Storage.
+2. Add frame-level WADO-RS responses for OHIF's native DICOMweb renderer.
+3. Add OAuth/session handoff from RAI Viewer to self-host OHIF.
+4. Deploy OHIF as a separate Vercel or Cloud Run app under `ohif.raipacs.com`.
+5. Configure OHIF datasource to `dicomweb.raipacs.com`.
+6. Keep current `viewer.ohif.org` links as fallback until self-host OHIF is stable.
 
 ## Security baseline
 

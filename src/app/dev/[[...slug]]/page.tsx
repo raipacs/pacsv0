@@ -46,6 +46,30 @@ const apiRows = [
   },
   {
     method: "GET",
+    path: "/dicomweb/studies",
+    scope: "QIDO-RS study arama",
+    auth: "RAI oturumu veya Bearer launch token",
+  },
+  {
+    method: "GET",
+    path: "/dicomweb/studies/:studyUid/series",
+    scope: "QIDO-RS series arama",
+    auth: "RAI oturumu veya Bearer launch token",
+  },
+  {
+    method: "GET",
+    path: "/dicomweb/studies/:studyUid/series/:seriesUid/instances",
+    scope: "QIDO-RS instance arama",
+    auth: "RAI oturumu veya Bearer launch token",
+  },
+  {
+    method: "GET/HEAD",
+    path: "/dicomweb/studies/:studyUid/series/:seriesUid/instances/:sopUid",
+    scope: "WADO-RS raw DICOM instance retrieve",
+    auth: "RAI oturumu veya Bearer launch token",
+  },
+  {
+    method: "GET",
     path: "/viewer-data/ohif-session",
     scope: "OHIF icin hasta bazli coklu tetkik dicomjson manifesti",
     auth: "Signed multi-study launch token",
@@ -141,6 +165,16 @@ const searchItems = [
 ]
 
 const changelog = [
+  {
+    date: "2026-07-02",
+    version: "0.2.0-dev.17",
+    title: "DICOMweb read-only API katmani baslatildi",
+    items: [
+      "RAI metadata ve Supabase Storage uzerinden QIDO-RS study, series ve instance arama endpointleri eklendi.",
+      "WADO-RS metadata ve raw DICOM instance retrieve endpointleri RAI oturumu veya signed launch token ile calisir hale getirildi.",
+      "Frame-level WADO-RS ve self-host OHIF datasource baglantisi bir sonraki faza ayrildi.",
+    ],
+  },
   {
     date: "2026-07-02",
     version: "0.2.0-dev.16",
@@ -450,6 +484,10 @@ export default function DevDocsPage() {
               public viewer.ohif.org bagimliligi kalkar; QIDO-RS, WADO-RS ve
               STOW-RS servisleri RAI domainleri altinda sunulur.
             </p>
+            <pre>{`GET /dicomweb/studies
+GET /dicomweb/studies/{StudyInstanceUID}/series
+GET /dicomweb/studies/{StudyInstanceUID}/series/{SeriesInstanceUID}/instances
+GET /dicomweb/studies/{StudyInstanceUID}/metadata`}</pre>
           </DocBlock>
 
           <DocBlock eyebrow="API" id="api-reference" title="Public ve signed teknik yuzeyler">
