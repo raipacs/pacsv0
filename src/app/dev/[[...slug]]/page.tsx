@@ -70,6 +70,12 @@ const apiRows = [
   },
   {
     method: "GET",
+    path: "/dicomweb/studies/:studyUid/series/:seriesUid/instances/:sopUid/frames/:frameList",
+    scope: "WADO-RS frame retrieve",
+    auth: "RAI oturumu veya Bearer launch token",
+  },
+  {
+    method: "GET",
     path: "/viewer-data/ohif-session",
     scope: "OHIF icin hasta bazli coklu tetkik dicomjson manifesti",
     auth: "Signed multi-study launch token",
@@ -165,6 +171,16 @@ const searchItems = [
 ]
 
 const changelog = [
+  {
+    date: "2026-07-02",
+    version: "0.2.0-dev.18",
+    title: "WADO-RS frame retrieve endpoint'i eklendi",
+    items: [
+      "DICOMweb altinda /frames/{frameList} endpoint'i eklendi.",
+      "Native uncompressed pixel data ve encapsulated compressed frame fragmentleri multipart/related yanit olarak doner.",
+      "Metadata Pixel Data BulkDataURI artik ilk frame endpoint'ine isaret eder.",
+    ],
+  },
   {
     date: "2026-07-02",
     version: "0.2.0-dev.17",
@@ -487,7 +503,8 @@ export default function DevDocsPage() {
             <pre>{`GET /dicomweb/studies
 GET /dicomweb/studies/{StudyInstanceUID}/series
 GET /dicomweb/studies/{StudyInstanceUID}/series/{SeriesInstanceUID}/instances
-GET /dicomweb/studies/{StudyInstanceUID}/metadata`}</pre>
+GET /dicomweb/studies/{StudyInstanceUID}/metadata
+GET /dicomweb/studies/{StudyInstanceUID}/series/{SeriesInstanceUID}/instances/{SOPInstanceUID}/frames/1`}</pre>
           </DocBlock>
 
           <DocBlock eyebrow="API" id="api-reference" title="Public ve signed teknik yuzeyler">

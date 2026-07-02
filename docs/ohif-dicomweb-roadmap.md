@@ -22,12 +22,14 @@ The first DICOMweb read-only layer is now available under `/dicomweb`:
 - `GET /dicomweb/studies/{StudyInstanceUID}/series/{SeriesInstanceUID}/metadata`
 - `GET /dicomweb/studies/{StudyInstanceUID}/series/{SeriesInstanceUID}/instances/{SOPInstanceUID}/metadata`
 - `GET /dicomweb/studies/{StudyInstanceUID}/series/{SeriesInstanceUID}/instances/{SOPInstanceUID}`
+- `GET /dicomweb/studies/{StudyInstanceUID}/series/{SeriesInstanceUID}/instances/{SOPInstanceUID}/frames/{frameList}`
 
 Authorization supports the current RAI app session or a Bearer/query launch token. When a
 launch token is used, access is restricted to the studies included in that token.
 
-Frame-level WADO-RS is intentionally not marked complete yet. It needs explicit frame
-extraction and multipart response handling, especially for compressed DICOM transfer syntaxes.
+Frame-level WADO-RS has an MVP implementation. Native uncompressed pixel data and
+encapsulated compressed frame fragments are returned as `multipart/related` responses.
+The next hardening step is broader transfer-syntax validation against real modality datasets.
 
 ## Phase 2 target
 
@@ -44,7 +46,7 @@ Move to a RAI-controlled OHIF + DICOMweb deployment:
 ## Implementation order
 
 1. Complete DICOMweb read APIs backed by current PostgreSQL metadata and Supabase Storage.
-2. Add frame-level WADO-RS responses for OHIF's native DICOMweb renderer.
+2. Validate frame-level WADO-RS against MR, CT, DX and US modality datasets.
 3. Add OAuth/session handoff from RAI Viewer to self-host OHIF.
 4. Deploy OHIF as a separate Vercel or Cloud Run app under `ohif.raipacs.com`.
 5. Configure OHIF datasource to `dicomweb.raipacs.com`.

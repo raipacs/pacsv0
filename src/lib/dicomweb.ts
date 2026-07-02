@@ -4,6 +4,7 @@ import {
   readOhifInstanceMetadata,
   type OhifInstanceMetadata,
 } from "@/lib/dicom-metadata"
+import { extractDicomFrames, type DicomFrame } from "@/lib/dicom-frame-extractor"
 import { getCurrentUser } from "@/lib/auth"
 import { getOhifLaunchStudyIds, verifyOhifLaunchToken } from "@/lib/ohif-launch"
 import { createServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service"
@@ -291,6 +292,50 @@ export async function handleRetrieveInstance(
     headers,
     status: upstream.status,
   })
+}
+
+export async function handleRetrieveFrames(
+  request: Request,
+  params: {
+    frameList: string
+    seriesInstanceUid: string
+    sopInstanceUid: string
+    studyInstanceUid: string
+  }
+) {
+  const context = await createDicomwebContext(request)
+  if (context.error) return context.error
+
+  const { access, supabase } = context
+  const resolved = await loadResolvedInstance(supabase, access, params)
+  if (!resolved) return dicomwebError("DICOM instance not found.", 404, request)
+
+  const { instance } = resolved
+  const { data: signedUrl, error } = await supabase.storage
+    .from(instance.storage_bucket)
+    .createSignedUrl(instance.storage_key, 10 * 60, { download: true })
+
+  if (error) return dicomwebError(error.message, 500, request)
+
+  const upstream = await fetch(signedUrl.signedUrl)
+  if (!upstream.ok) {
+    return dicomwebError(`DICOM retrieve failed: ${upstream.status}`, upstream.status, request)
+  }
+
+  try {
+    const frames = extractDicomFrames(
+      await upstream.arrayBuffer(),
+      parseFrameList(params.frameList)
+    )
+
+    return multipartFramesResponse(frames, request)
+  } catch (error) {
+    return dicomwebError(
+      error instanceof Error ? error.message : "DICOM frame retrieve failed.",
+      422,
+      request
+    )
+  }
 }
 
 async function handleMetadata(
@@ -722,6 +767,14 @@ function mapInstanceMetadata({
     series,
     study,
   })
+  const firstFrameUrl = createDicomwebFrameUrl({
+    accessToken,
+    frameList: "1",
+    instance,
+    origin,
+    series,
+    study,
+  })
 
   return compactDicomJson({
     "00080005": attr("CS", "ISO_IR 192"),
@@ -761,7 +814,7 @@ function mapInstanceMetadata({
     "00281051": attr("DS", header.WindowWidth),
     "00281052": attr("DS", header.RescaleIntercept),
     "00281053": attr("DS", header.RescaleSlope),
-    "7FE00010": bulkDataAttr(retrieveUrl),
+    "7FE00010": bulkDataAttr(firstFrameUrl),
   })
 }
 
@@ -790,10 +843,71 @@ function createDicomwebInstanceUrl({
   return url.toString()
 }
 
+function createDicomwebFrameUrl({
+  accessToken,
+  frameList,
+  instance,
+  origin,
+  series,
+  study,
+}: {
+  accessToken: string | null
+  frameList: string
+  instance: InstanceRow
+  origin: string
+  series: SeriesRow
+  study: StudyRow
+}) {
+  const url = new URL(
+    `/dicomweb/studies/${encodeURIComponent(
+      study.study_instance_uid
+    )}/series/${encodeURIComponent(series.series_instance_uid)}/instances/${encodeURIComponent(
+      instance.sop_instance_uid
+    )}/frames/${encodeURIComponent(frameList)}`,
+    origin
+  )
+  if (accessToken) url.searchParams.set("token", accessToken)
+  return url.toString()
+}
+
 function dicomwebJson(data: unknown, request: Request) {
   const headers = new Headers(dicomwebCorsHeaders(request))
   headers.set("Content-Type", "application/dicom+json; charset=utf-8")
   return new NextResponse(JSON.stringify(data), { headers })
+}
+
+function multipartFramesResponse(frames: DicomFrame[], request: Request) {
+  const boundary = `rai-${crypto.randomUUID()}`
+  const parts: Uint8Array[] = []
+  const encoder = new TextEncoder()
+
+  for (const frame of frames) {
+    parts.push(
+      encoder.encode(
+        [
+          `--${boundary}`,
+          `Content-Type: ${frame.contentType}; transfer-syntax=${frame.transferSyntaxUid}`,
+          `Content-Location: frame/${frame.frameNumber}`,
+          "",
+          "",
+        ].join("\r\n")
+      )
+    )
+    parts.push(frame.data)
+    parts.push(encoder.encode("\r\n"))
+  }
+
+  parts.push(encoder.encode(`--${boundary}--\r\n`))
+
+  const body = concatenateBytes(parts)
+  const headers = new Headers(dicomwebCorsHeaders(request))
+  headers.set(
+    "Content-Type",
+    `multipart/related; type="${frames[0]?.contentType ?? "application/octet-stream"}"; boundary=${boundary}`
+  )
+  headers.set("Content-Length", String(body.byteLength))
+
+  return new NextResponse(body, { headers })
 }
 
 function dicomwebError(message: string, status: number, request: Request) {
@@ -827,6 +941,14 @@ function parseLimit(searchParams: URLSearchParams) {
   const parsed = Number.parseInt(raw, 10)
   if (!Number.isFinite(parsed)) return 100
   return Math.max(1, Math.min(parsed, 200))
+}
+
+function parseFrameList(value: string) {
+  return decodeURIComponent(value)
+    .split(",")
+    .map((item) => Number.parseInt(item, 10))
+    .filter((item) => Number.isInteger(item) && item > 0)
+    .slice(0, 100)
 }
 
 function readQueryValue(searchParams: URLSearchParams, ...keys: string[]) {
@@ -913,6 +1035,19 @@ function copyRangeHeader(request: Request) {
 function copyHeader(source: Headers, target: Headers, name: string) {
   const value = source.get(name)
   if (value) target.set(name, value)
+}
+
+function concatenateBytes(parts: Uint8Array[]) {
+  const totalLength = parts.reduce((sum, part) => sum + part.byteLength, 0)
+  const output = new Uint8Array(totalLength)
+  let offset = 0
+
+  for (const part of parts) {
+    output.set(part, offset)
+    offset += part.byteLength
+  }
+
+  return output
 }
 
 function countBy<T>(items: T[], keyForItem: (item: T) => string) {
