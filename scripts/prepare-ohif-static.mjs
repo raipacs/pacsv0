@@ -59,6 +59,10 @@ function patchAppConfig(filePath) {
   let config = readFileSync(filePath, "utf8")
   config = config.replace("routerBasename: null,", "routerBasename: '/ohif-viewer',")
   config = config.replace("showWarningMessageForCrossOrigin: true,", "showWarningMessageForCrossOrigin: false,")
+  config = config.replace(
+    "  customizationService: {},",
+    "  customizationService: {},\n  investigationalUseDialog: { option: 'never' },"
+  )
 
   // The upstream config keeps dynamic config commented out. RAI enables it so
   // /ohif/config can later become the primary datasource contract for self-host OHIF.
