@@ -592,7 +592,10 @@ export async function startAiPreReport(formData: FormData) {
         imagePreviewErrors: visualContext.imagePreviewErrors,
         imagePreviews: visualContext.imagePreviews,
         inputContext,
-        model: provider.default_model || openAiCompatibleConfig.defaultModel,
+        model: normalizeOpenAiCompatibleModel(
+          provider.slug,
+          provider.default_model || openAiCompatibleConfig.defaultModel
+        ),
         patientName: patient ? `${patient.first_name} ${patient.last_name}` : "",
         supportsImages: openAiCompatibleConfig.supportsImages,
       })
@@ -1373,9 +1376,15 @@ function defaultOpenAiCompatibleBaseUrl(slug: string) {
 }
 
 function defaultOpenAiCompatibleModel(slug: string) {
-  if (slug === "qwen") return "qwen-vl-max-latest"
+  if (slug === "qwen") return "qwen-vl-max"
   if (slug === "deepseek") return "deepseek-v4-flash"
   return "model"
+}
+
+function normalizeOpenAiCompatibleModel(slug: string, model: string) {
+  if (slug === "qwen" && model === "qwen-vl-max-latest") return "qwen-vl-max"
+  if (slug === "qwen" && model === "qwen-vl-plus-latest") return "qwen-vl-plus"
+  return model
 }
 
 function openAiCompatibleSupportsImages(slug: string) {

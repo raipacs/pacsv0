@@ -1132,7 +1132,7 @@ function buildQwenStatus(provider: AiProviderRow | null) {
     process.env.QWEN_BASE_URL?.trim() ||
     "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions"
   const apiKeyReady = Boolean(process.env.QWEN_API_KEY?.trim())
-  const model = provider?.default_model || process.env.QWEN_MODEL || "qwen-vl-max-latest"
+  const model = provider?.default_model || process.env.QWEN_MODEL || "qwen-vl-max"
   const providerActive = provider?.is_active === true
   const ready = Boolean(provider && providerActive && apiKeyReady)
   const providerState = provider
@@ -1334,14 +1334,14 @@ async function ensureQwenProvider(
     organization_id: organizationId,
     created_by: userId,
     credential_reference: "QWEN_API_KEY",
-    default_model: "qwen-vl-max-latest",
+    default_model: "qwen-vl-max",
     is_active: false,
     is_default: false,
     name: "Qwen Vision",
     provider_type: "custom",
     requires_credentials: true,
     settings: {
-      availableModels: ["qwen-vl-max-latest", "qwen-vl-plus-latest"],
+      availableModels: ["qwen-vl-max", "qwen-vl-plus"],
       baseUrlEnv: "QWEN_BASE_URL",
       defaultBaseUrl: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
       deployment: "alibaba-model-studio-openai-compatible",

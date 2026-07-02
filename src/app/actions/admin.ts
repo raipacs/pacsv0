@@ -340,7 +340,7 @@ export async function testQwenEndpoint() {
   const endpoint =
     process.env.QWEN_BASE_URL?.trim() ||
     "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions"
-  const model = process.env.QWEN_MODEL?.trim() || "qwen-vl-max-latest"
+  const model = process.env.QWEN_MODEL?.trim() || "qwen-vl-max"
   const startedAt = Date.now()
   let status = "failed"
   let message = "QWEN_API_KEY tanımlı değil."

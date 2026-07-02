@@ -40,6 +40,34 @@ DICOM klasor import operasyon notu:
 docs/dicom-folder-import-runbook.md
 ```
 
+## AI provider saglik job'u
+
+Vercel Cron her gun Turkiye saatiyle 09:00'da AI provider durumlarini test eder.
+Cron schedule UTC olarak tanimlidir:
+
+```json
+{
+  "path": "/api/jobs/ai-provider-health",
+  "schedule": "0 6 * * *"
+}
+```
+
+E-posta gonderimi icin Vercel Production env degiskenleri:
+
+```text
+CRON_SECRET=
+RESEND_API_KEY=
+AI_PROVIDER_HEALTH_EMAIL_TO=support@raipacs.com
+AI_PROVIDER_HEALTH_EMAIL_FROM=RAI PACS <support@raipacs.com>
+```
+
+Manuel test:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" \
+  https://app.raipacs.com/api/jobs/ai-provider-health
+```
+
 ## Mevcut statik prototip
 
 GitHub Pages yayini kesilmemesi icin `index.html`, `app.js` ve `styles.css`

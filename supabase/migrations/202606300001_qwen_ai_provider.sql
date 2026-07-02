@@ -15,7 +15,7 @@ select
   'Qwen Vision',
   'qwen',
   'custom',
-  'qwen-vl-max-latest',
+  'qwen-vl-max',
   false,
   false,
   true,
@@ -28,7 +28,7 @@ select
     "baseUrlEnv": "QWEN_BASE_URL",
     "modelEnv": "QWEN_MODEL",
     "modalities": ["DX", "CT", "MR", "US", "SR"],
-    "availableModels": ["qwen-vl-max-latest", "qwen-vl-plus-latest"],
+    "availableModels": ["qwen-vl-max", "qwen-vl-plus"],
     "notes": "QWEN_API_KEY tanimlaninca manuel AI butonu veya RAI AI Orchestrator ile calistirilir."
   }'::jsonb
 from public.organizations
